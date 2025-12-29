@@ -14,6 +14,8 @@ enum class MessageType : uint32_t {
   Correction = 5
 };
 
+#pragma pack(push, 1)
+
 struct Header {
   MessageType type;
   uint32_t length;
@@ -36,5 +38,7 @@ struct TranscriptionResultHeader {
   double endTime;
   // Followed by text payload
 };
+
+#pragma pack(pop)
 } // namespace protocol
 } // namespace punch2pen
