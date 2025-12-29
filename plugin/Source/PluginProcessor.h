@@ -1,8 +1,11 @@
 #pragma once
 
 #include "IPCClient.h"
-#include "RingBuffer.h"
 #include <JuceHeader.h>
+
+namespace punch2pen {
+class AudioRingBuffer;
+}
 
 class Punch2PenAudioProcessor : public juce::AudioProcessor {
 public:
@@ -30,9 +33,10 @@ public:
 
   int getNumPrograms() override;
   int getCurrentProgram() override;
-  void setCurrentProgram(int index) override;
-  const juce::String getProgramName(int index) override;
-  void changeProgramName(int index, const juce::String &newName) override;
+  void setCurrentProgram(int programIndex) override;
+  const juce::String getProgramName(int programIndex) override;
+  void changeProgramName(int programIndex,
+                         const juce::String &newName) override;
 
   void getStateInformation(juce::MemoryBlock &destData) override;
   void setStateInformation(const void *data, int sizeInBytes) override;

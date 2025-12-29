@@ -33,8 +33,8 @@ void IPCClient::run() {
           if (socket.read(&resultHeader, sizeof(resultHeader), false) ==
               sizeof(resultHeader)) {
             juce::MemoryBlock textData(resultHeader.textLength + 1);
-            if (socket.read(textData.getData(), resultHeader.textLength,
-                            false) == resultHeader.textLength) {
+            if (socket.read(textData.getData(), (int)resultHeader.textLength,
+                            false) == (int)resultHeader.textLength) {
               ((char *)textData.getData())[resultHeader.textLength] = 0;
               std::string text((char *)textData.getData());
 
@@ -46,7 +46,7 @@ void IPCClient::run() {
         } else {
           if (header.length > 0) {
             juce::MemoryBlock skip(header.length);
-            socket.read(skip.getData(), header.length, false);
+            socket.read(skip.getData(), (int)header.length, false);
           }
         }
       } else if (bytesRead < 0) {
@@ -69,7 +69,7 @@ void IPCClient::processOutgoingAudio() {
   if (available > 0) {
     int chunkSize = juce::jmin(available, 4096);
     if (tempBuffer.size() < (size_t)chunkSize)
-      tempBuffer.resize(chunkSize);
+      tempBuffer.resize((size_t)chunkSize);
 
     ringBuffer->read(tempBuffer.data(), chunkSize);
     // Using standard 48k for now, realistically should get from processor
@@ -86,6 +86,34 @@ void IPCClient::attemptConnection() {
     for (auto *l : listeners) {
       l->onStatusChanged(true);
     }
+  } else {
+    launchEngine();
+  }
+}
+
+void IPCClient::launchEngine() {
+  // Try default install location
+  juce::File engineApp("/Applications/Punch2Pen/punch2penEngine");
+
+  if (!engineApp.existsAsFile()) {
+    // For development, try finding it relative to home
+    // This is a bit of a hack for testing on dev machine
+    juce::File home =
+        juce::File::getSpecialLocation(juce::File::userHomeDirectory);
+    engineApp = home.getChildFile(
+        "punch2pen/bin/punch2penEngine"); // Assuming symlink or copy
+
+    // Or check build dir if known... too varying.
+    if (!engineApp.existsAsFile()) {
+      engineApp = home.getChildFile("punch2pen/build/bin/punch2penEngine");
+    }
+  }
+
+  if (engineApp.existsAsFile()) {
+    // Launch in background
+    juce::String command =
+        "nohup \"" + engineApp.getFullPathName() + "\" > /dev/null 2>&1 &";
+    system(command.toRawUTF8());
   }
 }
 
@@ -104,7 +132,7 @@ void IPCClient::sendAudioChunk(const float *samples, int numSamples,
   chunkHeader.numSamples = (uint32_t)numSamples;
 
   size_t payloadSize =
-      sizeof(protocol::AudioChunkHeader) + (numSamples * sizeof(float));
+      sizeof(protocol::AudioChunkHeader) + ((size_t)numSamples * sizeof(float));
   header.length = (uint32_t)payloadSize;
 
   if (socket.write(&header, sizeof(header)) != sizeof(header)) {
@@ -115,8 +143,8 @@ void IPCClient::sendAudioChunk(const float *samples, int numSamples,
     connected = false;
     return;
   }
-  if (socket.write(samples, numSamples * sizeof(float)) !=
-      (numSamples * sizeof(float))) {
+  if (socket.write(samples, (int)((size_t)numSamples * sizeof(float))) !=
+      (int)((size_t)numSamples * sizeof(float))) {
     connected = false;
     return;
   }

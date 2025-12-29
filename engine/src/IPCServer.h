@@ -34,6 +34,14 @@ public:
   bool hasPendingAudio();
   AudioPacket popAudio();
 
+  struct Correction {
+    std::string original;
+    std::string corrected;
+  };
+
+  bool hasPendingCorrection();
+  Correction popCorrection();
+
   void sendResult(const std::string &text);
 
 private:
@@ -49,5 +57,8 @@ private:
 
   std::mutex audioQueueLock;
   std::vector<AudioPacket> audioQueue;
+
+  std::mutex correctionQueueLock;
+  std::vector<Correction> correctionQueue;
 };
 } // namespace punch2pen

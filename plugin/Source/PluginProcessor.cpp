@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "RingBuffer.h"
 
 Punch2PenAudioProcessor::Punch2PenAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -56,23 +57,20 @@ int Punch2PenAudioProcessor::getNumPrograms() {
 
 int Punch2PenAudioProcessor::getCurrentProgram() { return 0; }
 
-void Punch2PenAudioProcessor::setCurrentProgram(int index) {
-  juce::ignoreUnused(index);
-}
+// ... (previous code)
 
-const juce::String Punch2PenAudioProcessor::getProgramName(int index) {
-  juce::ignoreUnused(index);
+void Punch2PenAudioProcessor::setCurrentProgram(int /*programIndex*/) {}
+
+const juce::String
+Punch2PenAudioProcessor::getProgramName(int /*programIndex*/) {
   return {};
 }
 
-void Punch2PenAudioProcessor::changeProgramName(int index,
-                                                const juce::String &newName) {
-  juce::ignoreUnused(index, newName);
-}
+void Punch2PenAudioProcessor::changeProgramName(
+    int /*programIndex*/, const juce::String & /*newName*/) {}
 
-void Punch2PenAudioProcessor::prepareToPlay(double sampleRate,
-                                            int samplesPerBlock) {
-  juce::ignoreUnused(sampleRate, samplesPerBlock);
+void Punch2PenAudioProcessor::prepareToPlay(double /*sampleRate*/,
+                                            int /*samplesPerBlock*/) {
   // Use this method as the place to do any pre-playback
   // initialisation that you need..
 }

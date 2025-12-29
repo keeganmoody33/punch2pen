@@ -29,6 +29,7 @@ public:
 
 private:
   void attemptConnection();
+  void launchEngine();
   void handleMessage();
   void processOutgoingAudio();
 

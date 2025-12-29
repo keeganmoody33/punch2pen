@@ -39,6 +39,13 @@ struct TranscriptionResultHeader {
   // Followed by text payload
 };
 
+struct CorrectionHeader {
+  uint32_t originalLength;
+  uint32_t correctedLength;
+  // Followed by original string payload
+  // Followed by corrected string payload
+};
+
 #pragma pack(pop)
 } // namespace protocol
 } // namespace punch2pen

@@ -49,7 +49,7 @@ void Punch2PenAudioProcessorEditor::paint(juce::Graphics &g) {
 
 void Punch2PenAudioProcessorEditor::resized() {
   auto area = getLocalBounds();
-  auto header = area.removeFromTop(40);
+  area.removeFromTop(40);
 
   // Position Display
   auto displayArea = area.removeFromTop(30);

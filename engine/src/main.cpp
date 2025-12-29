@@ -8,13 +8,15 @@
 #include <iostream>
 #include <thread>
 
+using std::filesystem::create_directories;
+
 int main(int argc, char *argv[]) {
   std::cout << "punch2pen Engine v1.0.0" << std::endl;
 
   // Setup data directory
   std::string homeDir = getenv("HOME");
   std::string dataDir = homeDir + "/.punch2pen";
-  std::filesystem::create_directories(dataDir); // C++17
+  create_directories(dataDir); // C++17
 
   punch2pen::DatabaseManager db;
   db.initialize(dataDir + "/corrections.csv");
@@ -49,8 +51,15 @@ int main(int argc, char *argv[]) {
       server.sendResult(result);
     }
 
-    // 3. TODO: Check for incoming Correction messages from IPCServer (needs
-    // protocol update)
+    // 3. Check for incoming Correction messages
+    while (server.hasPendingCorrection()) {
+      auto correction = server.popCorrection();
+      db.addCorrection(correction.original, correction.corrected);
+      dictionary.refresh();
+      std::string newPrompt = dictionary.getInitialPrompt();
+      transcriber.setInitialPrompt(newPrompt);
+      std::cout << "Applied correction. New Prompt: " << newPrompt << std::endl;
+    }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }

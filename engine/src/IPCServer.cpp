@@ -24,6 +24,9 @@ void IPCServer::start() {
   addr.sin_addr.s_addr = INADDR_ANY;
   addr.sin_port = htons(port);
 
+  int opt = 1;
+  setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
   if (bind(serverSocket, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
     std::cerr << "Failed to bind socket on port " << port << std::endl;
     return;
@@ -60,6 +63,21 @@ IPCServer::AudioPacket IPCServer::popAudio() {
   AudioPacket packet = std::move(audioQueue.front());
   audioQueue.erase(audioQueue.begin());
   return packet;
+}
+
+bool IPCServer::hasPendingCorrection() {
+  std::lock_guard<std::mutex> lock(correctionQueueLock);
+  return !correctionQueue.empty();
+}
+
+IPCServer::Correction IPCServer::popCorrection() {
+  std::lock_guard<std::mutex> lock(correctionQueueLock);
+  if (correctionQueue.empty())
+    return {};
+
+  Correction c = correctionQueue.front();
+  correctionQueue.erase(correctionQueue.begin());
+  return c;
 }
 
 void IPCServer::acceptLoop() {
@@ -106,6 +124,24 @@ void IPCServer::clientHandler(int clientSocket) {
             (ssize_t)payloadSize) {
           std::lock_guard<std::mutex> lock(audioQueueLock);
           audioQueue.push_back({std::move(samples), chunkHeader.sampleRate});
+        }
+      }
+    } else if (header.type == protocol::MessageType::Correction) {
+      protocol::CorrectionHeader corrHeader;
+      if (recv(clientSocket, &corrHeader, sizeof(corrHeader), MSG_WAITALL) ==
+          sizeof(corrHeader)) {
+
+        std::string original(corrHeader.originalLength, '\0');
+        if (recv(clientSocket, original.data(), corrHeader.originalLength,
+                 MSG_WAITALL) == (ssize_t)corrHeader.originalLength) {
+          std::string corrected(corrHeader.correctedLength, '\0');
+          if (recv(clientSocket, corrected.data(), corrHeader.correctedLength,
+                   MSG_WAITALL) == (ssize_t)corrHeader.correctedLength) {
+            std::lock_guard<std::mutex> lock(correctionQueueLock);
+            correctionQueue.push_back({original, corrected});
+            std::cout << "Received Correction: '" << original << "' -> '"
+                      << corrected << "'" << std::endl;
+          }
         }
       }
     } else {
