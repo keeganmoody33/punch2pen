@@ -1,13 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-# Fetch JUCE
-include(FetchContent)
-FetchContent_Declare(
-    JUCE
-    GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
-    GIT_TAG        develop 
-)
-FetchContent_MakeAvailable(JUCE)
+
 
 juce_add_plugin(punch2pen_plugin
     COMPANY_NAME "Doctaaa"
