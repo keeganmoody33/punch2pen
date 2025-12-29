@@ -28,6 +28,7 @@ REQUIRED_FILES=(
     "plugin/Source/TranscriptView.cpp"
     "engine/src/main.cpp"
     "shared/Protocol.h"
+    "installer/macos/build_pkg.sh"
 )
 for file in "${REQUIRED_FILES[@]}"; do
     if [ -f "$file" ]; then

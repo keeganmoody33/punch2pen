@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="1">
+    <pkg-ref id="com.doctaaa.punch2pen.au"/>
+    <pkg-ref id="com.doctaaa.punch2pen.vst3"/>
+    <pkg-ref id="com.doctaaa.punch2pen.engine"/>
+    <options customize="never" require-scripts="false" hostArchitectures="x86_64,arm64"/>
+    <choices-outline>
+        <line choice="default">
+            <line choice="com.doctaaa.punch2pen.au"/>
+            <line choice="com.doctaaa.punch2pen.vst3"/>
+            <line choice="com.doctaaa.punch2pen.engine"/>
+        </line>
+    </choices-outline>
+    <choice id="default"/>
+    <choice id="com.doctaaa.punch2pen.au" visible="false">
+        <pkg-ref id="com.doctaaa.punch2pen.au"/>
+    </choice>
+    <pkg-ref id="com.doctaaa.punch2pen.au" version="1.0.0" onConclusion="none">punch2pen_au.pkg</pkg-ref>
+    <choice id="com.doctaaa.punch2pen.vst3" visible="false">
+        <pkg-ref id="com.doctaaa.punch2pen.vst3"/>
+    </choice>
+    <pkg-ref id="com.doctaaa.punch2pen.vst3" version="1.0.0" onConclusion="none">punch2pen_vst3.pkg</pkg-ref>
+    <choice id="com.doctaaa.punch2pen.engine" visible="false">
+        <pkg-ref id="com.doctaaa.punch2pen.engine"/>
+    </choice>
+    <pkg-ref id="com.doctaaa.punch2pen.engine" version="1.0.0" onConclusion="none">punch2pen_engine.pkg</pkg-ref>
+</installer-gui-script>

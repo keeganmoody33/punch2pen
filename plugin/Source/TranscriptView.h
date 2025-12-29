@@ -21,7 +21,7 @@ private:
   juce::TextEditor textEditor;
   bool isConnected = false;
 
-  JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TranscriptView);
+  JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TranscriptView)
 };
 
 } // namespace punch2pen

@@ -25,7 +25,12 @@ int main(int argc, char *argv[]) {
   server.start();
 
   punch2pen::Transcriber transcriber;
-  transcriber.initialize("dummy_model_path");
+  std::string modelPath = dataDir + "/models/ggml-base.bin";
+  if (!transcriber.initialize(modelPath)) {
+    std::cerr << "CRITICAL: Failed to load model at " << modelPath << std::endl;
+    // We don't exit here so the process stays alive for IPC, but transcription
+    // wont work
+  }
   transcriber.setInitialPrompt(dictionary.getInitialPrompt());
 
   std::cout << "Engine ready." << std::endl;

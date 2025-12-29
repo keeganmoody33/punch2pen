@@ -5,7 +5,7 @@ include(FetchContent)
 FetchContent_Declare(
     JUCE
     GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
-    GIT_TAG        8.0.0 
+    GIT_TAG        develop 
 )
 FetchContent_MakeAvailable(JUCE)
 
@@ -16,6 +16,8 @@ juce_add_plugin(punch2pen_plugin
     FORMATS VST3 AU
     PRODUCT_NAME "punch2pen"
 )
+
+juce_generate_juce_header(punch2pen_plugin)
 
 target_sources(punch2pen_plugin
     PRIVATE
@@ -32,9 +34,14 @@ target_sources(punch2pen_plugin
         Source/RingBuffer.h
 )
 
+target_include_directories(punch2pen_plugin PRIVATE
+    "${CMAKE_CURRENT_BINARY_DIR}/punch2pen_plugin_artefacts/JuceLibraryCode"
+)
+
 target_compile_definitions(punch2pen_plugin PUBLIC
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
+    JUCE_VST3_CAN_REPLACE_VST2=0
 )
 
 target_link_libraries(punch2pen_plugin

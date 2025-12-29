@@ -1,5 +1,7 @@
 #pragma once
 
+#include "IPCClient.h"
+#include "RingBuffer.h"
 #include <JuceHeader.h>
 
 class Punch2PenAudioProcessor : public juce::AudioProcessor {
@@ -52,9 +54,6 @@ public:
   punch2pen::IPCClient *getIPCClient() const { return ipcClient.get(); }
 
 private:
-#include "IPCClient.h"
-#include "RingBuffer.h"
-
   std::unique_ptr<punch2pen::AudioRingBuffer> audioRingBuffer;
   std::unique_ptr<punch2pen::IPCClient> ipcClient;
 

@@ -4,8 +4,7 @@
 #include <string>
 #include <vector>
 
-// Placeholders for whisper.cpp includes
-// #include "whisper.h"
+#include "whisper.h"
 
 namespace punch2pen {
 
@@ -28,7 +27,8 @@ public:
 private:
   std::string currentPrompt;
   std::vector<float> audioBuffer;
-  // whisper_context* ctx = nullptr;
+  struct whisper_context *ctx = nullptr;
+  struct whisper_full_params params;
 };
 
 } // namespace punch2pen

@@ -56,17 +56,23 @@ int Punch2PenAudioProcessor::getNumPrograms() {
 
 int Punch2PenAudioProcessor::getCurrentProgram() { return 0; }
 
-void Punch2PenAudioProcessor::setCurrentProgram(int index) {}
+void Punch2PenAudioProcessor::setCurrentProgram(int index) {
+  juce::ignoreUnused(index);
+}
 
 const juce::String Punch2PenAudioProcessor::getProgramName(int index) {
+  juce::ignoreUnused(index);
   return {};
 }
 
 void Punch2PenAudioProcessor::changeProgramName(int index,
-                                                const juce::String &newName) {}
+                                                const juce::String &newName) {
+  juce::ignoreUnused(index, newName);
+}
 
 void Punch2PenAudioProcessor::prepareToPlay(double sampleRate,
                                             int samplesPerBlock) {
+  juce::ignoreUnused(sampleRate, samplesPerBlock);
   // Use this method as the place to do any pre-playback
   // initialisation that you need..
 }
@@ -104,6 +110,7 @@ bool Punch2PenAudioProcessor::isBusesLayoutSupported(
 
 void Punch2PenAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
                                            juce::MidiBuffer &midiMessages) {
+  juce::ignoreUnused(midiMessages);
   juce::ScopedNoDenormals noDenormals;
   auto totalNumInputChannels = getTotalNumInputChannels();
   auto totalNumOutputChannels = getTotalNumOutputChannels();
@@ -117,7 +124,7 @@ void Punch2PenAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
       if (auto bpm = pos->getBpm())
         currentBpm = *bpm;
 
-      lastTransportPosition.bpm = *currentBpm;
+      lastTransportPosition.bpm = currentBpm;
 
       if (auto ppq = pos->getPpqPosition())
         lastTransportPosition.ppq = *ppq;
@@ -151,6 +158,7 @@ juce::AudioProcessorEditor *Punch2PenAudioProcessor::createEditor() {
 }
 
 void Punch2PenAudioProcessor::getStateInformation(juce::MemoryBlock &destData) {
+  juce::ignoreUnused(destData);
   // You should use this method to store your parameters in the memory block.
   // You could do that either as raw data, or use the XML or ValueTree classes
   // as intermediaries
@@ -158,6 +166,7 @@ void Punch2PenAudioProcessor::getStateInformation(juce::MemoryBlock &destData) {
 
 void Punch2PenAudioProcessor::setStateInformation(const void *data,
                                                   int sizeInBytes) {
+  juce::ignoreUnused(data, sizeInBytes);
   // You should use this method to restore your parameters from this memory
   // block, whose contents will have been created by the getStateInformation()
   // call.

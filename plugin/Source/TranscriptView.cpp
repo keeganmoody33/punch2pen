@@ -8,7 +8,7 @@ TranscriptView::TranscriptView() {
   textEditor.setReadOnly(true);
   textEditor.setScrollbarsShown(true);
   textEditor.setCaretVisible(false);
-  textEditor.setFont(juce::Font(16.0f));
+  textEditor.setFont(juce::FontOptions(16.0f));
   textEditor.setText("Waiting for transcription service...");
 
   // Style
@@ -38,7 +38,7 @@ void TranscriptView::onTranscriptionReceived(const std::string &text) {
   // Update on message thread
   juce::MessageManager::callAsync([this, text]() {
     textEditor.setText(text);
-    textEditor.scrollEditorToBottom(); // Auto-scroll
+    textEditor.moveCaretToEnd(); // Auto-scroll
   });
 }
 
