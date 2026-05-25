@@ -1,6 +1,8 @@
 #include "IPCClient.h"
 #include "RingBuffer.h"
 
+#include <algorithm>
+
 namespace punch2pen {
 
 IPCClient::IPCClient() : Thread("Punch2Pen_IPC") { startThread(); }
@@ -178,7 +180,10 @@ IPCClient::TranscriptionMode IPCClient::getTranscriptionMode() const {
 
 void IPCClient::addListener(Listener *listener) {
   juce::ScopedLock lock(listenerLock);
-  listeners.push_back(listener);
+  if (std::find(listeners.begin(), listeners.end(), listener) ==
+      listeners.end()) {
+    listeners.push_back(listener);
+  }
 }
 
 void IPCClient::removeListener(Listener *listener) {

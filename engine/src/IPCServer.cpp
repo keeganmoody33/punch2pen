@@ -55,12 +55,12 @@ bool IPCServer::hasPendingAudio() {
   return !audioQueue.empty();
 }
 
-IPCServer::AudioPacket IPCServer::popAudio() {
+std::vector<float> IPCServer::popAudio() {
   std::lock_guard<std::mutex> lock(audioQueueLock);
   if (audioQueue.empty())
     return {};
 
-  AudioPacket packet = std::move(audioQueue.front());
+  auto packet = std::move(audioQueue.front());
   audioQueue.erase(audioQueue.begin());
   return packet;
 }
@@ -127,7 +127,7 @@ void IPCServer::clientHandler(int clientSocket) {
         if (recv(clientSocket, samples.data(), payloadSize, MSG_WAITALL) ==
             (ssize_t)payloadSize) {
           std::lock_guard<std::mutex> lock(audioQueueLock);
-          audioQueue.push_back({std::move(samples), chunkHeader.sampleRate});
+          audioQueue.push_back(std::move(samples));
         }
       }
     } else if (header.type == protocol::MessageType::Correction) {

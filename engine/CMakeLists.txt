@@ -7,7 +7,6 @@ add_executable(punch2penEngine
     src/TranscriptionCoordinator.cpp
     src/Transcriber.cpp
     src/DatabaseManager.cpp
-    src/DictionaryProcessor.cpp
 )
 
 target_include_directories(punch2penEngine

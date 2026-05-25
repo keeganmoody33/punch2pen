@@ -1,5 +1,8 @@
 #include "Transcriber.h"
 
+#include <algorithm>
+#include <iostream>
+
 namespace punch2pen {
 
 Transcriber::Transcriber(const std::string &modelPath) {
@@ -24,18 +27,23 @@ Transcriber::Transcriber(const std::string &modelPath) {
 }
 
 Transcriber::~Transcriber() {
-  if (ctx)
+  if (ctx) {
     whisper_free(ctx);
+  }
 }
 
 void Transcriber::addListener(Listener *newListener) {
-  listener = newListener;
+  std::lock_guard<std::mutex> lock(listenerMutex);
+  if (std::find(listeners.begin(), listeners.end(), newListener) ==
+      listeners.end()) {
+    listeners.push_back(newListener);
+  }
 }
 
 void Transcriber::removeListener(Listener *listenerToRemove) {
-  if (listener == listenerToRemove) {
-    listener = nullptr;
-  }
+  std::lock_guard<std::mutex> lock(listenerMutex);
+  listeners.erase(std::remove(listeners.begin(), listeners.end(), listenerToRemove),
+                  listeners.end());
 }
 
 void Transcriber::setVocabularyBias(const std::vector<std::string> &words) {
@@ -47,14 +55,10 @@ void Transcriber::setVocabularyBias(const std::vector<std::string> &words) {
     prompt += word;
   }
 
-  if (!prompt.empty()) {
-    setInitialPrompt(prompt);
-  }
+  setInitialPrompt(prompt);
 }
 
-void Transcriber::finalizeStream() {
-  processAvailableAudio();
-}
+void Transcriber::finalizeStream() { processAvailableAudio(true); }
 
 void Transcriber::setInputSampleRate(double sampleRate) {
   inputSampleRate = sampleRate;
@@ -67,15 +71,7 @@ void Transcriber::pushAudioBlock(const float *samples, int sampleCount,
     return;
   }
 
-  // Simple resampling if needed (assuming 16kHz for now as required by whisper)
-  // In a real app, we should do high-quality resampling here.
-  // For now, allow mismatched sample rates but warn or just append.
-  // Ideally, the plugin sends 48k and we downsample.
-  // We will assume, for this MVP, that we just take the data.
-  // Note: Whisper expects 16kHz. If plugin sends 48k, we need to decimate by 3.
-
   if (inputSampleRate == 48000.0) {
-    // Basic decimation 3:1
     audioBuffer.reserve(audioBuffer.size() + static_cast<size_t>(sampleCount) / 3);
     for (int i = 0; i < sampleCount; i += 3) {
       audioBuffer.push_back(samples[i]);
@@ -83,7 +79,6 @@ void Transcriber::pushAudioBlock(const float *samples, int sampleCount,
   } else if (inputSampleRate == 16000.0) {
     audioBuffer.insert(audioBuffer.end(), samples, samples + sampleCount);
   } else {
-    // Fallback: Just append (expect poor results)
     audioBuffer.insert(audioBuffer.end(), samples, samples + sampleCount);
   }
 
@@ -92,20 +87,21 @@ void Transcriber::pushAudioBlock(const float *samples, int sampleCount,
 
 void Transcriber::setInitialPrompt(const std::string &prompt) {
   currentPrompt = prompt;
-  params.initial_prompt = currentPrompt.c_str();
+  params.initial_prompt = currentPrompt.empty() ? nullptr : currentPrompt.c_str();
 }
 
-void Transcriber::processAvailableAudio() {
+void Transcriber::processAvailableAudio(bool force) {
   if (!ctx) {
     return;
   }
 
-  // Wait for 3 seconds of audio before processing to avoid too frequent calls
-  if (audioBuffer.size() < WHISPER_SAMPLE_RATE * 3) {
+  if (audioBuffer.empty() ||
+      (!force && audioBuffer.size() < WHISPER_SAMPLE_RATE * 3)) {
     return;
   }
 
-  if (whisper_full(ctx, params, audioBuffer.data(), audioBuffer.size()) != 0) {
+  if (whisper_full(ctx, params, audioBuffer.data(),
+                   static_cast<int>(audioBuffer.size())) != 0) {
     std::cerr << "Failed to process audio" << std::endl;
     return;
   }
@@ -113,17 +109,22 @@ void Transcriber::processAvailableAudio() {
   std::string result;
   const int n_segments = whisper_full_n_segments(ctx);
   for (int i = 0; i < n_segments; ++i) {
-    const char *text = whisper_full_get_segment_text(ctx, i);
-    result += text;
+    result += whisper_full_get_segment_text(ctx, i);
   }
 
-  // Clear buffer after processing
-  // In a continuous stream, we might want to keep some context or overlapping
-  // window, but for simplicity, we clear it.
   audioBuffer.clear();
 
-  if (listener && !result.empty()) {
-    listener->onTranscriptUpdated(result, false);
+  if (!result.empty()) {
+    notifyListeners(result, false);
+  }
+}
+
+void Transcriber::notifyListeners(const std::string &text, bool isProvisional) {
+  std::lock_guard<std::mutex> lock(listenerMutex);
+  for (auto *listener : listeners) {
+    if (listener != nullptr) {
+      listener->onTranscriptUpdated(text, isProvisional);
+    }
   }
 }
 

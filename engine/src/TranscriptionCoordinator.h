@@ -1,9 +1,9 @@
 #pragma once
 
-#include <atomic>
-
 #include "IPCServerInterface.h"
 #include "TranscriberInterface.h"
+
+#include <atomic>
 
 namespace punch2pen {
 
@@ -18,7 +18,7 @@ public:
 private:
   IPCServerInterface &ipcServer;
   TranscriberInterface &transcriber;
-  std::atomic<bool> running{true};
+  std::atomic<bool> running{false};
 };
 
 } // namespace punch2pen

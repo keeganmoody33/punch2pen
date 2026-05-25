@@ -101,7 +101,8 @@ void OpenAICloudTranscriber::pushAudioBlock(const float *samples, int sampleCoun
 
   std::lock_guard<std::mutex> lock(audioMutex);
 
-  for (int i = 0; i < sampleCount; ++i) {
+  const int decimationFactor = inputSampleRate / targetSampleRate;
+  for (int i = 0; i < sampleCount; i += decimationFactor) {
     const float sample = std::max(-1.0f, std::min(1.0f, samples[i]));
     pcmAccumulator.push_back(static_cast<int16_t>(sample * 32767.0f));
   }
@@ -123,6 +124,16 @@ void OpenAICloudTranscriber::pushAudioBlock(const float *samples, int sampleCoun
 void OpenAICloudTranscriber::finalizeStream() {
   if (!webSocket) {
     return;
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(audioMutex);
+    if (!pcmAccumulator.empty()) {
+      const json audioAppend = {{"type", "input_audio_buffer.append"},
+                                {"audio", encodeBase64(pcmAccumulator)}};
+      webSocket->send(audioAppend.dump());
+      pcmAccumulator.clear();
+    }
   }
 
   const json commitEvent = {{"type", "input_audio_buffer.commit"}};

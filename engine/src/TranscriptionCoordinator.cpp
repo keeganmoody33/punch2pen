@@ -11,6 +11,7 @@ TranscriptionCoordinator::TranscriptionCoordinator(IPCServerInterface &ipcServer
 
 void TranscriptionCoordinator::run() {
   running.store(true);
+
   while (running.load()) {
     if (ipcServer.hasPendingAudio()) {
       auto block = ipcServer.popAudio();
