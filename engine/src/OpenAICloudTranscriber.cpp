@@ -85,9 +85,10 @@ void OpenAICloudTranscriber::setVocabularyBias(
     promptContext += word + ", ";
   }
 
-  const json sessionUpdate = {
-      {"type", "session.update"},
-      {{"session", {{"instructions", promptContext}, {"turn_detection", nullptr}}}}};
+  json sessionUpdate;
+  sessionUpdate["type"] = "session.update";
+  sessionUpdate["session"]["instructions"] = promptContext;
+  sessionUpdate["session"]["turn_detection"] = nullptr;
 
   webSocket->send(sessionUpdate.dump());
 }

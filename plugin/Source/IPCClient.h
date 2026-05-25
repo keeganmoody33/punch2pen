@@ -17,6 +17,7 @@ public:
   bool isConnected() const;
   void sendAudioChunk(const float *samples, int numSamples, double sampleRate);
   void sendTransportStop();
+  void sendCorrection(const std::string &original, const std::string &corrected);
   void setTranscriptionMode(TranscriptionMode mode);
   TranscriptionMode getTranscriptionMode() const;
 

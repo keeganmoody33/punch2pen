@@ -2,6 +2,7 @@
 
 #include "IPCClient.h"
 #include <JuceHeader.h>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -27,6 +28,7 @@ public:
 
   void paint(juce::Graphics &g) override;
   void resized() override;
+  void mouseDown(const juce::MouseEvent &event) override;
 
   void appendStreamingText(const std::string &newText, double sampleTime,
                            bool isProvisional);
@@ -36,8 +38,18 @@ public:
   void onTranscriptionReceived(const std::string &text) override;
   void onStatusChanged(bool isConnected) override;
 
+  using WordClickCallback = std::function<void(const std::string &word,
+                                               juce::Point<int> position)>;
+  void setWordClickCallback(WordClickCallback callback);
+
 private:
+  struct WordHitBox {
+    juce::Rectangle<int> bounds;
+    std::string text;
+  };
+
   std::vector<LyricLine> transcriptLines;
+  std::vector<WordHitBox> wordHitBoxes;
   double lastKnownPlayheadPosition = 0.0;
   double streamCursorSample = 0.0;
 
@@ -47,6 +59,8 @@ private:
   std::unique_ptr<juce::VBlankAttachment> vBlankAttachment;
   juce::CriticalSection dataLock;
   bool isConnected = false;
+
+  WordClickCallback onWordClicked;
 
   const juce::Colour bgPrimary = juce::Colour::fromRGB(28, 25, 23);
   const juce::Colour textPrimary = juce::Colour::fromRGB(250, 250, 249);

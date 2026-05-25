@@ -20,6 +20,8 @@ void TranscriptView::paint(juce::Graphics &g) {
 
   juce::ScopedLock lock(dataLock);
 
+  wordHitBoxes.clear();
+
   int yOffset = getHeight() / 2 - static_cast<int>(currentScrollY);
   const int lineHeight = 40;
 
@@ -40,6 +42,10 @@ void TranscriptView::paint(juce::Graphics &g) {
       const int wordWidth = g.getCurrentFont().getStringWidth(spacedWord);
       g.drawText(spacedWord, xOffset, yOffset, wordWidth, lineHeight,
                  juce::Justification::centredLeft);
+
+      wordHitBoxes.push_back(
+          {{xOffset, yOffset, wordWidth, lineHeight}, word.text});
+
       xOffset += wordWidth;
     }
 
@@ -48,6 +54,21 @@ void TranscriptView::paint(juce::Graphics &g) {
 }
 
 void TranscriptView::resized() {}
+
+void TranscriptView::mouseDown(const juce::MouseEvent &event) {
+  juce::ScopedLock lock(dataLock);
+  auto pos = event.getPosition();
+
+  for (const auto &hitBox : wordHitBoxes) {
+    if (hitBox.bounds.contains(pos)) {
+      if (onWordClicked) {
+        auto screenPos = localPointToGlobal(pos);
+        onWordClicked(hitBox.text, screenPos);
+      }
+      return;
+    }
+  }
+}
 
 void TranscriptView::updatePlaybackPosition(double currentDAWSample) {
   juce::ScopedLock lock(dataLock);
@@ -104,6 +125,10 @@ void TranscriptView::onStatusChanged(bool connected) {
     isConnected = connected;
     repaint();
   });
+}
+
+void TranscriptView::setWordClickCallback(WordClickCallback callback) {
+  onWordClicked = std::move(callback);
 }
 
 } // namespace punch2pen

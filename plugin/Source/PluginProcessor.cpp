@@ -171,18 +171,45 @@ juce::AudioProcessorEditor *Punch2PenAudioProcessor::createEditor() {
 }
 
 void Punch2PenAudioProcessor::getStateInformation(juce::MemoryBlock &destData) {
-  juce::ignoreUnused(destData);
-  // You should use this method to store your parameters in the memory block.
-  // You could do that either as raw data, or use the XML or ValueTree classes
-  // as intermediaries
+  juce::ValueTree state("Punch2PenState");
+
+  if (ipcClient) {
+    state.setProperty(
+        "transcriptionMode",
+        ipcClient->getTranscriptionMode() ==
+                punch2pen::IPCClient::TranscriptionMode::Online
+            ? "online"
+            : "offline",
+        nullptr);
+  }
+
+  state.setProperty("bpm", currentBpm.load(), nullptr);
+
+  std::unique_ptr<juce::XmlElement> xml(state.createXml());
+  if (xml != nullptr)
+    copyXmlToBinary(*xml, destData);
 }
 
 void Punch2PenAudioProcessor::setStateInformation(const void *data,
                                                   int sizeInBytes) {
-  juce::ignoreUnused(data, sizeInBytes);
-  // You should use this method to restore your parameters from this memory
-  // block, whose contents will have been created by the getStateInformation()
-  // call.
+  std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data, sizeInBytes));
+  if (xml == nullptr)
+    return;
+
+  juce::ValueTree state = juce::ValueTree::fromXml(*xml);
+  if (!state.isValid())
+    return;
+
+  if (state.hasProperty("transcriptionMode") && ipcClient) {
+    juce::String mode = state.getProperty("transcriptionMode").toString();
+    ipcClient->setTranscriptionMode(
+        mode == "online" ? punch2pen::IPCClient::TranscriptionMode::Online
+                         : punch2pen::IPCClient::TranscriptionMode::Offline);
+  }
+
+  if (state.hasProperty("bpm")) {
+    currentBpm.store((double)state.getProperty("bpm"));
+  }
 }
 
 // This creates new instances of the plugin..
