@@ -1,9 +1,19 @@
 # CMake
 build/
+build_debug/
+build_release/
+build_verify/
+build_host_integration/
 cmake-build-*/
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
+compile_commands.json
+CTestTestfile.cmake
+Testing/
+Makefile
+*.ninja
+*.dir/
 *.cmake
 !CMakeLists.txt
 
@@ -14,15 +24,22 @@ JuceLibraryCode/
 # IDEs
 .vscode/
 .idea/
+.vs/
+*.xcuserdata/
 *.xcodeproj/
 *.xcworkspace/
 *.sln
 *.vcxproj
 *.vcxproj.user
+*.code-workspace
 
 # OS
 .DS_Store
+.AppleDouble
+.LSOverride
 Thumbs.db
+ehthumbs.db
+Desktop.ini
 
 # Output
 bin/
