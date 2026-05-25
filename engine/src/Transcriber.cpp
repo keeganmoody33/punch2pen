@@ -1,15 +1,11 @@
 #include "Transcriber.h"
 
+#include <algorithm>
+#include <iostream>
+
 namespace punch2pen {
 
-Transcriber::Transcriber() {}
-
-Transcriber::~Transcriber() {
-  if (ctx)
-    whisper_free(ctx);
-}
-
-bool Transcriber::initialize(const std::string &modelPath) {
+Transcriber::Transcriber(const std::string &modelPath) {
   params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
   params.print_progress = false;
   params.print_special = false;
@@ -24,64 +20,112 @@ bool Transcriber::initialize(const std::string &modelPath) {
   if (!ctx) {
     std::cerr << "Failed to initialize whisper context from " << modelPath
               << std::endl;
-    return false;
+    return;
   }
+
   std::cout << "Transcriber initialized with model: " << modelPath << std::endl;
-  return true;
 }
 
-void Transcriber::pushAudio(const std::vector<float> &samples,
-                            double sampleRate) {
-  // Simple resampling if needed (assuming 16kHz for now as required by whisper)
-  // In a real app, we should do high-quality resampling here.
-  // For now, allow mismatched sample rates but warn or just append.
-  // Ideally, the plugin sends 48k and we downsample.
-  // We will assume, for this MVP, that we just take the data.
-  // Note: Whisper expects 16kHz. If plugin sends 48k, we need to decimate by 3.
+Transcriber::~Transcriber() {
+  if (ctx) {
+    whisper_free(ctx);
+  }
+}
 
-  if (sampleRate == 48000.0) {
-    // Basic decimation 3:1
-    audioBuffer.reserve(audioBuffer.size() + samples.size() / 3);
-    for (size_t i = 0; i < samples.size(); i += 3) {
+void Transcriber::addListener(Listener *newListener) {
+  std::lock_guard<std::mutex> lock(listenerMutex);
+  if (std::find(listeners.begin(), listeners.end(), newListener) ==
+      listeners.end()) {
+    listeners.push_back(newListener);
+  }
+}
+
+void Transcriber::removeListener(Listener *listenerToRemove) {
+  std::lock_guard<std::mutex> lock(listenerMutex);
+  listeners.erase(std::remove(listeners.begin(), listeners.end(), listenerToRemove),
+                  listeners.end());
+}
+
+void Transcriber::setVocabularyBias(const std::vector<std::string> &words) {
+  std::string prompt;
+  for (const auto &word : words) {
+    if (!prompt.empty()) {
+      prompt += ", ";
+    }
+    prompt += word;
+  }
+
+  setInitialPrompt(prompt);
+}
+
+void Transcriber::finalizeStream() { processAvailableAudio(true); }
+
+void Transcriber::setInputSampleRate(double sampleRate) {
+  inputSampleRate = sampleRate;
+}
+
+void Transcriber::pushAudioBlock(const float *samples, int sampleCount,
+                                 double dawSampleTime) {
+  (void)dawSampleTime;
+  if (samples == nullptr || sampleCount <= 0) {
+    return;
+  }
+
+  if (inputSampleRate == 48000.0) {
+    audioBuffer.reserve(audioBuffer.size() + static_cast<size_t>(sampleCount) / 3);
+    for (int i = 0; i < sampleCount; i += 3) {
       audioBuffer.push_back(samples[i]);
     }
-  } else if (sampleRate == 16000.0) {
-    audioBuffer.insert(audioBuffer.end(), samples.begin(), samples.end());
+  } else if (inputSampleRate == 16000.0) {
+    audioBuffer.insert(audioBuffer.end(), samples, samples + sampleCount);
   } else {
-    // Fallback: Just append (expect poor results)
-    audioBuffer.insert(audioBuffer.end(), samples.begin(), samples.end());
+    audioBuffer.insert(audioBuffer.end(), samples, samples + sampleCount);
   }
+
+  processAvailableAudio();
 }
 
 void Transcriber::setInitialPrompt(const std::string &prompt) {
   currentPrompt = prompt;
-  params.initial_prompt = currentPrompt.c_str();
+  params.initial_prompt = currentPrompt.empty() ? nullptr : currentPrompt.c_str();
 }
 
-std::string Transcriber::process() {
-  // Wait for 3 seconds of audio before processing to avoid too frequent calls
-  if (audioBuffer.size() < WHISPER_SAMPLE_RATE * 3) {
-    return "";
+void Transcriber::processAvailableAudio(bool force) {
+  if (!ctx) {
+    return;
   }
 
-  if (whisper_full(ctx, params, audioBuffer.data(), audioBuffer.size()) != 0) {
+  if (audioBuffer.empty() ||
+      (!force && audioBuffer.size() < WHISPER_SAMPLE_RATE * 3)) {
+    return;
+  }
+
+  if (whisper_full(ctx, params, audioBuffer.data(),
+                   static_cast<int>(audioBuffer.size())) != 0) {
     std::cerr << "Failed to process audio" << std::endl;
-    return "";
+    return;
   }
 
   std::string result;
   const int n_segments = whisper_full_n_segments(ctx);
   for (int i = 0; i < n_segments; ++i) {
-    const char *text = whisper_full_get_segment_text(ctx, i);
-    result += text;
+    result += whisper_full_get_segment_text(ctx, i);
   }
 
-  // Clear buffer after processing
-  // In a continuous stream, we might want to keep some context or overlapping
-  // window, but for simplicity, we clear it.
   audioBuffer.clear();
 
-  return result;
+  if (!result.empty()) {
+    notifyListeners(result, false);
+  }
+}
+
+void Transcriber::notifyListeners(const std::string &text, bool isProvisional) {
+  std::lock_guard<std::mutex> lock(listenerMutex);
+  for (auto *listener : listeners) {
+    if (listener != nullptr) {
+      listener->onTranscriptUpdated(text, isProvisional);
+    }
+  }
 }
 
 } // namespace punch2pen

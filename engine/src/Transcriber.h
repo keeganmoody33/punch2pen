@@ -1,34 +1,41 @@
 #pragma once
 
-#include <iostream>
+#include "TranscriberInterface.h"
+#include "whisper.h"
+
+#include <mutex>
 #include <string>
 #include <vector>
 
-#include "whisper.h"
-
 namespace punch2pen {
 
-class Transcriber {
+class Transcriber : public TranscriberInterface {
 public:
-  Transcriber();
-  ~Transcriber();
+  explicit Transcriber(const std::string &modelPath);
+  ~Transcriber() override;
 
-  bool initialize(const std::string &modelPath);
+  void pushAudioBlock(const float *samples, int sampleCount,
+                      double dawSampleTime) override;
+  void addListener(Listener *newListener) override;
+  void removeListener(Listener *listenerToRemove) override;
+  void setVocabularyBias(const std::vector<std::string> &words) override;
+  void finalizeStream() override;
 
-  // Push audio to the transcription buffer
-  void pushAudio(const std::vector<float> &samples, double sampleRate);
-
-  // Run one iteration of inference (blocking)
-  // Returns transcribed text segment if any, else empty
-  std::string process();
-
+  void setInputSampleRate(double sampleRate);
   void setInitialPrompt(const std::string &prompt);
 
 private:
+  void processAvailableAudio(bool force = false);
+  void notifyListeners(const std::string &text, bool isProvisional);
+
   std::string currentPrompt;
   std::vector<float> audioBuffer;
   struct whisper_context *ctx = nullptr;
   struct whisper_full_params params;
+  double inputSampleRate = 16000.0;
+
+  std::mutex listenerMutex;
+  std::vector<Listener *> listeners;
 };
 
 } // namespace punch2pen

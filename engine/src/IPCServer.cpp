@@ -55,12 +55,12 @@ bool IPCServer::hasPendingAudio() {
   return !audioQueue.empty();
 }
 
-IPCServer::AudioPacket IPCServer::popAudio() {
+std::vector<float> IPCServer::popAudio() {
   std::lock_guard<std::mutex> lock(audioQueueLock);
   if (audioQueue.empty())
     return {};
 
-  AudioPacket packet = std::move(audioQueue.front());
+  auto packet = std::move(audioQueue.front());
   audioQueue.erase(audioQueue.begin());
   return packet;
 }
@@ -78,6 +78,10 @@ IPCServer::Correction IPCServer::popCorrection() {
   Correction c = correctionQueue.front();
   correctionQueue.erase(correctionQueue.begin());
   return c;
+}
+
+bool IPCServer::transportStateChangedToStop() {
+  return transportStopTriggered.exchange(false);
 }
 
 void IPCServer::acceptLoop() {
@@ -123,7 +127,7 @@ void IPCServer::clientHandler(int clientSocket) {
         if (recv(clientSocket, samples.data(), payloadSize, MSG_WAITALL) ==
             (ssize_t)payloadSize) {
           std::lock_guard<std::mutex> lock(audioQueueLock);
-          audioQueue.push_back({std::move(samples), chunkHeader.sampleRate});
+          audioQueue.push_back(std::move(samples));
         }
       }
     } else if (header.type == protocol::MessageType::Correction) {
@@ -143,6 +147,12 @@ void IPCServer::clientHandler(int clientSocket) {
                       << corrected << "'" << std::endl;
           }
         }
+      }
+    } else if (header.type == protocol::MessageType::TransportStop) {
+      transportStopTriggered.store(true);
+      if (header.length > 0) {
+        std::vector<char> trash(header.length);
+        recv(clientSocket, trash.data(), header.length, MSG_WAITALL);
       }
     } else {
       if (header.length > 0) {

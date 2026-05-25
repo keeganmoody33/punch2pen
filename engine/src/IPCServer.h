@@ -1,15 +1,12 @@
 #pragma once
 
+#include "IPCServerInterface.h"
+
 #include <atomic>
-#include <iostream>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <vector>
-
-// Platform specific sockets would go here.
-// For this MVP we'll use a simulation or simple socket wrapper if portability
-// is needed. Since we are writing raw C++ for engine without JUCE, we need
-// system sockets. Assume POSIX for macOS for now.
 
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -17,27 +14,22 @@
 
 namespace punch2pen {
 
-class IPCServer {
+class IPCServer : public IPCServerInterface {
 public:
-  IPCServer(int port = 7483);
-  ~IPCServer();
-
-  void start();
-  void stop();
-
-  // Polling for new audio
-  struct AudioPacket {
-    std::vector<float> samples;
-    double sampleRate = 48000;
-  };
-
-  bool hasPendingAudio();
-  AudioPacket popAudio();
-
   struct Correction {
     std::string original;
     std::string corrected;
   };
+
+  explicit IPCServer(int port = 7483);
+  ~IPCServer() override;
+
+  void start();
+  void stop();
+
+  bool hasPendingAudio() override;
+  std::vector<float> popAudio() override;
+  bool transportStateChangedToStop() override;
 
   bool hasPendingCorrection();
   Correction popCorrection();
@@ -56,9 +48,12 @@ private:
   std::mutex clientLock;
 
   std::mutex audioQueueLock;
-  std::vector<AudioPacket> audioQueue;
+  std::vector<std::vector<float>> audioQueue;
 
   std::mutex correctionQueueLock;
   std::vector<Correction> correctionQueue;
+
+  std::atomic<bool> transportStopTriggered{false};
 };
+
 } // namespace punch2pen

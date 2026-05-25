@@ -11,7 +11,8 @@ enum class MessageType : uint32_t {
   TranscriptionResult = 2,
   Handshake = 3,
   HandshakeResponse = 4,
-  Correction = 5
+  Correction = 5,
+  TransportStop = 6
 };
 
 #pragma pack(push, 1)

@@ -1,6 +1,8 @@
 #include "IPCClient.h"
 #include "RingBuffer.h"
 
+#include <algorithm>
+
 namespace punch2pen {
 
 IPCClient::IPCClient() : Thread("Punch2Pen_IPC") { startThread(); }
@@ -67,7 +69,12 @@ void IPCClient::processOutgoingAudio() {
 
   int available = ringBuffer->getNumReady();
   if (available > 0) {
-    int chunkSize = juce::jmin(available, 4096);
+    const int chunkSize = transcriptionMode.load() == TranscriptionMode::Online
+                              ? 1600
+                              : 4096;
+    if (available < chunkSize)
+      return;
+
     if (tempBuffer.size() < (size_t)chunkSize)
       tempBuffer.resize((size_t)chunkSize);
 
@@ -150,9 +157,33 @@ void IPCClient::sendAudioChunk(const float *samples, int numSamples,
   }
 }
 
+void IPCClient::sendTransportStop() {
+  if (!connected)
+    return;
+
+  protocol::Header header;
+  header.type = protocol::MessageType::TransportStop;
+  header.length = 0;
+
+  if (socket.write(&header, sizeof(header)) != sizeof(header)) {
+    connected = false;
+  }
+}
+
+void IPCClient::setTranscriptionMode(TranscriptionMode mode) {
+  transcriptionMode.store(mode);
+}
+
+IPCClient::TranscriptionMode IPCClient::getTranscriptionMode() const {
+  return transcriptionMode.load();
+}
+
 void IPCClient::addListener(Listener *listener) {
   juce::ScopedLock lock(listenerLock);
-  listeners.push_back(listener);
+  if (std::find(listeners.begin(), listeners.end(), listener) ==
+      listeners.end()) {
+    listeners.push_back(listener);
+  }
 }
 
 void IPCClient::removeListener(Listener *listener) {
