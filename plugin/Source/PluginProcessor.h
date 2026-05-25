@@ -65,6 +65,7 @@ private:
 
   // Avoid heap alloc in processBlock
   TransportPosition lastTransportPosition;
+  bool wasRecordingLastBlock = false;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Punch2PenAudioProcessor)
 };

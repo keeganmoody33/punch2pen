@@ -1,6 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "RingBuffer.h"
+#include <cstdlib>
 
 Punch2PenAudioProcessor::Punch2PenAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -71,8 +72,16 @@ void Punch2PenAudioProcessor::changeProgramName(
 
 void Punch2PenAudioProcessor::prepareToPlay(double /*sampleRate*/,
                                             int /*samplesPerBlock*/) {
-  // Use this method as the place to do any pre-playback
-  // initialisation that you need..
+  if (const char *modeEnv = std::getenv("PUNCH2PEN_TRANSCRIBE_MODE")) {
+    const std::string mode(modeEnv);
+    if (mode == "online") {
+      ipcClient->setTranscriptionMode(
+          punch2pen::IPCClient::TranscriptionMode::Online);
+    } else {
+      ipcClient->setTranscriptionMode(
+          punch2pen::IPCClient::TranscriptionMode::Offline);
+    }
+  }
 }
 
 void Punch2PenAudioProcessor::releaseResources() {
@@ -145,6 +154,12 @@ void Punch2PenAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     // If ring buffer is safe, write
     audioRingBuffer->write(channelData, buffer.getNumSamples());
   }
+
+  if (wasRecordingLastBlock && !lastTransportPosition.isRecording) {
+    ipcClient->sendTransportStop();
+  }
+
+  wasRecordingLastBlock = lastTransportPosition.isRecording;
 }
 
 bool Punch2PenAudioProcessor::hasEditor() const {

@@ -7,6 +7,8 @@ namespace punch2pen {
 
 class IPCClient : public juce::Thread {
 public:
+  enum class TranscriptionMode { Offline, Online };
+
   IPCClient();
   ~IPCClient() override;
 
@@ -14,6 +16,9 @@ public:
 
   bool isConnected() const;
   void sendAudioChunk(const float *samples, int numSamples, double sampleRate);
+  void sendTransportStop();
+  void setTranscriptionMode(TranscriptionMode mode);
+  TranscriptionMode getTranscriptionMode() const;
 
   // Callback interface for receiving messages
   struct Listener {
@@ -39,6 +44,7 @@ private:
 
   class AudioRingBuffer *ringBuffer = nullptr;
   std::vector<float> tempBuffer;
+  std::atomic<TranscriptionMode> transcriptionMode{TranscriptionMode::Offline};
 
   juce::CriticalSection listenerLock;
   std::vector<Listener *> listeners;

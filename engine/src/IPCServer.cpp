@@ -80,6 +80,10 @@ IPCServer::Correction IPCServer::popCorrection() {
   return c;
 }
 
+bool IPCServer::transportStateChangedToStop() {
+  return transportStopTriggered.exchange(false);
+}
+
 void IPCServer::acceptLoop() {
   while (running) {
     sockaddr_in clientAddr;
@@ -143,6 +147,12 @@ void IPCServer::clientHandler(int clientSocket) {
                       << corrected << "'" << std::endl;
           }
         }
+      }
+    } else if (header.type == protocol::MessageType::TransportStop) {
+      transportStopTriggered.store(true);
+      if (header.length > 0) {
+        std::vector<char> trash(header.length);
+        recv(clientSocket, trash.data(), header.length, MSG_WAITALL);
       }
     } else {
       if (header.length > 0) {

@@ -67,7 +67,12 @@ void IPCClient::processOutgoingAudio() {
 
   int available = ringBuffer->getNumReady();
   if (available > 0) {
-    int chunkSize = juce::jmin(available, 4096);
+    const int chunkSize = transcriptionMode.load() == TranscriptionMode::Online
+                              ? 1600
+                              : 4096;
+    if (available < chunkSize)
+      return;
+
     if (tempBuffer.size() < (size_t)chunkSize)
       tempBuffer.resize((size_t)chunkSize);
 
@@ -148,6 +153,27 @@ void IPCClient::sendAudioChunk(const float *samples, int numSamples,
     connected = false;
     return;
   }
+}
+
+void IPCClient::sendTransportStop() {
+  if (!connected)
+    return;
+
+  protocol::Header header;
+  header.type = protocol::MessageType::TransportStop;
+  header.length = 0;
+
+  if (socket.write(&header, sizeof(header)) != sizeof(header)) {
+    connected = false;
+  }
+}
+
+void IPCClient::setTranscriptionMode(TranscriptionMode mode) {
+  transcriptionMode.store(mode);
+}
+
+IPCClient::TranscriptionMode IPCClient::getTranscriptionMode() const {
+  return transcriptionMode.load();
 }
 
 void IPCClient::addListener(Listener *listener) {

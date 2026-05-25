@@ -41,6 +41,7 @@ public:
 
   bool hasPendingCorrection();
   Correction popCorrection();
+  bool transportStateChangedToStop();
 
   void sendResult(const std::string &text);
 
@@ -60,5 +61,7 @@ private:
 
   std::mutex correctionQueueLock;
   std::vector<Correction> correctionQueue;
+
+  std::atomic<bool> transportStopTriggered{false};
 };
 } // namespace punch2pen
