@@ -7,6 +7,7 @@ add_executable(punch2penEngine
     src/TranscriptionCoordinator.cpp
     src/Transcriber.cpp
     src/DatabaseManager.cpp
+    src/ProfileManager.cpp
 )
 
 target_include_directories(punch2penEngine
@@ -58,13 +59,76 @@ set_target_properties(punch2penEngine PROPERTIES
 add_executable(transcriptionCoordinatorTest
     tests/TranscriptionCoordinatorTest.cpp
     src/TranscriptionCoordinator.cpp
+    src/DatabaseManager.cpp
 )
 
 target_include_directories(transcriptionCoordinatorTest
     PRIVATE src
+    PRIVATE ../shared
 )
 
 set_target_properties(transcriptionCoordinatorTest PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+)
+
+add_executable(databaseManagerTest
+    tests/DatabaseManagerTest.cpp
+    src/DatabaseManager.cpp
+)
+
+target_include_directories(databaseManagerTest
+    PRIVATE src
+)
+
+set_target_properties(databaseManagerTest PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+)
+
+add_executable(profileManagerTest
+    tests/ProfileManagerTest.cpp
+    src/ProfileManager.cpp
+)
+
+target_include_directories(profileManagerTest
+    PRIVATE src
+    PRIVATE ../shared
+)
+
+target_link_libraries(profileManagerTest PRIVATE nlohmann_json::nlohmann_json)
+
+set_target_properties(profileManagerTest PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+)
+
+add_executable(protocolSerializationTest
+    tests/ProtocolSerializationTest.cpp
+)
+
+target_include_directories(protocolSerializationTest
+    PRIVATE src
+    PRIVATE ../shared
+)
+
+set_target_properties(protocolSerializationTest PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+)
+
+add_executable(openAIJsonTest
+    tests/OpenAIJsonTest.cpp
+)
+
+target_include_directories(openAIJsonTest
+    PRIVATE src
+    PRIVATE ../shared
+)
+
+target_link_libraries(openAIJsonTest PRIVATE nlohmann_json::nlohmann_json)
+
+set_target_properties(openAIJsonTest PROPERTIES
     CXX_STANDARD 20
     CXX_STANDARD_REQUIRED ON
 )

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DatabaseManager.h"
 #include "IPCServerInterface.h"
 #include "TranscriberInterface.h"
 
@@ -10,7 +11,8 @@ namespace punch2pen {
 class TranscriptionCoordinator {
 public:
   TranscriptionCoordinator(IPCServerInterface &ipcServer,
-                           TranscriberInterface &transcriber);
+                           TranscriberInterface &transcriber,
+                           DatabaseManager &db);
 
   void run();
   void stop();
@@ -18,6 +20,7 @@ public:
 private:
   IPCServerInterface &ipcServer;
   TranscriberInterface &transcriber;
+  DatabaseManager &db;
   std::atomic<bool> running{false};
 };
 

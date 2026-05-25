@@ -16,11 +16,6 @@ namespace punch2pen {
 
 class IPCServer : public IPCServerInterface {
 public:
-  struct Correction {
-    std::string original;
-    std::string corrected;
-  };
-
   explicit IPCServer(int port = 7483);
   ~IPCServer() override;
 
@@ -29,10 +24,11 @@ public:
 
   bool hasPendingAudio() override;
   std::vector<float> popAudio() override;
+  double lastAudioDawSampleTime() override;
   bool transportStateChangedToStop() override;
 
-  bool hasPendingCorrection();
-  Correction popCorrection();
+  bool hasPendingCorrection() override;
+  CorrectionPair popCorrection() override;
 
   void sendResult(const std::string &text);
 
@@ -48,10 +44,15 @@ private:
   std::mutex clientLock;
 
   std::mutex audioQueueLock;
-  std::vector<std::vector<float>> audioQueue;
+  struct AudioPacket {
+    std::vector<float> samples;
+    double dawSampleTime = 0.0;
+  };
+  std::vector<AudioPacket> audioQueue;
+  double lastDawSampleTime_ = 0.0;
 
   std::mutex correctionQueueLock;
-  std::vector<Correction> correctionQueue;
+  std::vector<CorrectionPair> correctionQueue;
 
   std::atomic<bool> transportStopTriggered{false};
 };

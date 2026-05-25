@@ -30,6 +30,7 @@ struct Handshake {
 struct AudioChunkHeader {
   double sampleRate;
   uint32_t numSamples;
+  double dawSampleTime;
   // Followed by float32 payload
 };
 

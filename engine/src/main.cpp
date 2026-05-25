@@ -3,13 +3,12 @@
 #include "OpenAICloudTranscriber.h"
 #include "Transcriber.h"
 #include "TranscriberInterface.h"
+#include "TranscriptionCoordinator.h"
 
-#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
 #include <memory>
-#include <thread>
 
 class EngineTranscriberListener
     : public punch2pen::TranscriberInterface::Listener {
@@ -91,32 +90,8 @@ int main(int argc, char *argv[]) {
 
   std::cout << "Engine ready." << std::endl;
 
-  while (true) {
-    if (server.hasPendingAudio()) {
-      auto block = server.popAudio();
-      if (!block.empty()) {
-        activeTranscriber->pushAudioBlock(block.data(),
-                                          static_cast<int>(block.size()), 0.0);
-      }
-    }
-
-    if (server.transportStateChangedToStop()) {
-      activeTranscriber->finalizeStream();
-    }
-
-    while (server.hasPendingCorrection()) {
-      auto correction = server.popCorrection();
-      db.addCorrection(correction.original, correction.corrected);
-
-      auto vocab = db.getVocabulary();
-      activeTranscriber->setVocabularyBias(vocab);
-
-      std::cout << "Applied correction. Vocabulary terms: " << vocab.size()
-                << std::endl;
-    }
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  }
+  punch2pen::TranscriptionCoordinator coordinator(server, *activeTranscriber, db);
+  coordinator.run();
 
   return 0;
 }

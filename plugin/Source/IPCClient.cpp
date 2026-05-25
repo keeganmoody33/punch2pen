@@ -137,6 +137,7 @@ void IPCClient::sendAudioChunk(const float *samples, int numSamples,
   protocol::AudioChunkHeader chunkHeader;
   chunkHeader.sampleRate = sampleRate;
   chunkHeader.numSamples = (uint32_t)numSamples;
+  chunkHeader.dawSampleTime = 0.0;
 
   size_t payloadSize =
       sizeof(protocol::AudioChunkHeader) + ((size_t)numSamples * sizeof(float));
@@ -167,6 +168,38 @@ void IPCClient::sendTransportStop() {
 
   if (socket.write(&header, sizeof(header)) != sizeof(header)) {
     connected = false;
+  }
+}
+
+void IPCClient::sendCorrection(const std::string &original,
+                               const std::string &corrected) {
+  if (!connected)
+    return;
+
+  protocol::Header header;
+  header.type = protocol::MessageType::Correction;
+
+  protocol::CorrectionHeader corrHeader;
+  corrHeader.originalLength = (uint32_t)original.size();
+  corrHeader.correctedLength = (uint32_t)corrected.size();
+
+  header.length = (uint32_t)(sizeof(corrHeader) + original.size() + corrected.size());
+
+  if (socket.write(&header, sizeof(header)) != sizeof(header)) {
+    connected = false;
+    return;
+  }
+  if (socket.write(&corrHeader, sizeof(corrHeader)) != sizeof(corrHeader)) {
+    connected = false;
+    return;
+  }
+  if (socket.write(original.data(), (int)original.size()) != (int)original.size()) {
+    connected = false;
+    return;
+  }
+  if (socket.write(corrected.data(), (int)corrected.size()) != (int)corrected.size()) {
+    connected = false;
+    return;
   }
 }
 

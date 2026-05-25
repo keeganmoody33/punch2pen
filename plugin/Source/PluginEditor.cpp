@@ -9,6 +9,7 @@ Punch2PenAudioProcessorEditor::Punch2PenAudioProcessorEditor(
 
   addAndMakeVisible(positionDisplay);
   addAndMakeVisible(transcriptView);
+  addChildComponent(correctionEditor);
 
   // Connect display to processor state
   positionDisplay.setUpdateFunction([&p]() {
@@ -26,13 +27,34 @@ Punch2PenAudioProcessorEditor::Punch2PenAudioProcessorEditor(
 
   if (auto *client = p.getIPCClient()) {
     client->addListener(&transcriptView);
+    correctionEditor.setIPCClient(client);
   }
+
+  transcriptView.setWordClickCallback(
+      [this](const std::string &word, juce::Point<int> screenPos) {
+        auto localPos = getLocalPoint(nullptr, screenPos);
+        int x = juce::jlimit(0, getWidth() - 260, localPos.x);
+        int y = juce::jlimit(0, getHeight() - 90, localPos.y);
+        correctionEditor.show(word, {x, y});
+      });
+
+  startTimerHz(30);
 }
 
 Punch2PenAudioProcessorEditor::~Punch2PenAudioProcessorEditor() {
+  stopTimer();
   if (auto *client = audioProcessor.getIPCClient()) {
     client->removeListener(&transcriptView);
   }
+}
+
+void Punch2PenAudioProcessorEditor::timerCallback() {
+  auto transport = audioProcessor.getTransportPosition();
+  double sampleRate = audioProcessor.getSampleRate();
+  if (sampleRate <= 0.0)
+    sampleRate = 48000.0;
+  double currentSamplePosition = transport.ppq * (60.0 / transport.bpm) * sampleRate;
+  transcriptView.updatePlaybackPosition(currentSamplePosition);
 }
 
 void Punch2PenAudioProcessorEditor::paint(juce::Graphics &g) {
