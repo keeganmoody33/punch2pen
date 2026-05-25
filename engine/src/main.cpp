@@ -10,6 +10,21 @@
 
 using std::filesystem::create_directories;
 
+class EngineTranscriberListener : public punch2pen::TranscriberInterface::Listener {
+public:
+  explicit EngineTranscriberListener(punch2pen::IPCServer &serverRef)
+      : server(serverRef) {}
+
+  void onTranscriptUpdated(const std::string &text, bool isProvisional) override {
+    (void)isProvisional;
+    std::cout << "Transcription: " << text << std::endl;
+    server.sendResult(text);
+  }
+
+private:
+  punch2pen::IPCServer &server;
+};
+
 int main(int argc, char *argv[]) {
   std::cout << "punch2pen Engine v1.0.0" << std::endl;
 
@@ -26,13 +41,10 @@ int main(int argc, char *argv[]) {
   punch2pen::IPCServer server(7483);
   server.start();
 
-  punch2pen::Transcriber transcriber;
   std::string modelPath = dataDir + "/models/ggml-base.bin";
-  if (!transcriber.initialize(modelPath)) {
-    std::cerr << "CRITICAL: Failed to load model at " << modelPath << std::endl;
-    // We don't exit here so the process stays alive for IPC, but transcription
-    // wont work
-  }
+  punch2pen::Transcriber transcriber(modelPath);
+  EngineTranscriberListener transcriberListener(server);
+  transcriber.setListener(&transcriberListener);
   transcriber.setInitialPrompt(dictionary.getInitialPrompt());
 
   std::cout << "Engine ready." << std::endl;
@@ -41,17 +53,13 @@ int main(int argc, char *argv[]) {
     // 1. Check for audio from network
     if (server.hasPendingAudio()) {
       auto packet = server.popAudio();
-      transcriber.pushAudio(packet.samples, packet.sampleRate);
+      transcriber.setInputSampleRate(packet.sampleRate);
+      transcriber.pushAudioBlock(packet.samples.data(),
+                                 static_cast<int>(packet.samples.size()),
+                                 0.0);
     }
 
-    // 2. Run Transcription
-    std::string result = transcriber.process();
-    if (!result.empty()) {
-      std::cout << "Transcription: " << result << std::endl;
-      server.sendResult(result);
-    }
-
-    // 3. Check for incoming Correction messages
+    // 2. Check for incoming Correction messages
     while (server.hasPendingCorrection()) {
       auto correction = server.popCorrection();
       db.addCorrection(correction.original, correction.corrected);

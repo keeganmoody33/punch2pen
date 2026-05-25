@@ -2,14 +2,7 @@
 
 namespace punch2pen {
 
-Transcriber::Transcriber() {}
-
-Transcriber::~Transcriber() {
-  if (ctx)
-    whisper_free(ctx);
-}
-
-bool Transcriber::initialize(const std::string &modelPath) {
+Transcriber::Transcriber(const std::string &modelPath) {
   params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
   params.print_progress = false;
   params.print_special = false;
@@ -24,14 +17,32 @@ bool Transcriber::initialize(const std::string &modelPath) {
   if (!ctx) {
     std::cerr << "Failed to initialize whisper context from " << modelPath
               << std::endl;
-    return false;
+    return;
   }
+
   std::cout << "Transcriber initialized with model: " << modelPath << std::endl;
-  return true;
 }
 
-void Transcriber::pushAudio(const std::vector<float> &samples,
-                            double sampleRate) {
+Transcriber::~Transcriber() {
+  if (ctx)
+    whisper_free(ctx);
+}
+
+void Transcriber::setListener(Listener *newListener) {
+  listener = newListener;
+}
+
+void Transcriber::setInputSampleRate(double sampleRate) {
+  inputSampleRate = sampleRate;
+}
+
+void Transcriber::pushAudioBlock(const float *samples, int sampleCount,
+                                 double dawSampleTime) {
+  (void)dawSampleTime;
+  if (samples == nullptr || sampleCount <= 0) {
+    return;
+  }
+
   // Simple resampling if needed (assuming 16kHz for now as required by whisper)
   // In a real app, we should do high-quality resampling here.
   // For now, allow mismatched sample rates but warn or just append.
@@ -39,18 +50,20 @@ void Transcriber::pushAudio(const std::vector<float> &samples,
   // We will assume, for this MVP, that we just take the data.
   // Note: Whisper expects 16kHz. If plugin sends 48k, we need to decimate by 3.
 
-  if (sampleRate == 48000.0) {
+  if (inputSampleRate == 48000.0) {
     // Basic decimation 3:1
-    audioBuffer.reserve(audioBuffer.size() + samples.size() / 3);
-    for (size_t i = 0; i < samples.size(); i += 3) {
+    audioBuffer.reserve(audioBuffer.size() + static_cast<size_t>(sampleCount) / 3);
+    for (int i = 0; i < sampleCount; i += 3) {
       audioBuffer.push_back(samples[i]);
     }
-  } else if (sampleRate == 16000.0) {
-    audioBuffer.insert(audioBuffer.end(), samples.begin(), samples.end());
+  } else if (inputSampleRate == 16000.0) {
+    audioBuffer.insert(audioBuffer.end(), samples, samples + sampleCount);
   } else {
     // Fallback: Just append (expect poor results)
-    audioBuffer.insert(audioBuffer.end(), samples.begin(), samples.end());
+    audioBuffer.insert(audioBuffer.end(), samples, samples + sampleCount);
   }
+
+  processAvailableAudio();
 }
 
 void Transcriber::setInitialPrompt(const std::string &prompt) {
@@ -58,15 +71,19 @@ void Transcriber::setInitialPrompt(const std::string &prompt) {
   params.initial_prompt = currentPrompt.c_str();
 }
 
-std::string Transcriber::process() {
+void Transcriber::processAvailableAudio() {
+  if (!ctx) {
+    return;
+  }
+
   // Wait for 3 seconds of audio before processing to avoid too frequent calls
   if (audioBuffer.size() < WHISPER_SAMPLE_RATE * 3) {
-    return "";
+    return;
   }
 
   if (whisper_full(ctx, params, audioBuffer.data(), audioBuffer.size()) != 0) {
     std::cerr << "Failed to process audio" << std::endl;
-    return "";
+    return;
   }
 
   std::string result;
@@ -81,7 +98,9 @@ std::string Transcriber::process() {
   // window, but for simplicity, we clear it.
   audioBuffer.clear();
 
-  return result;
+  if (listener && !result.empty()) {
+    listener->onTranscriptUpdated(result, false);
+  }
 }
 
 } // namespace punch2pen
