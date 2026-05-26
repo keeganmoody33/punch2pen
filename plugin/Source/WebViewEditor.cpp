@@ -30,7 +30,18 @@ juce::String getIndexHtml() {
   if (auto *data = BinaryData::getNamedResource("index_html", size))
     return juce::String::fromUTF8(data, size);
 
-  return {};
+  // Return a minimal diagnostic page so a misconfigured build (e.g. the
+  // BinaryData resource key drifted, or index.html was removed from
+  // juce_add_binary_data) is visible rather than producing a silent blank
+  // WebView.
+  return "<html><body style='background:#1C1917;color:#FCD34D;"
+         "font-family:monospace;padding:24px'>"
+         "<h3>punch2pen WebView</h3>"
+         "<p>BinaryData resource \"index_html\" not found. "
+         "Re-run CMake configure and verify that "
+         "<code>Source/ui/public/index.html</code> is listed in "
+         "<code>juce_add_binary_data</code>.</p>"
+         "</body></html>";
 }
 
 } // namespace
