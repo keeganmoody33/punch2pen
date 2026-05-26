@@ -1,14 +1,28 @@
 #include "DatabaseManager.h"
 #include "IPCServer.h"
 #include "OpenAICloudTranscriber.h"
+#include "ProfileManager.h"
 #include "Transcriber.h"
 #include "TranscriberInterface.h"
 #include "TranscriptionCoordinator.h"
 
+#include <csignal>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#include <unordered_set>
+
+volatile std::sig_atomic_t g_shutdownRequested = 0;
+static punch2pen::TranscriptionCoordinator *g_coordinator = nullptr;
+
+void signalHandler(int signum) {
+  (void)signum;
+  g_shutdownRequested = 1;
+  if (g_coordinator != nullptr) {
+    g_coordinator->stop();
+  }
+}
 
 class EngineTranscriberListener
     : public punch2pen::TranscriberInterface::Listener {
@@ -49,6 +63,10 @@ int main(int argc, char *argv[]) {
   punch2pen::DatabaseManager db;
   db.initialize(dataDir + "/corrections.csv");
 
+  punch2pen::ProfileManager profileManager;
+  profileManager.setDataDirectory(dataDir);
+  profileManager.loadProfile("default");
+
   punch2pen::IPCServer server(7483);
   server.start();
 
@@ -83,15 +101,29 @@ int main(int argc, char *argv[]) {
     activeTranscriber = localTranscriber.get();
   }
 
-  activeTranscriber->setVocabularyBias(db.getVocabulary());
+  auto dbVocab = db.getVocabulary();
+  auto profileVocab = profileManager.getVocabulary();
+  std::unordered_set<std::string> merged(dbVocab.begin(), dbVocab.end());
+  merged.insert(profileVocab.begin(), profileVocab.end());
+  std::vector<std::string> initialVocab(merged.begin(), merged.end());
+  activeTranscriber->setVocabularyBias(initialVocab);
 
   EngineTranscriberListener transcriberListener(server);
   activeTranscriber->addListener(&transcriberListener);
 
   std::cout << "Engine ready." << std::endl;
 
-  punch2pen::TranscriptionCoordinator coordinator(server, *activeTranscriber, db);
+  punch2pen::TranscriptionCoordinator coordinator(server, *activeTranscriber, db,
+                                                  profileManager);
+  g_coordinator = &coordinator;
+
+  std::signal(SIGINT, signalHandler);
+  std::signal(SIGTERM, signalHandler);
+
   coordinator.run();
+
+  profileManager.saveProfile();
+  server.stop();
 
   return 0;
 }

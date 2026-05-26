@@ -1,0 +1,23 @@
+name: Engine CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DPUNCH2PEN_BUILD_PLUGIN=OFF
+      - name: Build test targets
+        run: cmake --build build --target databaseManagerTest profileManagerTest protocolSerializationTest openAIJsonTest transcriptionCoordinatorTest -j4
+      - name: Run tests
+        run: |
+          ./build/bin/databaseManagerTest
+          ./build/bin/profileManagerTest
+          ./build/bin/protocolSerializationTest
+          ./build/bin/openAIJsonTest
+          ./build/bin/transcriptionCoordinatorTest

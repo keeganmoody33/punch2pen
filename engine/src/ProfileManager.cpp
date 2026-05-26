@@ -1,9 +1,11 @@
 #include "ProfileManager.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <sstream>
 
 using json = nlohmann::json;
 
@@ -101,6 +103,15 @@ std::vector<std::string> ProfileManager::getVocabulary() const {
 void ProfileManager::addCorrection(const std::string &original,
                                    const std::string &corrected) {
   corrections.push_back({original, corrected});
+
+  std::stringstream ss(corrected);
+  std::string word;
+  while (ss >> word) {
+    word.erase(std::remove_if(word.begin(), word.end(), ::ispunct), word.end());
+    if (!word.empty()) {
+      addVocabularyWord(word);
+    }
+  }
 }
 
 } // namespace punch2pen

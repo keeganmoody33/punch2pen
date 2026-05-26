@@ -60,12 +60,15 @@ add_executable(transcriptionCoordinatorTest
     tests/TranscriptionCoordinatorTest.cpp
     src/TranscriptionCoordinator.cpp
     src/DatabaseManager.cpp
+    src/ProfileManager.cpp
 )
 
 target_include_directories(transcriptionCoordinatorTest
     PRIVATE src
     PRIVATE ../shared
 )
+
+target_link_libraries(transcriptionCoordinatorTest PRIVATE nlohmann_json::nlohmann_json)
 
 set_target_properties(transcriptionCoordinatorTest PROPERTIES
     CXX_STANDARD 20
