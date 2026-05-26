@@ -3,6 +3,10 @@
 
 #include <algorithm>
 
+#if JUCE_MAC || JUCE_IOS
+#include <sys/socket.h>
+#endif
+
 namespace punch2pen {
 
 IPCClient::IPCClient(int port, bool autoLaunchEngineFlag)
@@ -91,6 +95,11 @@ void IPCClient::processOutgoingAudio() {
 void IPCClient::attemptConnection() {
   // Localhost, configurable port (default 7483 from spec)
   if (socket.connect("127.0.0.1", serverPort, 1000)) {
+#if JUCE_MAC || JUCE_IOS
+    int disableSigPipe = 1;
+    setsockopt(socket.getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE,
+               &disableSigPipe, sizeof(disableSigPipe));
+#endif
     connected = true;
 
     juce::ScopedLock lock(listenerLock);

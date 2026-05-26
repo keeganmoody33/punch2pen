@@ -1,6 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "RingBuffer.h"
+#include <cmath>
 #include <cstdlib>
 
 Punch2PenAudioProcessor::Punch2PenAudioProcessor()
@@ -125,29 +126,30 @@ void Punch2PenAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
   for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
     buffer.clear(i, 0, buffer.getNumSamples());
 
+  bool isRecording = transportIsRecording.load();
+
   // 1. Get Transport Info
   if (auto *ph = getPlayHead()) {
     if (auto pos = ph->getPosition()) {
       if (auto bpm = pos->getBpm())
-        currentBpm = *bpm;
-
-      lastTransportPosition.bpm = currentBpm;
+        currentBpm.store(*bpm);
 
       if (auto ppq = pos->getPpqPosition())
-        lastTransportPosition.ppq = *ppq;
+        transportPpq.store(*ppq);
 
       if (auto ts = pos->getTimeSignature()) {
-        lastTransportPosition.timeSigNum = ts->numerator;
-        lastTransportPosition.timeSigDenom = ts->denominator;
+        transportTimeSigNum.store(ts->numerator);
+        transportTimeSigDenom.store(ts->denominator);
       }
 
-      lastTransportPosition.isPlaying = pos->getIsPlaying();
-      lastTransportPosition.isRecording = pos->getIsRecording();
+      transportIsPlaying.store(pos->getIsPlaying());
+      isRecording = pos->getIsRecording();
+      transportIsRecording.store(isRecording);
     }
   }
 
   // 2. Capture Audio if Recording
-  if (lastTransportPosition.isRecording) {
+  if (isRecording) {
     // We only take the first channel for voice recognition usually
     auto *channelData = buffer.getReadPointer(0);
 
@@ -155,11 +157,11 @@ void Punch2PenAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     audioRingBuffer->write(channelData, buffer.getNumSamples());
   }
 
-  if (wasRecordingLastBlock && !lastTransportPosition.isRecording) {
+  if (wasRecordingLastBlock && !isRecording) {
     ipcClient->sendTransportStop();
   }
 
-  wasRecordingLastBlock = lastTransportPosition.isRecording;
+  wasRecordingLastBlock = isRecording;
 }
 
 bool Punch2PenAudioProcessor::hasEditor() const {
@@ -219,5 +221,16 @@ juce::AudioProcessor *JUCE_CALLTYPE createPluginFilter() {
 
 Punch2PenAudioProcessor::TransportPosition
 Punch2PenAudioProcessor::getTransportPosition() const {
-  return lastTransportPosition;
+  TransportPosition position;
+  position.ppq = transportPpq.load();
+  position.bpm = currentBpm.load();
+  position.timeSigNum = transportTimeSigNum.load();
+  position.timeSigDenom = transportTimeSigDenom.load();
+  position.isPlaying = transportIsPlaying.load();
+  position.isRecording = transportIsRecording.load();
+
+  const auto beatsPerBar = juce::jmax(1, position.timeSigNum);
+  position.bar = (int)(position.ppq / (double)beatsPerBar) + 1;
+  position.beat = (int)std::fmod(position.ppq, (double)beatsPerBar) + 1;
+  return position;
 }

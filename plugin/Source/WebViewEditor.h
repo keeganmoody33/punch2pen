@@ -69,6 +69,7 @@ private:
   // Tracks what we last told the page, so we don't spam the bridge.
   bool   lastConnected     = false;
   double streamCursorSample = 0.0;
+  double lastPlayheadSample = 0.0;
   std::atomic<uint32_t> takeGeneration { 0 };
   int    lastBar           = -1;
   int    lastBeat          = -1;
