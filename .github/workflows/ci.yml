@@ -27,9 +27,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Configure with plugin
-        run: cmake -S . -B build -DPUNCH2PEN_BUILD_PLUGIN=ON
+        run: cmake -S . -B build -DPUNCH2PEN_BUILD_PLUGIN=ON -DCMAKE_BUILD_TYPE=Release
       - name: Build plugin test targets
-        run: cmake --build build --target ringBufferTest ipcClientTest -j4
+        run: cmake --build build --config Release --target ringBufferTest ipcClientTest -j4
       - name: Run plugin tests
         run: |
           ./build/plugin/ringBufferTest_artefacts/Release/ringBufferTest

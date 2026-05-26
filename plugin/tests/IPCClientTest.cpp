@@ -32,7 +32,6 @@ void testConnectionAndAudioChunk() {
   bool bound = server.createListener(TEST_PORT, "127.0.0.1");
   assert(bound);
 
-  std::atomic<bool> serverReady{true};
   std::atomic<bool> gotAudioChunk{false};
   std::atomic<bool> headerOk{false};
   std::atomic<bool> payloadOk{false};
@@ -86,8 +85,9 @@ void testConnectionAndAudioChunk() {
   // Give server a moment to start listening
   juce::Thread::sleep(100);
 
-  // Create IPCClient with test port (auto-connects on construction)
-  auto ipcClient = std::make_unique<Punch2Pen::IPCClient>(TEST_PORT);
+  // Create IPCClient with test port (auto-connects on construction).
+  // Disable auto-launch so a failed connect doesn't shell out to the engine binary.
+  auto ipcClient = std::make_unique<Punch2Pen::IPCClient>(TEST_PORT, /*autoLaunchEngine=*/false);
 
   // Wait for connection
   for (int i = 0; i < 50; ++i) {
@@ -149,7 +149,7 @@ void testTransportStop() {
   });
 
   juce::Thread::sleep(100);
-  auto ipcClient = std::make_unique<Punch2Pen::IPCClient>(TEST_PORT + 1);
+  auto ipcClient = std::make_unique<Punch2Pen::IPCClient>(TEST_PORT + 1, /*autoLaunchEngine=*/false);
 
   for (int i = 0; i < 50; ++i) {
     if (ipcClient->isConnected())
@@ -237,7 +237,7 @@ void testCorrection() {
   });
 
   juce::Thread::sleep(100);
-  auto ipcClient = std::make_unique<Punch2Pen::IPCClient>(TEST_PORT + 2);
+  auto ipcClient = std::make_unique<Punch2Pen::IPCClient>(TEST_PORT + 2, /*autoLaunchEngine=*/false);
 
   for (int i = 0; i < 50; ++i) {
     if (ipcClient->isConnected())
@@ -280,7 +280,7 @@ void testDisconnectDetection() {
   });
 
   juce::Thread::sleep(100);
-  auto ipcClient = std::make_unique<Punch2Pen::IPCClient>(TEST_PORT + 3);
+  auto ipcClient = std::make_unique<Punch2Pen::IPCClient>(TEST_PORT + 3, /*autoLaunchEngine=*/false);
 
   for (int i = 0; i < 50; ++i) {
     if (ipcClient->isConnected())
@@ -310,8 +310,11 @@ void testDisconnectDetection() {
 }
 
 int main() {
-  // Ensure the JUCE message manager exists (needed by Thread internals).
-  juce::MessageManager::getInstance();
+  // RAII initializer for JUCE Thread internals. JUCE only ships the _GUI
+  // variant; per its own header docs, it's the recommended initializer for
+  // console-app main()s, and ensures MessageManager isn't leaked under
+  // JUCE_CHECK_MEMORY_LEAKS. Matches PluginProcessorStateTest.cpp.
+  juce::ScopedJuceInitialiser_GUI juceInit;
 
   testConnectionAndAudioChunk();
   testTransportStop();

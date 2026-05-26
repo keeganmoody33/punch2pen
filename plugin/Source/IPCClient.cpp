@@ -5,8 +5,9 @@
 
 namespace punch2pen {
 
-IPCClient::IPCClient(int port)
-    : Thread("Punch2Pen_IPC"), serverPort(port) {
+IPCClient::IPCClient(int port, bool autoLaunchEngineFlag)
+    : Thread("Punch2Pen_IPC"), serverPort(port),
+      autoLaunchEngine(autoLaunchEngineFlag) {
   startThread();
 }
 
@@ -88,7 +89,7 @@ void IPCClient::processOutgoingAudio() {
 }
 
 void IPCClient::attemptConnection() {
-  // Localhost, port 7483 (from spec)
+  // Localhost, configurable port (default 7483 from spec)
   if (socket.connect("127.0.0.1", serverPort, 1000)) {
     connected = true;
 
@@ -97,7 +98,8 @@ void IPCClient::attemptConnection() {
       l->onStatusChanged(true);
     }
   } else {
-    launchEngine();
+    if (autoLaunchEngine)
+      launchEngine();
   }
 }
 
