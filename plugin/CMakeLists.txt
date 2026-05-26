@@ -71,7 +71,6 @@ target_link_libraries(ipcClientTest PRIVATE
     juce::juce_core
     juce::juce_audio_basics
     juce::juce_events
-    juce::juce_gui_basics
 )
 target_include_directories(ipcClientTest PRIVATE
     Source

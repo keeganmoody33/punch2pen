@@ -310,8 +310,8 @@ void testDisconnectDetection() {
 }
 
 int main() {
-  // JUCE message manager is needed for event-based classes
-  juce::ScopedJuceInitialiser_GUI init;
+  // Ensure the JUCE message manager exists (needed by Thread internals).
+  juce::MessageManager::getInstance();
 
   testConnectionAndAudioChunk();
   testTransportStop();
