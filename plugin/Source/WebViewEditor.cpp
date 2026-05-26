@@ -134,7 +134,7 @@ void WebViewEditor::timerCallback() {
       transport.ppq * (60.0 / juce::jmax(1.0, transport.bpm)) * sampleRate;
   jsUpdatePlayhead(currentSamplePosition);
 
-  double beatsPerBar = (double)transport.timeSigNum;
+  double beatsPerBar = (double)juce::jmax(1, (int)transport.timeSigNum);
   int bar  = (int)(transport.ppq / beatsPerBar) + 1;
   int beat = (int)std::fmod(transport.ppq, beatsPerBar) + 1;
   if (bar != lastBar || beat != lastBeat) {
@@ -150,6 +150,11 @@ void WebViewEditor::timerCallback() {
   else if (transport.isPlaying)    state = "playback";
   else                             state = "idle";
   if (state != lastState) {
+    if (state == "recording" && lastState != "recording") {
+      ++takeGeneration;
+      streamCursorSample = 0.0;
+      runJs("window.resetTranscript();");
+    }
     jsSetState(state);
     lastState = state;
   }
@@ -157,20 +162,25 @@ void WebViewEditor::timerCallback() {
 
 // ── IPCClient::Listener ─────────────────────────────────────────────────────
 void WebViewEditor::onTranscriptionReceived(const std::string &text) {
-  juce::MessageManager::callAsync([this, text] {
-    // Mirror the heuristics from TranscriptView::appendStreamingText.
-    streamCursorSample += 4800.0;
-    double start = streamCursorSample;
+  juce::Component::SafePointer<WebViewEditor> safeThis(this);
+  auto generation = takeGeneration.load();
+  juce::MessageManager::callAsync([safeThis, text, generation] {
+    if (safeThis == nullptr) return;
+    if (safeThis->takeGeneration.load() != generation) return;
+    safeThis->streamCursorSample += 4800.0;
+    double start = safeThis->streamCursorSample;
     double end   = start + 4800.0;
-    int bar = juce::jmax(1, lastBar);
-    jsAppendWord(juce::String(text), start, end, bar);
+    int bar = juce::jmax(1, safeThis->lastBar);
+    safeThis->jsAppendWord(juce::String(text), start, end, bar);
   });
 }
 
 void WebViewEditor::onStatusChanged(bool connected) {
-  juce::MessageManager::callAsync([this, connected] {
-    lastConnected = connected;
-    jsSetConnectionStatus(connected);
+  juce::Component::SafePointer<WebViewEditor> safeThis(this);
+  juce::MessageManager::callAsync([safeThis, connected] {
+    if (safeThis == nullptr) return;
+    safeThis->lastConnected = connected;
+    safeThis->jsSetConnectionStatus(connected);
   });
 }
 
