@@ -1,28 +1,28 @@
 #pragma once
 
-#include "CorrectionEditor.h"
 #include "PluginProcessor.h"
-#include "PositionDisplay.h"
 #include <JuceHeader.h>
 
-#include "TranscriptView.h"
+namespace punch2pen { class WebViewEditor; }
 
-class Punch2PenAudioProcessorEditor : public juce::AudioProcessorEditor,
-                                      private juce::Timer {
+/**
+    Plugin editor — thin shell that delegates to WebViewEditor.
+
+    The bulk of the UI lives in Source/ui/public/index.html.
+    This class is kept around because PluginProcessor::createEditor()
+    constructs it by name and the host plugin binding requires the
+    juce::AudioProcessorEditor subclass to live where it always has.
+ */
+class Punch2PenAudioProcessorEditor : public juce::AudioProcessorEditor {
 public:
-  Punch2PenAudioProcessorEditor(Punch2PenAudioProcessor &);
+  explicit Punch2PenAudioProcessorEditor(Punch2PenAudioProcessor &);
   ~Punch2PenAudioProcessorEditor() override;
 
   void paint(juce::Graphics &) override;
   void resized() override;
 
 private:
-  void timerCallback() override;
-
-  Punch2PenAudioProcessor &audioProcessor;
-  punch2pen::PositionDisplay positionDisplay;
-  punch2pen::TranscriptView transcriptView;
-  punch2pen::CorrectionEditor correctionEditor;
+  std::unique_ptr<punch2pen::WebViewEditor> webEditor;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Punch2PenAudioProcessorEditor)
 };

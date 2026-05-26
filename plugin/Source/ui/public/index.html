@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>punch2pen</title>
+  <!--
+    punch2pen WebView UI.
+
+    This single file is the entire plugin face. It is loaded by
+    WebViewEditor and driven over a tiny JS API:
+
+      C++ → JS (call via evaluateJavascript):
+        appendWord(text, startSample, endSample, barNumber)
+        updatePlayhead(currentDAWSample)
+        setConnectionStatus(connected)        // boolean
+        updatePosition(bar, beat)             // ints
+        setState(stateName)                   // disconnected|idle|recording|playback|correction
+        resetTranscript()                     // clears all words (e.g. new take)
+        showCorrection(originalWord, x, y)    // opens the popup at a position
+        hideCorrection()
+
+      JS → C++ (registered as native functions on window.punch2pen):
+        onWordClicked(word, x, y)
+        submitCorrection(original, corrected)
+        onCorrectionCancelled()
+
+    Element IDs that the bridge / DAW side may bind to:
+      #header-bar  #app-title  #status-badge
+      #position-display  #position-text
+      #connection-banner
+      #transcript-container
+      #correction-overlay  #correction-original
+      #correction-input  #correction-submit  #correction-cancel
+      #logo-mark
+  -->
+  <style>
+    /* ──────────────────────────────────────────────────────────
+       Tokens — taken from the existing JUCE codebase:
+         TranscriptView.h         lines 65–67
+         CorrectionEditor.cpp     lines 16–28
+         PluginEditor.cpp paint() line 61
+       ────────────────────────────────────────────────────────── */
+    :root {
+      --bg-primary:      #1C1917;
+      --text-primary:    #FAFAF9;
+      --accent-primary:  #FCD34D;
+      --window-bg:       #1E1E1E;
+      --header-bg:       #2D2D2D;
+      --input-bg:        #3A3A3A;
+      --border-color:    #505050;
+      --submit-green:    #4A9F4A;
+      --cancel-red:      #9F4A4A;
+
+      /* Derived */
+      --ink-mid:         rgba(250, 250, 249, 0.55);
+      --ink-dim:         rgba(250, 250, 249, 0.30);
+      --rule:            rgba(250, 250, 249, 0.10);
+      --past:            0.4;     /* per spec — past-word alpha */
+      --upcoming:        0.6;
+      --active:          1.0;
+
+      --mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      width: 400px; height: 600px;
+      background: var(--window-bg);
+      color: var(--text-primary);
+      font-family: var(--mono);
+      font-size: 13px;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+
+    /* ── HEADER ─────────────────────────────────────────────── */
+    #header-bar {
+      height: 40px;
+      background: var(--header-bg);
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--rule);
+      position: relative;
+      z-index: 2;
+    }
+    #app-title {
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      font-size: 16px;
+      color: var(--text-primary);
+    }
+    #app-title .accent { color: var(--accent-primary); font-size: 19px; }
+    #status-badge {
+      margin-left: auto;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      font-size: 10px;
+      text-transform: uppercase;
+      display: inline-flex; align-items: center; gap: 6px;
+      color: var(--ink-mid);
+    }
+    #status-badge::before {
+      content: ""; width: 8px; height: 8px; border-radius: 50%;
+      background: currentColor;
+    }
+    /* State → badge */
+    body[data-state="disconnected"] #status-badge { color: var(--accent-primary); }
+    body[data-state="idle"]         #status-badge { color: var(--ink-mid); }
+    body[data-state="recording"]    #status-badge { color: #ff4d57; }
+    body[data-state="playback"]     #status-badge { color: var(--submit-green); }
+    body[data-state="recording"] #status-badge::before {
+      animation: p2p-pulse 1.3s ease-out infinite;
+    }
+    @keyframes p2p-pulse {
+      0%   { box-shadow: 0 0 0 0   #ff4d57aa; }
+      70%  { box-shadow: 0 0 0 10px transparent; }
+      100% { box-shadow: 0 0 0 0   transparent; }
+    }
+
+    /* ── POSITION DISPLAY ───────────────────────────────────── */
+    #position-display {
+      height: 36px;                           /* bumped from 30 per spec */
+      display: flex; align-items: center;
+      padding: 0 14px;
+      border-bottom: 1px solid var(--rule);
+      background: var(--bg-primary);
+    }
+    #position-text {
+      font-size: 18px;                        /* dropped from 24 per spec */
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      font-variant-numeric: tabular-nums;
+    }
+    #position-text .bar-num,
+    #position-text .beat-num { color: var(--accent-primary); }
+
+    /* ── CONNECTION BANNER ──────────────────────────────────── */
+    #connection-banner {
+      display: none;                          /* shown only in disconnected */
+      padding: 14px 16px;
+      font-size: 13px; font-weight: 700;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--accent-primary);
+      background:
+        linear-gradient(180deg,
+          rgba(252,211,77,0.10),
+          rgba(252,211,77,0.02));
+      border-bottom: 1px dashed rgba(252,211,77,0.4);
+    }
+    body[data-state="disconnected"] #connection-banner { display: block; }
+
+    /* ── TRANSCRIPT ─────────────────────────────────────────── */
+    #transcript-container {
+      position: relative;
+      background: var(--bg-primary);
+      height: calc(600px - 40px - 36px);
+      overflow: hidden;
+    }
+    /* Disconnected steals 50px from the transcript for the banner. */
+    body[data-state="disconnected"] #transcript-container {
+      height: calc(600px - 40px - 36px - 50px);
+    }
+    #transcript-inner {
+      position: absolute; left: 0; right: 0; top: 50%;
+      will-change: transform;
+      transform: translateY(0);               /* updated by RAF spring */
+      transition: none;
+    }
+    .lyric-line {
+      height: 40px;
+      display: flex; align-items: center; gap: 6px;
+      padding: 0 22px;
+      font-size: 16px;
+      white-space: nowrap;
+    }
+    .lyric-word {
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 2px;
+      transition: background 140ms ease, color 140ms ease, opacity 140ms ease;
+      opacity: 0.6;                            /* default = upcoming */
+    }
+    .lyric-word:hover { background: rgba(255,255,255,0.06); }
+    .lyric-word.active {
+      opacity: 1.0;
+      color: var(--bg-primary);
+      background: var(--text-primary);
+      font-weight: 700;
+    }
+    .lyric-word.past { opacity: 0.4; }
+    .lyric-word.upcoming { opacity: 0.6; }
+
+    /* Recording state: uniform "provisional" alpha, no active hot word */
+    body[data-state="recording"] .lyric-word {
+      opacity: 0.6 !important;
+      color: var(--text-primary) !important;
+      background: transparent !important;
+      font-weight: 400 !important;
+    }
+    body[data-state="recording"] .lyric-word:last-of-type {
+      opacity: 0.85 !important;                /* newest word slight emphasis */
+    }
+
+    /* Idle empty-state hint */
+    #idle-hint, #connecting-hint {
+      display: none;
+      position: absolute; inset: 0;
+      align-items: center; justify-content: center;
+      flex-direction: column; gap: 6px;
+      color: var(--ink-mid); font-size: 11px;
+      letter-spacing: 0.22em; text-transform: uppercase;
+      text-align: center;
+      pointer-events: none;
+    }
+    #idle-hint .sub {
+      letter-spacing: 0;
+      text-transform: none;
+      color: var(--ink-dim); font-size: 11px;
+      margin-top: 4px;
+    }
+    body[data-state="idle"]:not(.has-words) #transcript-container #idle-hint { display: flex; }
+
+    /* Streaming cursor at the very end of the transcript during recording */
+    #stream-cursor {
+      display: none;
+      width: 8px; height: 16px;
+      background: #ff4d57;
+      animation: p2p-blink 1s steps(2) infinite;
+      vertical-align: middle;
+    }
+    body[data-state="recording"] #stream-cursor { display: inline-block; }
+    @keyframes p2p-blink { 50% { opacity: 0; } }
+
+    /* Top/bottom fade so the karaoke scroll feels physical */
+    .fade-top, .fade-bot {
+      position: absolute; left: 0; right: 0; height: 50px;
+      pointer-events: none; z-index: 1;
+    }
+    .fade-top { top: 0;    background: linear-gradient(var(--bg-primary), transparent); }
+    .fade-bot { bottom: 0; background: linear-gradient(transparent, var(--bg-primary)); }
+
+    /* ── CORRECTION OVERLAY (260×90, 6px padding per spec) ──── */
+    #correction-overlay {
+      display: none;
+      position: absolute;
+      width: 260px; height: 90px;
+      background: var(--header-bg);
+      border: 1px solid var(--border-color);
+      padding: 6px;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.55);
+      z-index: 10;
+      font-family: var(--mono);
+      animation: p2p-pop 140ms ease-out;
+    }
+    body[data-state="correction"] #correction-overlay { display: block; }
+    @keyframes p2p-pop {
+      from { transform: translateY(-4px) scale(0.96); opacity: 0; }
+      to   { transform: translateY(0) scale(1);       opacity: 1; }
+    }
+    #correction-original {
+      display: block;
+      font-size: 12px; font-weight: 700;
+      color: var(--text-primary);
+      height: 22px; line-height: 22px;
+    }
+    #correction-original::before {
+      content: "Original: ";
+      font-weight: 400;
+      color: var(--ink-mid);
+    }
+    #correction-original .strike { text-decoration: line-through; text-decoration-color: var(--cancel-red); }
+    #correction-input {
+      display: block;
+      width: 100%; height: 24px;
+      margin-top: 4px;
+      padding: 2px 6px;
+      background: var(--input-bg);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      font-family: var(--mono); font-size: 13px; font-weight: 600;
+      outline: none;
+      caret-color: var(--accent-primary);
+    }
+    #correction-input:focus { border-color: var(--accent-primary); }
+    .button-row { display: flex; gap: 4px; margin-top: 4px; }
+    #correction-submit, #correction-cancel {
+      flex: 1; height: 24px;
+      border: none; cursor: pointer;
+      color: #fff; font-family: var(--mono);
+      font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+      font-size: 10px;
+    }
+    #correction-submit { background: var(--submit-green); }
+    #correction-cancel { background: var(--cancel-red); }
+
+    /* ── LOGO MARK (bottom-right, all states) ───────────────── */
+    #logo-mark {
+      position: fixed;
+      right: 12px; bottom: 12px;
+      width: 56px; height: 56px;
+      opacity: 0.45;
+      pointer-events: none;
+      z-index: 0;
+      color: var(--text-primary);
+    }
+    #logo-mark svg { width: 100%; height: 100%; display: block; }
+  </style>
+</head>
+<body data-state="disconnected">
+
+  <!-- HEADER ─────────────────────────────────────────────── -->
+  <div id="header-bar">
+    <span id="app-title">[ PUNCH<span class="accent">2</span>PEN ]</span>
+    <span id="status-badge">WAIT</span>
+  </div>
+
+  <!-- POSITION ───────────────────────────────────────────── -->
+  <div id="position-display">
+    <span id="position-text">
+      Bar <span class="bar-num">1</span>&nbsp;|&nbsp;Beat <span class="beat-num">1</span>
+    </span>
+  </div>
+
+  <!-- CONNECTION BANNER (only Disconnected) ───────────────── -->
+  <div id="connection-banner">Waiting for engine connection…</div>
+
+  <!-- TRANSCRIPT ─────────────────────────────────────────── -->
+  <div id="transcript-container">
+    <div class="fade-top"></div>
+    <div id="idle-hint">
+      — no signal —
+      <span class="sub">armed and ready · press ● REC on your DAW</span>
+    </div>
+    <div id="transcript-inner"></div>
+    <div class="fade-bot"></div>
+  </div>
+
+  <!-- CORRECTION OVERLAY ─────────────────────────────────── -->
+  <div id="correction-overlay">
+    <span id="correction-original"></span>
+    <input id="correction-input" type="text" spellcheck="false" autocomplete="off" />
+    <div class="button-row">
+      <button id="correction-submit">Apply ↵</button>
+      <button id="correction-cancel">Cancel</button>
+    </div>
+  </div>
+
+  <!-- LOGO MARK ──────────────────────────────────────────── -->
+  <div id="logo-mark" aria-hidden="true">
+    <!-- Minimal fist+bolt placeholder. Replace with the real
+         binary-embedded PNG once it's wired into the resource provider. -->
+    <svg viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="2.5"
+         stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 22 L20 22 L20 14 L28 14 L28 22 L36 22 L36 38 L20 44 L12 38 Z" />
+      <path d="M36 16 L44 16 L40 26 L46 26 L34 44 L38 32 L32 32 Z"
+            fill="currentColor" fill-opacity="0.85" stroke="none" />
+    </svg>
+  </div>
+
+  <script>
+    // ────────────────────────────────────────────────────────────
+    // State machine + DOM helpers
+    // ────────────────────────────────────────────────────────────
+    const body         = document.body;
+    const badge        = document.getElementById('status-badge');
+    const positionBar  = document.querySelector('#position-text .bar-num');
+    const positionBeat = document.querySelector('#position-text .beat-num');
+    const transcript   = document.getElementById('transcript-inner');
+    const container    = document.getElementById('transcript-container');
+    const overlay      = document.getElementById('correction-overlay');
+    const original     = document.getElementById('correction-original');
+    const input        = document.getElementById('correction-input');
+
+    const BADGE_TEXT = {
+      disconnected: 'WAIT',
+      idle:         'IDLE',
+      recording:    'REC',
+      playback:     'PLAY',
+      correction:   '—',   // preserved by setState
+    };
+
+    let currentState = 'disconnected';
+    function setState(stateName) {
+      // 'correction' is an overlay layer — preserve the underlying state
+      // so when the popup closes we drop back to it.
+      if (stateName === 'correction') {
+        body.classList.add('correction-open');
+        body.dataset.state = 'correction';
+        return;
+      }
+      currentState = stateName;
+      body.dataset.state = stateName;
+      if (badge) badge.textContent = BADGE_TEXT[stateName] || '';
+      // Toggle the idle empty-state class based on whether we have words
+      body.classList.toggle('has-words', transcript.children.length > 0);
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // Transcript model
+    // Each .lyric-line holds .lyric-word spans with data-start/data-end
+    // (in DAW samples). updatePlayhead() walks them every frame.
+    // ────────────────────────────────────────────────────────────
+    function appendWord(text, startSample, endSample, barNumber) {
+      let line = transcript.lastElementChild;
+      // Start a new line when bar changes or the current line has 8+ words.
+      const startNewLine =
+        !line ||
+        (line.dataset.bar && Number(line.dataset.bar) !== Number(barNumber)) ||
+        line.children.length >= 8;
+
+      if (startNewLine) {
+        line = document.createElement('div');
+        line.className = 'lyric-line';
+        line.dataset.bar = String(barNumber);
+        transcript.appendChild(line);
+      }
+
+      const span = document.createElement('span');
+      span.className = 'lyric-word upcoming';
+      span.dataset.start = String(startSample);
+      span.dataset.end   = String(endSample);
+      span.textContent   = text;
+      line.appendChild(span);
+
+      body.classList.add('has-words');
+    }
+
+    function resetTranscript() {
+      transcript.innerHTML = '';
+      body.classList.remove('has-words');
+      currentSamplePos = 0;
+      targetScrollY = 0;
+      currentScrollY = 0;
+      transcript.style.transform = 'translateY(0)';
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // Playhead + scroll. Mirrors juce::VBlankAttachment behaviour
+    // from TranscriptView.cpp (scroll += (target - scroll) * 0.15).
+    // ────────────────────────────────────────────────────────────
+    let currentSamplePos = 0;
+    let targetScrollY    = 0;
+    let currentScrollY   = 0;
+
+    function updatePlayhead(currentDAWSample) {
+      currentSamplePos = currentDAWSample;
+      if (currentState !== 'playback' && currentState !== 'correction') return;
+
+      const lines = transcript.querySelectorAll('.lyric-line');
+      let activeLineIdx = -1;
+
+      lines.forEach((line, li) => {
+        let lineHasActive = false;
+        line.querySelectorAll('.lyric-word').forEach((w) => {
+          const s = Number(w.dataset.start);
+          const e = Number(w.dataset.end);
+          w.classList.remove('past', 'active', 'upcoming');
+          if (currentDAWSample >= s && currentDAWSample <= e) {
+            w.classList.add('active');
+            lineHasActive = true;
+          } else if (currentDAWSample > e) {
+            w.classList.add('past');
+          } else {
+            w.classList.add('upcoming');
+          }
+        });
+        if (lineHasActive) activeLineIdx = li;
+      });
+
+      if (activeLineIdx !== -1) {
+        // Center the active line. 40 = .lyric-line height.
+        targetScrollY = activeLineIdx * 40;
+      }
+    }
+
+    // RAF spring loop — matches the 0.15 ease factor from JUCE.
+    function springLoop() {
+      const delta = targetScrollY - currentScrollY;
+      if (Math.abs(delta) > 0.1) {
+        currentScrollY += delta * 0.15;
+        transcript.style.transform = `translateY(${-currentScrollY}px)`;
+      }
+      requestAnimationFrame(springLoop);
+    }
+    requestAnimationFrame(springLoop);
+
+    function setConnectionStatus(connected) {
+      if (!connected) {
+        setState('disconnected');
+      } else if (currentState === 'disconnected') {
+        // promote to idle on first connection unless host overrides
+        setState(body.classList.contains('has-words') ? 'playback' : 'idle');
+      }
+    }
+
+    function updatePosition(bar, beat) {
+      if (positionBar)  positionBar.textContent  = bar;
+      if (positionBeat) positionBeat.textContent = beat;
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // Correction overlay
+    // ────────────────────────────────────────────────────────────
+    let savedState = 'playback';
+
+    function showCorrection(word, x, y) {
+      savedState = currentState === 'correction' ? savedState : currentState;
+      original.innerHTML = `<span class="strike">${word}</span>`;
+      input.value = word;
+      // Clamp to plugin window (260x90, 6px padding off edges)
+      const clampedX = Math.max(8, Math.min(x, 400 - 260 - 8));
+      const clampedY = Math.max(50, Math.min(y, 600 - 90 - 8));
+      overlay.style.left = clampedX + 'px';
+      overlay.style.top  = clampedY + 'px';
+      overlay.dataset.original = word;
+      setState('correction');
+      // Defer focus so the overlay is laid out
+      setTimeout(() => { input.focus(); input.select(); }, 0);
+    }
+
+    function hideCorrection() {
+      setState(savedState);
+    }
+
+    function commitCorrection() {
+      const orig = overlay.dataset.original || '';
+      const next = input.value.trim();
+      if (next && next !== orig) {
+        if (window.punch2pen && window.punch2pen.submitCorrection) {
+          window.punch2pen.submitCorrection(orig, next);
+        }
+      }
+      hideCorrection();
+    }
+
+    document.getElementById('correction-submit').addEventListener('click', commitCorrection);
+    document.getElementById('correction-cancel').addEventListener('click', () => {
+      if (window.punch2pen && window.punch2pen.onCorrectionCancelled) {
+        window.punch2pen.onCorrectionCancelled();
+      }
+      hideCorrection();
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter')  { e.preventDefault(); commitCorrection(); }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (window.punch2pen && window.punch2pen.onCorrectionCancelled) {
+          window.punch2pen.onCorrectionCancelled();
+        }
+        hideCorrection();
+      }
+    });
+
+    // ────────────────────────────────────────────────────────────
+    // Word click → C++
+    // ────────────────────────────────────────────────────────────
+    container.addEventListener('click', (e) => {
+      const w = e.target.closest('.lyric-word');
+      if (!w) return;
+      const rect = w.getBoundingClientRect();
+      const x = Math.round(rect.left);
+      const y = Math.round(rect.bottom);
+      const word = w.textContent || '';
+      // Fire native callback if registered; otherwise open the popup
+      // locally so the page also works as a static preview.
+      if (window.punch2pen && window.punch2pen.onWordClicked) {
+        window.punch2pen.onWordClicked(word, x, y);
+      } else {
+        showCorrection(word, x, y);
+      }
+    });
+
+    // ────────────────────────────────────────────────────────────
+    // Expose the C++ → JS API on window for evaluateJavascript().
+    // ────────────────────────────────────────────────────────────
+    window.appendWord           = appendWord;
+    window.updatePlayhead       = updatePlayhead;
+    window.setConnectionStatus  = setConnectionStatus;
+    window.updatePosition       = updatePosition;
+    window.setState             = setState;
+    window.resetTranscript      = resetTranscript;
+    window.showCorrection       = showCorrection;
+    window.hideCorrection       = hideCorrection;
+
+    // ────────────────────────────────────────────────────────────
+    // Initial state — disconnected until the engine reports in.
+    // ────────────────────────────────────────────────────────────
+    setState('disconnected');
+
+    // Notify host that the page is ready for binding.
+    if (window.punch2pen && window.punch2pen.onReady) {
+      window.punch2pen.onReady();
+    }
+  </script>
+</body>
+</html>

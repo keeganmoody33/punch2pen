@@ -39,7 +39,7 @@ void TranscriptView::paint(juce::Graphics &g) {
     for (const auto &word : line.words) {
       g.setColour(textPrimary.withAlpha(word.currentAlpha));
       const juce::String spacedWord = juce::String(word.text) + " ";
-      const int wordWidth = g.getCurrentFont().getStringWidth(spacedWord);
+      const int wordWidth = juce::GlyphArrangement::getStringWidthInt(g.getCurrentFont(), spacedWord);
       g.drawText(spacedWord, xOffset, yOffset, wordWidth, lineHeight,
                  juce::Justification::centredLeft);
 
