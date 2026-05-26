@@ -109,6 +109,7 @@ The `--api-key=` flag can be omitted if the `OPENAI_API_KEY` environment variabl
 | `engine/tests/` | Unit tests for coordinator, database manager, profile manager, protocol serialization, OpenAI JSON |
 | `plugin/` | JUCE DAW plugin — audio capture, IPC client, transcript UI, correction editor |
 | `plugin/Source/` | C++ plugin sources (`PluginProcessor`, `PluginEditor`, `TranscriptView`, `CorrectionEditor`, `IPCClient`, `RingBuffer`) |
+| `plugin/tests/` | Unit tests for RingBuffer, IPCClient, and PluginProcessor state persistence |
 | `shared/` | Protocol definitions shared between plugin and engine (`Protocol.h`) |
 | `scripts/` | Model download and verification helpers |
 | `installer/` | macOS distribution packaging (`installer/macos/build_pkg.sh`) |
@@ -118,8 +119,11 @@ The `--api-key=` flag can be omitted if the `OPENAI_API_KEY` environment variabl
 The following items are **planned but not yet implemented**:
 
 - **ProfileManager persistence** — stubs exist in `engine/src/ProfileManager.h` with `loadProfile()` / `saveProfile()` but no file I/O is wired
-- **Expanded test coverage** — current tests cover coordinator, database, profile, protocol serialization, and OpenAI JSON parsing; integration and plugin-side tests are planned
-- **CI/CD pipeline** — no automated build/test pipeline exists yet
+
+**Recently completed:**
+
+- ~~Expanded test coverage~~ — plugin-side tests now exist for `AudioRingBuffer`, `IPCClient`, and `PluginProcessor` state round-trip (see `plugin/tests/`)
+- ~~CI/CD pipeline~~ — GitHub Actions CI runs engine tests and plugin tests as parallel jobs
 
 ## Documentation
 
