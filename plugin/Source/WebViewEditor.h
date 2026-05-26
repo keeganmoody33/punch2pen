@@ -28,7 +28,7 @@ namespace punch2pen {
       onCorrectionCancelled()
       onReady()
  */
-class WebViewEditor : public juce::AudioProcessorEditor,
+class WebViewEditor : public juce::Component,
                       public IPCClient::Listener,
                       private juce::Timer {
 public:

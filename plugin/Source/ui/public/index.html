@@ -508,7 +508,11 @@
 
     function showCorrection(word, x, y) {
       savedState = currentState === 'correction' ? savedState : currentState;
-      original.innerHTML = `<span class="strike">${word}</span>`;
+      original.textContent = '';
+      const strike = document.createElement('span');
+      strike.className = 'strike';
+      strike.textContent = word;
+      original.appendChild(strike);
       input.value = word;
       // Clamp to plugin window (260x90, 6px padding off edges)
       const clampedX = Math.max(8, Math.min(x, 400 - 260 - 8));
