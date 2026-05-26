@@ -9,7 +9,7 @@ class IPCClient : public juce::Thread {
 public:
   enum class TranscriptionMode { Offline, Online };
 
-  IPCClient();
+  explicit IPCClient(int port = 7483);
   ~IPCClient() override;
 
   void run() override;
@@ -47,6 +47,7 @@ private:
   std::vector<float> tempBuffer;
   std::atomic<TranscriptionMode> transcriptionMode{TranscriptionMode::Offline};
 
+  int serverPort;
   juce::CriticalSection listenerLock;
   std::vector<Listener *> listeners;
 };

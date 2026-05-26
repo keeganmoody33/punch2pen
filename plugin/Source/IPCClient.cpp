@@ -5,7 +5,10 @@
 
 namespace punch2pen {
 
-IPCClient::IPCClient() : Thread("Punch2Pen_IPC") { startThread(); }
+IPCClient::IPCClient(int port)
+    : Thread("Punch2Pen_IPC"), serverPort(port) {
+  startThread();
+}
 
 IPCClient::~IPCClient() {
   signalThreadShouldExit();
@@ -86,7 +89,7 @@ void IPCClient::processOutgoingAudio() {
 
 void IPCClient::attemptConnection() {
   // Localhost, port 7483 (from spec)
-  if (socket.connect("127.0.0.1", 7483, 1000)) {
+  if (socket.connect("127.0.0.1", serverPort, 1000)) {
     connected = true;
 
     juce::ScopedLock lock(listenerLock);
