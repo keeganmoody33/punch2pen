@@ -8,9 +8,18 @@ juce_add_plugin(punch2pen_plugin
     PLUGIN_CODE "P2pn"
     FORMATS VST3 AU
     PRODUCT_NAME "punch2pen"
+    NEEDS_WEB_BROWSER TRUE
 )
 
 juce_generate_juce_header(punch2pen_plugin)
+
+# ── Embed the WebView HTML/CSS/JS as a binary blob ──────────────────────
+# JUCE generates a BinaryData resource (key "index_html") that
+# WebViewEditor.cpp loads via BinaryData::getNamedResource.
+juce_add_binary_data(punch2pen_resources
+    SOURCES
+        Source/ui/public/index.html
+)
 
 target_sources(punch2pen_plugin
     PRIVATE
@@ -18,8 +27,15 @@ target_sources(punch2pen_plugin
         Source/PluginProcessor.h
         Source/PluginEditor.cpp
         Source/PluginEditor.h
+        Source/WebViewEditor.cpp
+        Source/WebViewEditor.h
+        # Legacy native components — kept for reference, no longer added
+        # to the editor tree. Remove these source entries (and their files)
+        # once the WebView build is confirmed everywhere.
         Source/TranscriptView.cpp
         Source/TranscriptView.h
+        Source/CorrectionEditor.cpp
+        Source/CorrectionEditor.h
         Source/IPCClient.cpp
         Source/IPCClient.h
         Source/PositionDisplay.cpp
@@ -32,20 +48,24 @@ target_include_directories(punch2pen_plugin PRIVATE
 )
 
 target_compile_definitions(punch2pen_plugin PUBLIC
-    JUCE_WEB_BROWSER=0
+    JUCE_WEB_BROWSER=1
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0
 )
 
 target_link_libraries(punch2pen_plugin
     PRIVATE
+    punch2pen_resources
     juce::juce_audio_utils
+    juce::juce_gui_extra
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags
 )
 
-# ---------- Plugin test targets ----------
+# ──────────────────────────────────────────────────────────────────────
+# Plugin test targets
+# ──────────────────────────────────────────────────────────────────────
 
 # RingBuffer test (header-only, needs juce_core + juce_audio_basics)
 juce_add_console_app(ringBufferTest PRODUCT_NAME "ringBufferTest")
@@ -84,13 +104,16 @@ target_sources(pluginProcessorStateTest PRIVATE
     tests/PluginProcessorStateTest.cpp
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
+    Source/WebViewEditor.cpp
     Source/TranscriptView.cpp
     Source/CorrectionEditor.cpp
     Source/PositionDisplay.cpp
     Source/IPCClient.cpp
 )
 target_link_libraries(pluginProcessorStateTest PRIVATE
+    punch2pen_resources
     juce::juce_audio_utils
+    juce::juce_gui_extra
     juce::juce_recommended_config_flags
 )
 target_include_directories(pluginProcessorStateTest PRIVATE
@@ -98,7 +121,7 @@ target_include_directories(pluginProcessorStateTest PRIVATE
     ${CMAKE_SOURCE_DIR}/shared
 )
 target_compile_definitions(pluginProcessorStateTest PRIVATE
-    JUCE_WEB_BROWSER=0
+    JUCE_WEB_BROWSER=1
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0
     JucePlugin_Name="punch2pen"
