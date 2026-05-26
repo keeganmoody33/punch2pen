@@ -25,23 +25,14 @@ juce::String jsQuote(const juce::String &s) {
   return "\"" + escaped + "\"";
 }
 
-// Resolve the embedded index.html. Falls back to a minimal error page if
-// the binary data target hasn't been regenerated yet.
+// Resolve the embedded index.html. BinaryData::indexhtml /
+// BinaryData::indexhtmlSize are produced by juce_add_binary_data when
+// index.html is added as a resource (see plugin/CMakeLists.txt). If the
+// binary data target hasn't been regenerated, the build fails at link
+// time, so a runtime fallback is not needed here.
 juce::String getIndexHtml() {
-  // BinaryData::indexhtml / BinaryData::indexhtmlSize are produced by
-  // juce_add_binary_data when index.html is added as a resource.
- #if defined(BINARYDATA_H_INCLUDED) || defined(BinaryData_indexhtml_h)
   return juce::String::fromUTF8(BinaryData::indexhtml,
                                 BinaryData::indexhtmlSize);
- #else
-  return "<html><body style='background:#1C1917;color:#FCD34D;"
-         "font-family:monospace;padding:24px'>"
-         "<h3>punch2pen WebView</h3>"
-         "<p>BinaryData::indexhtml not generated yet. "
-         "Re-run CMake configure after adding "
-         "<code>Source/ui/public/index.html</code> to "
-         "<code>juce_add_binary_data</code>.</p></body></html>";
- #endif
 }
 
 } // namespace
@@ -49,7 +40,7 @@ juce::String getIndexHtml() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 WebViewEditor::WebViewEditor(Punch2PenAudioProcessor &p)
-    : AudioProcessorEditor(&p), audioProcessor(p) {
+    : audioProcessor(p) {
 
   setSize(400, 600);
 
