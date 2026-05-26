@@ -14,8 +14,8 @@ juce_add_plugin(punch2pen_plugin
 juce_generate_juce_header(punch2pen_plugin)
 
 # ── Embed the WebView HTML/CSS/JS as a binary blob ──────────────────────
-# JUCE generates BinaryData::indexhtml + BinaryData::indexhtmlSize that
-# WebViewEditor.cpp loads via its resource provider.
+# JUCE generates a BinaryData resource (key "index_html") that
+# WebViewEditor.cpp loads via BinaryData::getNamedResource.
 juce_add_binary_data(punch2pen_resources
     SOURCES
         Source/ui/public/index.html
