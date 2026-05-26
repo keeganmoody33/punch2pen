@@ -185,10 +185,15 @@ void WebViewEditor::onStatusChanged(bool connected) {
 }
 
 // ── JS dispatch ─────────────────────────────────────────────────────────────
-void WebViewEditor::runJs(const juce::String &script) {
+void WebViewEditor::runJs(const juce::String &script, bool queueIfPending) {
   if (!webView) return;
   if (!pageReady) {
-    queuedJs.add(script);
+    // Only buffer scripts the caller explicitly wants replayed once the page
+    // is ready (e.g. resetTranscript, setState). Transient 30Hz updates pass
+    // queueIfPending=false so they don't accumulate if the WebView never
+    // initialises.
+    if (queueIfPending)
+      queuedJs.add(script);
     return;
   }
   webView->evaluateJavascript(script);
@@ -196,20 +201,27 @@ void WebViewEditor::runJs(const juce::String &script) {
 
 void WebViewEditor::jsAppendWord(const juce::String &text,
                                  double startSample, double endSample, int bar) {
+  // Words arrive on IPC at unbounded rate; don't buffer them if the page
+  // isn't ready (resetTranscript will be replayed instead).
   runJs("window.appendWord("
         + jsQuote(text) + ","
         + juce::String(startSample) + ","
         + juce::String(endSample) + ","
-        + juce::String(bar) + ");");
+        + juce::String(bar) + ");",
+        /*queueIfPending=*/false);
 }
 
 void WebViewEditor::jsUpdatePlayhead(double sample) {
-  runJs("window.updatePlayhead(" + juce::String(sample) + ");");
+  // 30Hz — never buffer.
+  runJs("window.updatePlayhead(" + juce::String(sample) + ");",
+        /*queueIfPending=*/false);
 }
 
 void WebViewEditor::jsUpdatePosition(int bar, int beat) {
+  // Changes on every beat — never buffer.
   runJs("window.updatePosition(" + juce::String(bar) + ","
-        + juce::String(beat) + ");");
+        + juce::String(beat) + ");",
+        /*queueIfPending=*/false);
 }
 
 void WebViewEditor::jsSetConnectionStatus(bool connected) {

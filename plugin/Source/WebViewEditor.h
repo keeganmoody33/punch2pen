@@ -46,8 +46,12 @@ public:
 private:
   void timerCallback() override;
 
-  // Push a fragment of JS into the page.
-  void runJs(const juce::String &script);
+  // Push a fragment of JS into the page. If the page hasn't signalled
+  // onReady() yet, the script is buffered when queueIfPending is true and
+  // dropped otherwise — used for transient 30Hz updates (playhead etc.)
+  // that would otherwise grow the queue unboundedly if the WebView never
+  // initialises (e.g. missing WebView2 runtime).
+  void runJs(const juce::String &script, bool queueIfPending = true);
 
   // Helpers that wrap the C++ → JS contract.
   void jsAppendWord(const juce::String &text,
