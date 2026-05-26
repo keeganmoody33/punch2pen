@@ -1,7 +1,9 @@
 #include "../src/DatabaseManager.h"
 #include "../src/IPCServerInterface.h"
+#include "../src/ProfileManager.h"
 #include "../src/TranscriberInterface.h"
 #include "../src/TranscriptionCoordinator.h"
+#include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <filesystem>
@@ -88,7 +90,12 @@ void testCoordinatorRouting() {
   punch2pen::DatabaseManager db;
   db.initialize(tmpDir + "/test_corrections.csv");
 
-  Punch2Pen::TranscriptionCoordinator coordinator(mockServer, mockTranscriber, db);
+  punch2pen::ProfileManager profileManager;
+  profileManager.setDataDirectory(tmpDir);
+  profileManager.loadProfile("test");
+
+  Punch2Pen::TranscriptionCoordinator coordinator(mockServer, mockTranscriber, db,
+                                                  profileManager);
 
   std::vector<float> fakeDAWAudio(1600, 0.5f);
   mockServer.audioQueue.push_back(fakeDAWAudio);
@@ -124,7 +131,12 @@ void testCoordinatorCorrections() {
   punch2pen::DatabaseManager db;
   db.initialize(tmpDir + "/test_corrections.csv");
 
-  Punch2Pen::TranscriptionCoordinator coordinator(mockServer, mockTranscriber, db);
+  punch2pen::ProfileManager profileManager;
+  profileManager.setDataDirectory(tmpDir);
+  profileManager.loadProfile("test");
+
+  Punch2Pen::TranscriptionCoordinator coordinator(mockServer, mockTranscriber, db,
+                                                  profileManager);
 
   mockServer.correctionQueue.push_back({"hello", "world"});
 
@@ -144,9 +156,69 @@ void testCoordinatorCorrections() {
   std::filesystem::remove_all(tmpDir);
 }
 
+void testCoordinatorProfileCorrections() {
+  MockIPCServer mockServer;
+  MockTranscriber mockTranscriber;
+
+  std::string tmpDbDir = "/tmp/punch2pen_test_coord_profile_db";
+  std::string tmpProfileDir = "/tmp/punch2pen_test_coord_profile_pm";
+  std::filesystem::create_directories(tmpDbDir);
+  std::filesystem::create_directories(tmpProfileDir);
+
+  punch2pen::DatabaseManager db;
+  db.initialize(tmpDbDir + "/test_corrections.csv");
+
+  punch2pen::ProfileManager profileManager;
+  profileManager.setDataDirectory(tmpProfileDir);
+  profileManager.loadProfile("test");
+
+  Punch2Pen::TranscriptionCoordinator coordinator(mockServer, mockTranscriber, db,
+                                                  profileManager);
+
+  mockServer.correctionQueue.push_back({"mic", "studio microphone"});
+
+  std::thread worker([&]() { coordinator.run(); });
+  std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  coordinator.stop();
+  worker.join();
+
+  auto dbVocab = db.getVocabulary();
+  bool dbHasStudio = std::find(dbVocab.begin(), dbVocab.end(), "studio") != dbVocab.end();
+  bool dbHasMicrophone = std::find(dbVocab.begin(), dbVocab.end(), "microphone") != dbVocab.end();
+  assert(dbHasStudio && "DB vocabulary should contain 'studio'");
+  assert(dbHasMicrophone && "DB vocabulary should contain 'microphone'");
+
+  auto profileCorrections = profileManager.getCorrections();
+  assert(profileCorrections.size() == 1 && "ProfileManager should have 1 correction");
+  assert(profileCorrections[0].original == "mic" &&
+         "Correction original should be 'mic'");
+  assert(profileCorrections[0].corrected == "studio microphone" &&
+         "Correction corrected should be 'studio microphone'");
+
+  auto profileVocab = profileManager.getVocabulary();
+  bool profileHasStudio = std::find(profileVocab.begin(), profileVocab.end(), "studio") != profileVocab.end();
+  bool profileHasMicrophone = std::find(profileVocab.begin(), profileVocab.end(), "microphone") != profileVocab.end();
+  assert(profileHasStudio && "Profile vocabulary should contain 'studio'");
+  assert(profileHasMicrophone && "Profile vocabulary should contain 'microphone'");
+
+  auto &lastVocab = mockTranscriber.lastVocabularyReceived;
+  bool transcriberHasStudio = std::find(lastVocab.begin(), lastVocab.end(), "studio") != lastVocab.end();
+  bool transcriberHasMicrophone = std::find(lastVocab.begin(), lastVocab.end(), "microphone") != lastVocab.end();
+  assert(transcriberHasStudio &&
+         "Transcriber vocabulary bias should contain 'studio'");
+  assert(transcriberHasMicrophone &&
+         "Transcriber vocabulary bias should contain 'microphone'");
+
+  std::cout << "[PASS] testCoordinatorProfileCorrections" << std::endl;
+
+  std::filesystem::remove_all(tmpDbDir);
+  std::filesystem::remove_all(tmpProfileDir);
+}
+
 int main() {
   testCoordinatorRouting();
   testCoordinatorCorrections();
+  testCoordinatorProfileCorrections();
   std::cout << "All TranscriptionCoordinator tests passed!" << std::endl;
   return 0;
 }

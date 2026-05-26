@@ -3,13 +3,16 @@
 #include <chrono>
 #include <iostream>
 #include <thread>
+#include <unordered_set>
 
 namespace punch2pen {
 
 TranscriptionCoordinator::TranscriptionCoordinator(IPCServerInterface &ipcServerRef,
                                                    TranscriberInterface &transcriberRef,
-                                                   DatabaseManager &dbRef)
-    : ipcServer(ipcServerRef), transcriber(transcriberRef), db(dbRef) {}
+                                                   DatabaseManager &dbRef,
+                                                   ProfileManager &profileManagerRef)
+    : ipcServer(ipcServerRef), transcriber(transcriberRef), db(dbRef),
+      profileManager(profileManagerRef) {}
 
 void TranscriptionCoordinator::run() {
   running.store(true);
@@ -31,8 +34,13 @@ void TranscriptionCoordinator::run() {
     while (ipcServer.hasPendingCorrection()) {
       auto correction = ipcServer.popCorrection();
       db.addCorrection(correction.original, correction.corrected);
+      profileManager.addCorrection(correction.original, correction.corrected);
 
-      auto vocab = db.getVocabulary();
+      auto dbVocab = db.getVocabulary();
+      auto profileVocab = profileManager.getVocabulary();
+      std::unordered_set<std::string> merged(dbVocab.begin(), dbVocab.end());
+      merged.insert(profileVocab.begin(), profileVocab.end());
+      std::vector<std::string> vocab(merged.begin(), merged.end());
       transcriber.setVocabularyBias(vocab);
 
       std::cout << "Applied correction. Vocabulary terms: " << vocab.size()

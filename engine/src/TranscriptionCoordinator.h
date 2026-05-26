@@ -2,6 +2,7 @@
 
 #include "DatabaseManager.h"
 #include "IPCServerInterface.h"
+#include "ProfileManager.h"
 #include "TranscriberInterface.h"
 
 #include <atomic>
@@ -12,7 +13,8 @@ class TranscriptionCoordinator {
 public:
   TranscriptionCoordinator(IPCServerInterface &ipcServer,
                            TranscriberInterface &transcriber,
-                           DatabaseManager &db);
+                           DatabaseManager &db,
+                           ProfileManager &profileManager);
 
   void run();
   void stop();
@@ -21,6 +23,7 @@ private:
   IPCServerInterface &ipcServer;
   TranscriberInterface &transcriber;
   DatabaseManager &db;
+  ProfileManager &profileManager;
   std::atomic<bool> running{false};
 };
 

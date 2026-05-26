@@ -96,10 +96,32 @@ void testOverwriteProfile() {
   std::filesystem::remove_all(tmpDir);
 }
 
+void testAddCorrectionExtractsVocabulary() {
+  std::string tmpDir = "/tmp/punch2pen_test_profile_corr_vocab";
+  std::filesystem::create_directories(tmpDir);
+
+  punch2pen::ProfileManager pm;
+  pm.setDataDirectory(tmpDir);
+  pm.loadProfile("testuser");
+
+  pm.addCorrection("mic", "studio microphone");
+
+  auto vocab = pm.getVocabulary();
+  bool foundStudio = std::find(vocab.begin(), vocab.end(), "studio") != vocab.end();
+  bool foundMicrophone = std::find(vocab.begin(), vocab.end(), "microphone") != vocab.end();
+  assert(foundStudio && "addCorrection should extract 'studio' into vocabulary");
+  assert(foundMicrophone && "addCorrection should extract 'microphone' into vocabulary");
+
+  std::cout << "[PASS] testAddCorrectionExtractsVocabulary" << std::endl;
+
+  std::filesystem::remove_all(tmpDir);
+}
+
 int main() {
   testSaveAndLoad();
   testEmptyProfile();
   testOverwriteProfile();
+  testAddCorrectionExtractsVocabulary();
   std::cout << "All ProfileManager tests passed!" << std::endl;
   return 0;
 }
