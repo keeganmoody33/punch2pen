@@ -25,23 +25,14 @@ juce::String jsQuote(const juce::String &s) {
   return "\"" + escaped + "\"";
 }
 
+// Resolve the embedded index.html. BinaryData::indexhtml /
+// BinaryData::indexhtmlSize are produced by juce_add_binary_data when
+// index.html is added as a resource (see plugin/CMakeLists.txt). If the
+// binary data target hasn't been regenerated, the build fails at link
+// time, so a runtime fallback is not needed here.
 juce::String getIndexHtml() {
-  int size = 0;
-  if (auto *data = BinaryData::getNamedResource("index_html", size))
-    return juce::String::fromUTF8(data, size);
-
-  // Return a minimal diagnostic page so a misconfigured build (e.g. the
-  // BinaryData resource key drifted, or index.html was removed from
-  // juce_add_binary_data) is visible rather than producing a silent blank
-  // WebView.
-  return "<html><body style='background:#1C1917;color:#FCD34D;"
-         "font-family:monospace;padding:24px'>"
-         "<h3>punch2pen WebView</h3>"
-         "<p>BinaryData resource \"index_html\" not found. "
-         "Re-run CMake configure and verify that "
-         "<code>Source/ui/public/index.html</code> is listed in "
-         "<code>juce_add_binary_data</code>.</p>"
-         "</body></html>";
+  return juce::String::fromUTF8(BinaryData::indexhtml,
+                                BinaryData::indexhtmlSize);
 }
 
 } // namespace
