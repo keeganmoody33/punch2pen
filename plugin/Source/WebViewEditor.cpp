@@ -26,8 +26,11 @@ juce::String jsQuote(const juce::String &s) {
 }
 
 juce::String getIndexHtml() {
-  return juce::String::fromUTF8(BinaryData::indexhtml,
-                                BinaryData::indexhtmlSize);
+  int size = 0;
+  if (auto *data = BinaryData::getNamedResource("index_html", size))
+    return juce::String::fromUTF8(data, size);
+
+  return {};
 }
 
 } // namespace
@@ -146,6 +149,7 @@ void WebViewEditor::timerCallback() {
   else                             state = "idle";
   if (state != lastState) {
     if (state == "recording" && lastState != "recording") {
+      ++takeGeneration;
       streamCursorSample = 0.0;
       runJs("window.resetTranscript();");
     }
@@ -157,8 +161,10 @@ void WebViewEditor::timerCallback() {
 // ── IPCClient::Listener ─────────────────────────────────────────────────────
 void WebViewEditor::onTranscriptionReceived(const std::string &text) {
   juce::Component::SafePointer<WebViewEditor> safeThis(this);
-  juce::MessageManager::callAsync([safeThis, text] {
+  auto generation = takeGeneration.load();
+  juce::MessageManager::callAsync([safeThis, text, generation] {
     if (safeThis == nullptr) return;
+    if (safeThis->takeGeneration.load() != generation) return;
     safeThis->streamCursorSample += 4800.0;
     double start = safeThis->streamCursorSample;
     double end   = start + 4800.0;

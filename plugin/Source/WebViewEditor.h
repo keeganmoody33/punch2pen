@@ -3,6 +3,7 @@
 #include "IPCClient.h"
 #include "PluginProcessor.h"
 #include <JuceHeader.h>
+#include <atomic>
 
 namespace punch2pen {
 
@@ -11,7 +12,7 @@ namespace punch2pen {
 
     Replaces the native Punch2PenAudioProcessorEditor. Loads
     Source/ui/public/index.html (embedded as binary data via
-    BinaryData::indexhtml) and bridges to the page using
+    BinaryData::getNamedResource) and bridges to the page using
     juce::WebBrowserComponent's native-function API.
 
     C++ → JS (called from this class via evaluateJavascript / NativeFunction
@@ -68,6 +69,7 @@ private:
   // Tracks what we last told the page, so we don't spam the bridge.
   bool   lastConnected     = false;
   double streamCursorSample = 0.0;
+  std::atomic<uint32_t> takeGeneration { 0 };
   int    lastBar           = -1;
   int    lastBeat          = -1;
   juce::String lastState   = {};
