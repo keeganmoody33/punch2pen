@@ -47,8 +47,13 @@ target_link_libraries(punch2pen_plugin
 
 # ---------- Plugin test targets ----------
 
+# The plugin's juce_generate_juce_header() produces JuceHeader.h here.
+set(JUCE_LIBRARY_CODE_DIR
+    "${CMAKE_CURRENT_BINARY_DIR}/punch2pen_plugin_artefacts/JuceLibraryCode")
+
 # RingBuffer test (header-only, needs juce_core + juce_audio_basics)
 add_executable(ringBufferTest tests/RingBufferTest.cpp)
+add_dependencies(ringBufferTest punch2pen_plugin)
 target_link_libraries(ringBufferTest PRIVATE
     juce::juce_core
     juce::juce_audio_basics
@@ -56,6 +61,7 @@ target_link_libraries(ringBufferTest PRIVATE
 target_include_directories(ringBufferTest PRIVATE
     Source
     ${CMAKE_SOURCE_DIR}/shared
+    ${JUCE_LIBRARY_CODE_DIR}
 )
 target_compile_definitions(ringBufferTest PRIVATE
     JUCE_STANDALONE_APPLICATION=1
@@ -71,9 +77,11 @@ target_link_libraries(ipcClientTest PRIVATE
     juce::juce_events
     juce::juce_gui_basics
 )
+add_dependencies(ipcClientTest punch2pen_plugin)
 target_include_directories(ipcClientTest PRIVATE
     Source
     ${CMAKE_SOURCE_DIR}/shared
+    ${JUCE_LIBRARY_CODE_DIR}
 )
 target_compile_definitions(ipcClientTest PRIVATE
     JUCE_STANDALONE_APPLICATION=1
