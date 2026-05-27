@@ -458,7 +458,7 @@
       submitCorrection: (...args) => window.__JUCE__.backend.submitCorrection(...args),
       onCorrectionCancelled: (...args) => window.__JUCE__.backend.onCorrectionCancelled(...args),
       onReady: (...args) => window.__JUCE__.backend.onReady(...args),
-    } : {};
+    } : (console.warn('[punch2pen] window.__JUCE__.backend unavailable — native calls are no-ops'), {});
     window.punch2pen = nativeBridge;
 
     function scheduleSpringLoop() {
