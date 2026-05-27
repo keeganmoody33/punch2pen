@@ -54,18 +54,28 @@ public:
   };
 
   TransportPosition getTransportPosition() const;
+  double getSampleRate() const { return AudioProcessor::getSampleRate(); }
 
   punch2pen::IPCClient *getIPCClient() const { return ipcClient.get(); }
+
+  bool consumePendingTransportStop() {
+    return pendingTransportStop.exchange(false);
+  }
 
 private:
   std::unique_ptr<punch2pen::AudioRingBuffer> audioRingBuffer;
   std::unique_ptr<punch2pen::IPCClient> ipcClient;
 
   std::atomic<double> currentBpm{120.0};
+  std::atomic<double> transportPpq{0.0};
+  std::atomic<int> transportTimeSigNum{4};
+  std::atomic<int> transportTimeSigDenom{4};
+  std::atomic<bool> transportIsPlaying{false};
+  std::atomic<bool> transportIsRecording{false};
 
   // Avoid heap alloc in processBlock
-  TransportPosition lastTransportPosition;
   bool wasRecordingLastBlock = false;
+  std::atomic<bool> pendingTransportStop{false};
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Punch2PenAudioProcessor)
 };

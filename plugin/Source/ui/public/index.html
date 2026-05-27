@@ -409,7 +409,7 @@
       const startNewLine =
         !line ||
         (line.dataset.bar && Number(line.dataset.bar) !== Number(barNumber)) ||
-        line.children.length >= 8;
+        line.querySelectorAll('.lyric-word').length >= 8;
 
       if (startNewLine) {
         line = document.createElement('div');
@@ -424,6 +424,13 @@
       span.dataset.end   = String(endSample);
       span.textContent   = text;
       line.appendChild(span);
+
+      let cursor = document.getElementById('stream-cursor');
+      if (!cursor) {
+        cursor = document.createElement('i');
+        cursor.id = 'stream-cursor';
+      }
+      line.appendChild(cursor);
 
       body.classList.add('has-words');
     }
@@ -444,6 +451,22 @@
     let currentSamplePos = 0;
     let targetScrollY    = 0;
     let currentScrollY   = 0;
+    let springFramePending = false;
+
+    const nativeBridge = window.__JUCE__ && window.__JUCE__.backend ? {
+      onWordClicked: (...args) => window.__JUCE__.backend.onWordClicked(...args),
+      submitCorrection: (...args) => window.__JUCE__.backend.submitCorrection(...args),
+      onCorrectionCancelled: (...args) => window.__JUCE__.backend.onCorrectionCancelled(...args),
+      onReady: (...args) => window.__JUCE__.backend.onReady(...args),
+    } : (console.warn('[punch2pen] window.__JUCE__.backend unavailable — native calls are no-ops'), {});
+    window.punch2pen = nativeBridge;
+
+    function scheduleSpringLoop() {
+      if (!springFramePending) {
+        springFramePending = true;
+        requestAnimationFrame(springLoop);
+      }
+    }
 
     function updatePlayhead(currentDAWSample) {
       currentSamplePos = currentDAWSample;
@@ -472,20 +495,24 @@
 
       if (activeLineIdx !== -1) {
         // Center the active line. 40 = .lyric-line height.
-        targetScrollY = activeLineIdx * 40;
+        const nextTargetScrollY = activeLineIdx * 40;
+        if (Math.abs(nextTargetScrollY - targetScrollY) > 0.1) {
+          targetScrollY = nextTargetScrollY;
+          scheduleSpringLoop();
+        }
       }
     }
 
     // RAF spring loop — matches the 0.15 ease factor from JUCE.
     function springLoop() {
+      springFramePending = false;
       const delta = targetScrollY - currentScrollY;
       if (Math.abs(delta) > 0.1) {
         currentScrollY += delta * 0.15;
         transcript.style.transform = `translateY(${-currentScrollY}px)`;
+        scheduleSpringLoop();
       }
-      requestAnimationFrame(springLoop);
     }
-    requestAnimationFrame(springLoop);
 
     function setConnectionStatus(connected) {
       if (!connected) {
