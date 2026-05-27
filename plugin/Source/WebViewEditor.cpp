@@ -27,10 +27,6 @@ WebViewEditor::WebViewEditor(Punch2PenAudioProcessor &p)
   // Build the WebBrowserComponent with native integration.
   juce::WebBrowserComponent::Options options;
   options = options
-            .withBackend(juce::WebBrowserComponent::Options::Backend::webview2)
-            .withWinWebView2Options(
-                juce::WebBrowserComponent::Options::WinWebView2{}
-                    .withBackgroundColour(juce::Colour(0xff1E1E1E)))
             .withNativeIntegrationEnabled()
             .withInitialisationData("punch2pen", juce::var(true))
             .withNativeFunction(
@@ -71,11 +67,20 @@ WebViewEditor::WebViewEditor(Punch2PenAudioProcessor &p)
                   return res;
                 });
 
+#if JUCE_WINDOWS
+  options = options
+                .withBackend(
+                    juce::WebBrowserComponent::Options::Backend::webview2)
+                .withWinWebView2Options(
+                    juce::WebBrowserComponent::Options::WinWebView2{}
+                        .withBackgroundColour(juce::Colour(0xff1E1E1E)));
+#endif
+
   webView = std::make_unique<juce::WebBrowserComponent>(options);
   addAndMakeVisible(*webView);
+  webView->setBounds(getLocalBounds());
 
-  // Trigger the resource provider with any URL — content is the same.
-  webView->goToURL("https://punch2pen.local/index.html");
+  webView->goToURL(juce::WebBrowserComponent::getResourceProviderRoot());
 
   // Hook into IPC.
   if (auto *client = audioProcessor.getIPCClient()) {
@@ -121,6 +126,13 @@ void WebViewEditor::timerCallback() {
     jsUpdatePosition(bar, beat);
     lastBar = bar;
     lastBeat = beat;
+  }
+
+  auto *client = audioProcessor.getIPCClient();
+  const bool connected = client != nullptr && client->isConnected();
+  if (connected != lastConnected) {
+    lastConnected = connected;
+    jsSetConnectionStatus(connected);
   }
 
   // Derive the canonical state from processor flags.

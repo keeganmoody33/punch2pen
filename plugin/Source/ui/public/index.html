@@ -453,6 +453,35 @@
     let currentScrollY   = 0;
     let springFramePending = false;
 
+    const nativeBridge = (() => {
+      const backend = window.__JUCE__ && window.__JUCE__.backend;
+      if (!backend) return {};
+
+      let nextResultId = 1;
+      const pending = new Map();
+      backend.addEventListener('__juce__complete', ({ promiseId, result }) => {
+        const resolve = pending.get(promiseId);
+        if (!resolve) return;
+        pending.delete(promiseId);
+        resolve(result);
+      });
+
+      const bind = (name) => (...params) => {
+        const resultId = nextResultId++;
+        const result = new Promise((resolve) => pending.set(resultId, resolve));
+        backend.emitEvent('__juce__invoke', { name, params, resultId });
+        return result;
+      };
+
+      return {
+        onWordClicked: bind('onWordClicked'),
+        submitCorrection: bind('submitCorrection'),
+        onCorrectionCancelled: bind('onCorrectionCancelled'),
+        onReady: bind('onReady'),
+      };
+    })();
+    window.punch2pen = nativeBridge;
+
     function scheduleSpringLoop() {
       if (!springFramePending) {
         springFramePending = true;
