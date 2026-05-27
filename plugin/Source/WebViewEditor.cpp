@@ -9,7 +9,9 @@ namespace {
 
 juce::String getIndexHtml() {
   int size = 0;
-  if (auto *data = BinaryData::getNamedResource("index_html", size))
+  auto *data = BinaryData::getNamedResource("index_html", size);
+  jassert(data != nullptr);
+  if (data != nullptr)
     return juce::String::fromUTF8(data, size);
 
   return {};
@@ -119,13 +121,15 @@ void WebViewEditor::timerCallback() {
       transport.ppq * (60.0 / juce::jmax(1.0, transport.bpm)) * sampleRate;
   jsUpdatePlayhead(currentSamplePosition);
 
-  double beatsPerBar = (double)juce::jmax(1, (int)transport.timeSigNum);
-  int bar  = (int)(transport.ppq / beatsPerBar) + 1;
-  int beat = (int)std::fmod(transport.ppq, beatsPerBar) + 1;
-  if (bar != lastBar || beat != lastBeat) {
-    jsUpdatePosition(bar, beat);
-    lastBar = bar;
-    lastBeat = beat;
+  if (transport.bar != lastBar || transport.beat != lastBeat) {
+    jsUpdatePosition(transport.bar, transport.beat);
+    lastBar = transport.bar;
+    lastBeat = transport.beat;
+  }
+
+  if (audioProcessor.consumePendingTransportStop()) {
+    if (auto *c = audioProcessor.getIPCClient())
+      c->sendTransportStop();
   }
 
   auto *client = audioProcessor.getIPCClient();

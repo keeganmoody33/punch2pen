@@ -427,7 +427,7 @@
 
       let cursor = document.getElementById('stream-cursor');
       if (!cursor) {
-        cursor = document.createElement('span');
+        cursor = document.createElement('i');
         cursor.id = 'stream-cursor';
       }
       line.appendChild(cursor);
@@ -453,33 +453,12 @@
     let currentScrollY   = 0;
     let springFramePending = false;
 
-    const nativeBridge = (() => {
-      const backend = window.__JUCE__ && window.__JUCE__.backend;
-      if (!backend) return {};
-
-      let nextResultId = 1;
-      const pending = new Map();
-      backend.addEventListener('__juce__complete', ({ promiseId, result }) => {
-        const resolve = pending.get(promiseId);
-        if (!resolve) return;
-        pending.delete(promiseId);
-        resolve(result);
-      });
-
-      const bind = (name) => (...params) => {
-        const resultId = nextResultId++;
-        const result = new Promise((resolve) => pending.set(resultId, resolve));
-        backend.emitEvent('__juce__invoke', { name, params, resultId });
-        return result;
-      };
-
-      return {
-        onWordClicked: bind('onWordClicked'),
-        submitCorrection: bind('submitCorrection'),
-        onCorrectionCancelled: bind('onCorrectionCancelled'),
-        onReady: bind('onReady'),
-      };
-    })();
+    const nativeBridge = window.__JUCE__ && window.__JUCE__.backend ? {
+      onWordClicked: (...args) => window.__JUCE__.backend.onWordClicked(...args),
+      submitCorrection: (...args) => window.__JUCE__.backend.submitCorrection(...args),
+      onCorrectionCancelled: (...args) => window.__JUCE__.backend.onCorrectionCancelled(...args),
+      onReady: (...args) => window.__JUCE__.backend.onReady(...args),
+    } : {};
     window.punch2pen = nativeBridge;
 
     function scheduleSpringLoop() {

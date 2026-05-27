@@ -58,6 +58,10 @@ public:
 
   punch2pen::IPCClient *getIPCClient() const { return ipcClient.get(); }
 
+  bool consumePendingTransportStop() {
+    return pendingTransportStop.exchange(false);
+  }
+
 private:
   std::unique_ptr<punch2pen::AudioRingBuffer> audioRingBuffer;
   std::unique_ptr<punch2pen::IPCClient> ipcClient;
@@ -71,6 +75,7 @@ private:
 
   // Avoid heap alloc in processBlock
   bool wasRecordingLastBlock = false;
+  std::atomic<bool> pendingTransportStop{false};
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Punch2PenAudioProcessor)
 };
