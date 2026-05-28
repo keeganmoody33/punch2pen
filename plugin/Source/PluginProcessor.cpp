@@ -158,7 +158,8 @@ void Punch2PenAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
   }
 
   if (wasRecordingLastBlock && !isRecording) {
-    pendingTransportStop.store(true);
+    if (ipcClient)
+      ipcClient->flagTransportStop();
   }
 
   wasRecordingLastBlock = isRecording;
@@ -229,9 +230,9 @@ Punch2PenAudioProcessor::getTransportPosition() const {
   position.isPlaying = transportIsPlaying.load();
   position.isRecording = transportIsRecording.load();
 
-  const auto beatsPerBar = juce::jmax(1, position.timeSigNum);
+  const auto ppqPerBar = position.timeSigNum * (4.0 / juce::jmax(1.0, (double)position.timeSigDenom));
   const auto safePpq = juce::jmax(0.0, position.ppq);
-  position.bar = (int)(safePpq / (double)beatsPerBar) + 1;
-  position.beat = (int)std::fmod(safePpq, (double)beatsPerBar) + 1;
+  position.bar = (int)(safePpq / ppqPerBar) + 1;
+  position.beat = (int)std::fmod(safePpq, ppqPerBar) + 1;
   return position;
 }
