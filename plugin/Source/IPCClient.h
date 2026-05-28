@@ -17,6 +17,7 @@ public:
   bool isConnected() const;
   void sendAudioChunk(const float *samples, int numSamples, double sampleRate);
   void sendTransportStop();
+  void flagTransportStop() { pendingStop.store(true); }
   void sendCorrection(const std::string &original, const std::string &corrected);
   void setTranscriptionMode(TranscriptionMode mode);
   TranscriptionMode getTranscriptionMode() const;
@@ -51,6 +52,8 @@ private:
   bool autoLaunchEngine;
   juce::CriticalSection listenerLock;
   std::vector<Listener *> listeners;
+
+  std::atomic<bool> pendingStop{false};
 };
 
 } // namespace punch2pen

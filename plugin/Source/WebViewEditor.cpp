@@ -127,11 +127,6 @@ void WebViewEditor::timerCallback() {
     lastBeat = transport.beat;
   }
 
-  if (audioProcessor.consumePendingTransportStop()) {
-    if (auto *c = audioProcessor.getIPCClient())
-      c->sendTransportStop();
-  }
-
   auto *client = audioProcessor.getIPCClient();
   const bool connected = client != nullptr && client->isConnected();
   if (connected != lastConnected) {

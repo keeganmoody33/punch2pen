@@ -68,6 +68,9 @@ void IPCClient::run() {
     }
 
     processOutgoingAudio();
+
+    if (pendingStop.exchange(false))
+      sendTransportStop();
   }
 }
 
