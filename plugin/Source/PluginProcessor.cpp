@@ -230,9 +230,10 @@ Punch2PenAudioProcessor::getTransportPosition() const {
   position.isPlaying = transportIsPlaying.load();
   position.isRecording = transportIsRecording.load();
 
-  const auto ppqPerBar = position.timeSigNum * (4.0 / juce::jmax(1.0, (double)position.timeSigDenom));
+  const auto ppqPerBeat = 4.0 / juce::jmax(1.0, (double)position.timeSigDenom);
+  const auto ppqPerBar = juce::jmax(1, position.timeSigNum) * ppqPerBeat;
   const auto safePpq = juce::jmax(0.0, position.ppq);
   position.bar = (int)(safePpq / ppqPerBar) + 1;
-  position.beat = (int)std::fmod(safePpq, ppqPerBar) + 1;
+  position.beat = (int)(std::fmod(safePpq, ppqPerBar) / ppqPerBeat) + 1;
   return position;
 }
