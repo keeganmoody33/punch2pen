@@ -9,12 +9,22 @@ namespace {
 
 juce::String getIndexHtml() {
   int size = 0;
-  auto *data = BinaryData::getNamedResource("index_html", size);
-  jassert(data != nullptr);
-  if (data != nullptr)
+  if (auto *data = BinaryData::getNamedResource("index_html", size))
     return juce::String::fromUTF8(data, size);
 
-  return {};
+  // Some JUCE/BinaryData generators strip '.' instead of replacing it with
+  // '_', so support both index_html and indexhtml keys.
+  if (auto *data = BinaryData::getNamedResource("indexhtml", size))
+    return juce::String::fromUTF8(data, size);
+
+  return "<html><body style='background:#1C1917;color:#FCD34D;"
+         "font-family:monospace;padding:24px'>"
+         "<h3>punch2pen WebView</h3>"
+         "<p>BinaryData resource \"index_html\"/\"indexhtml\" not found. "
+         "Re-run CMake configure and verify that "
+         "<code>Source/ui/public/index.html</code> is listed in "
+         "<code>juce_add_binary_data</code>.</p>"
+         "</body></html>";
 }
 
 } // namespace

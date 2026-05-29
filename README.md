@@ -111,17 +111,34 @@ The `--api-key=` flag can be omitted if the `OPENAI_API_KEY` environment variabl
 | `plugin/Source/` | C++ plugin sources (`PluginProcessor`, `PluginEditor`, `TranscriptView`, `CorrectionEditor`, `IPCClient`, `RingBuffer`) |
 | `plugin/tests/` | Unit tests for RingBuffer, IPCClient, and PluginProcessor state persistence |
 | `shared/` | Protocol definitions shared between plugin and engine (`Protocol.h`) |
-| `scripts/` | Model download and verification helpers |
+| `scripts/` | Model download, IPC verification, and DAW integration readiness helpers |
 | `installer/` | macOS distribution packaging (`installer/macos/build_pkg.sh`) |
+
+## DAW Integration Readiness
+
+Before opening Logic Pro, REAPER, Ableton Live, or another DAW, run the end-to-end readiness checker:
+
+```bash
+./scripts/test_daw_integration.sh --download-model
+```
+
+For a local install into the current macOS user account, run:
+
+```bash
+./scripts/test_daw_integration.sh --download-model --install-plugin --setup-engine-link
+```
+
+The script checks macOS prerequisites, CMake/compiler availability, DAW detection, model files, build artifacts, engine startup on `127.0.0.1:7483`, IPC correction submission, plugin bundles, code signing status, and the exact manual DAW checklist to follow next.
 
 ## Roadmap
 
 The following items are **planned but not yet implemented**:
 
-- **ProfileManager persistence** — stubs exist in `engine/src/ProfileManager.h` with `loadProfile()` / `saveProfile()` but no file I/O is wired
+- End-to-end automated host validation inside a real DAW session. The readiness script prepares the machine and opens the DAW, but recording/monitoring in Logic Pro or another host still requires manual confirmation.
 
 **Recently completed:**
 
+- ~~ProfileManager persistence~~ — per-user JSON profile loading/saving is implemented and wired into the engine startup/shutdown path.
 - ~~Expanded test coverage~~ — plugin-side tests now exist for `AudioRingBuffer`, `IPCClient`, and `PluginProcessor` state round-trip (see `plugin/tests/`)
 - ~~CI/CD pipeline~~ — GitHub Actions CI runs engine tests and plugin tests as parallel jobs
 
