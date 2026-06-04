@@ -116,21 +116,20 @@ void IPCClient::attemptConnection() {
 }
 
 void IPCClient::launchEngine() {
-  // Try default install location
-  juce::File engineApp("/Applications/Punch2Pen/punch2penEngine");
+  juce::File home =
+      juce::File::getSpecialLocation(juce::File::userHomeDirectory);
+
+  // Prefer the user-writable helper path so local test installs do not get
+  // shadowed by an older system-wide engine.
+  juce::File engineApp = home.getChildFile("punch2pen/bin/punch2penEngine");
 
   if (!engineApp.existsAsFile()) {
-    // For development, try finding it relative to home
-    // This is a bit of a hack for testing on dev machine
-    juce::File home =
-        juce::File::getSpecialLocation(juce::File::userHomeDirectory);
-    engineApp = home.getChildFile(
-        "punch2pen/bin/punch2penEngine"); // Assuming symlink or copy
+    engineApp = home.getChildFile("punch2pen/build/bin/punch2penEngine");
+  }
 
-    // Or check build dir if known... too varying.
-    if (!engineApp.existsAsFile()) {
-      engineApp = home.getChildFile("punch2pen/build/bin/punch2penEngine");
-    }
+  // Fall back to a packaged/system install location.
+  if (!engineApp.existsAsFile()) {
+    engineApp = juce::File("/Applications/Punch2Pen/punch2penEngine");
   }
 
   if (engineApp.existsAsFile()) {
