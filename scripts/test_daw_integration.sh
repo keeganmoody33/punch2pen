@@ -86,7 +86,8 @@ run_cmd() {
 command_exists() { command -v "$1" >/dev/null 2>&1; }
 
 version_ge() {
-  # Returns true if $1 >= $2. Uses sort -V when available; falls back to Python.
+  # Returns true if $1 >= $2. Uses sort -V when available; falls back to Python;
+  # last resort uses IFS-split numeric comparison (not lexicographic).
   local have="$1" need="$2"
   if sort -V </dev/null >/dev/null 2>&1; then
     [[ "$(printf '%s\n%s\n' "$need" "$have" | sort -V | head -n1)" == "$need" ]]
@@ -102,7 +103,15 @@ def parts(value):
 sys.exit(0 if parts(sys.argv[1]) >= parts(sys.argv[2]) else 1)
 PY
   else
-    [[ "$have" == "$need" || "$have" > "$need" ]]
+    local IFS='.'
+    local -a h=($have) n=($need)
+    local i
+    for i in 0 1 2; do
+      local hv=${h[$i]:-0} nv=${n[$i]:-0}
+      (( hv > nv )) && return 0
+      (( hv < nv )) && return 1
+    done
+    return 0
   fi
 }
 
@@ -111,6 +120,8 @@ cleanup() {
     kill "$ENGINE_PID" >/dev/null 2>&1 || true
     wait "$ENGINE_PID" >/dev/null 2>&1 || true
   fi
+  [[ -n "${ENGINE_LOG:-}" && -f "${ENGINE_LOG:-}" ]] && rm -f "$ENGINE_LOG"
+  [[ -n "${AUVAL_LOG:-}" && -f "${AUVAL_LOG:-}" ]] && rm -f "$AUVAL_LOG"
 }
 trap cleanup EXIT
 
@@ -193,7 +204,15 @@ daw_path() {
   case "$1" in
     logic) printf '%s\n' "/Applications/Logic Pro.app" ;;
     reaper) printf '%s\n' "/Applications/REAPER.app" ;;
-    ableton) printf '%s\n' "/Applications/Ableton Live 12 Suite.app" ;;
+    ableton)
+      local match
+      match="$(find /Applications -maxdepth 1 -name 'Ableton Live*.app' -print -quit 2>/dev/null)"
+      if [[ -n "$match" ]]; then
+        printf '%s\n' "$match"
+      else
+        printf '%s\n' "/Applications/Ableton Live 12 Suite.app"
+      fi
+      ;;
     *) return 1 ;;
   esac
 }
@@ -322,7 +341,7 @@ if [[ "$RUN_ENGINE" -eq 1 ]]; then
       if [[ "$ENGINE_MODE" == "cloud" ]]; then
         ENGINE_ARGS+=(--cloud)
         if [[ -n "$OPENAI_API_KEY_ARG" ]]; then
-          ENGINE_ARGS+=("--api-key=$OPENAI_API_KEY_ARG")
+          export OPENAI_API_KEY="$OPENAI_API_KEY_ARG"
         fi
       fi
       if [[ "${#ENGINE_ARGS[@]}" -gt 0 ]]; then
