@@ -78,11 +78,20 @@ void Transcriber::pushAudioBlock(const float *samples, int sampleCount,
     return;
   }
 
+  if (!audioBuffer.empty()) {
+    const double expected =
+        bufferStartDawSample + static_cast<double>(bufferHostSamples);
+    if (isDawTimelineDiscontinuous(expected, dawSampleTime))
+      processAvailableAudio(true);
+  }
+
   if (audioBuffer.empty()) {
     bufferStartDawSample = dawSampleTime;
+    bufferHostSamples = 0;
   }
 
   appendResampled(samples, sampleCount);
+  bufferHostSamples += sampleCount;
   processAvailableAudio();
 }
 
@@ -130,11 +139,13 @@ void Transcriber::processAvailableAudio(bool force) {
     std::cerr << "Failed to process audio" << std::endl;
     audioBuffer.clear();
     resampleCarry = 0.0;
+    bufferHostSamples = 0;
     return;
   }
 
   audioBuffer.clear();
   resampleCarry = 0.0;
+  bufferHostSamples = 0;
   emitWordsFromWhisper();
 }
 

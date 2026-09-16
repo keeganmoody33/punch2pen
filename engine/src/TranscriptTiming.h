@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstddef>
 #include <string>
 #include <vector>
@@ -75,6 +76,13 @@ inline std::vector<TimedWord> splitWordsAcrossRange(const std::string &text,
   return words;
 }
 
+// Host blocks are contiguous when the next origin matches the previous
+// block's end. Loops, seeks, and dropped writes jump by many samples.
+inline bool isDawTimelineDiscontinuous(double expectedOrigin,
+                                       double actualOrigin) {
+  return std::abs(actualOrigin - expectedOrigin) > 1.0;
+}
+
 inline bool isBlankTranscript(const std::string &text) {
   for (const char c : text) {
     if (std::isspace(static_cast<unsigned char>(c)) == 0)
@@ -88,12 +96,14 @@ inline bool isBlankTranscript(const std::string &text) {
 struct CloudStreamWindow {
   double origin = 0.0;
   double sentEnd = 0.0;
+  double queuedEnd = 0.0;
   size_t pcmSamplesSent = 0;
   bool active = false;
 
   void start(double dawOrigin) {
     origin = dawOrigin;
     sentEnd = dawOrigin;
+    queuedEnd = dawOrigin;
     pcmSamplesSent = 0;
     active = true;
   }
@@ -121,6 +131,18 @@ struct CloudDeltaAssembler {
   void captureLiveOrigin(double dawSampleTime) {
     if (!live.active)
       live.start(dawSampleTime);
+  }
+
+  bool needsFinalizeForOrigin(double dawSampleTime) const {
+    if (!live.active)
+      return false;
+    return isDawTimelineDiscontinuous(live.queuedEnd, dawSampleTime);
+  }
+
+  void noteHostSamples(int sampleCount) {
+    if (!live.active || sampleCount <= 0)
+      return;
+    live.queuedEnd += static_cast<double>(sampleCount);
   }
 
   void noteLivePcmSent(size_t pcmCount, double hostSampleRate, int targetRate) {

@@ -69,15 +69,18 @@ void IPCClient::run() {
       }
     }
 
-    processOutgoingAudio();
+    processOutgoingAudio(false);
 
-    if (pendingStop.exchange(false))
+    if (pendingStop.exchange(false)) {
+      processOutgoingAudio(true);
       sendTransportStop();
+      if (ringBuffer)
+        ringBuffer->reset();
+    }
   }
 }
 
-void IPCClient::processOutgoingAudio() {
-  applyPendingCaptureReset();
+void IPCClient::processOutgoingAudio(bool flushPartial) {
   if (!connected || !ringBuffer)
     return;
 
@@ -85,28 +88,40 @@ void IPCClient::processOutgoingAudio() {
   if (sampleRate <= 0.0)
     return;
 
-  int available = ringBuffer->getNumReady();
-  if (available > 0) {
-    const int chunkSize = transcriptionMode.load() == TranscriptionMode::Online
-                              ? 1600
-                              : 4096;
-    if (available < chunkSize)
+  const int chunkSize = transcriptionMode.load() == TranscriptionMode::Online
+                            ? 1600
+                            : 4096;
+
+  while (true) {
+    const int available = ringBuffer->getNumReady();
+    if (available <= 0)
       return;
 
-    if (tempBuffer.size() < (size_t)chunkSize)
-      tempBuffer.resize((size_t)chunkSize);
+    int toRead = chunkSize;
+    if (available < chunkSize) {
+      if (!flushPartial)
+        return;
+      toRead = available;
+    }
+
+    if (tempBuffer.size() < (size_t)toRead)
+      tempBuffer.resize((size_t)toRead);
 
     double chunkDawSample = 0.0;
-    ringBuffer->read(tempBuffer.data(), chunkSize, &chunkDawSample);
-    sendAudioChunk(tempBuffer.data(), chunkSize, sampleRate, chunkDawSample);
+    const int n = ringBuffer->read(tempBuffer.data(), toRead, &chunkDawSample);
+    if (n <= 0)
+      return;
+    sendAudioChunk(tempBuffer.data(), n, sampleRate, chunkDawSample);
+    if (!flushPartial)
+      return;
   }
 }
 
 void IPCClient::applyPendingCaptureReset() {
   if (!pendingCaptureReset.load())
     return;
-  // Reset while the flag is still set so the audio thread keeps skipping
-  // writes until the FIFO is actually empty.
+  // Consumer-only. Stop-flush also resets after draining so a new take
+  // can write its first host block without skipping.
   if (ringBuffer)
     ringBuffer->reset();
   pendingCaptureReset.store(false);
@@ -162,6 +177,11 @@ bool IPCClient::isConnected() const { return connected; }
 void IPCClient::setHostSampleRate(double sampleRate) {
   if (sampleRate > 0.0)
     hostSampleRate.store(sampleRate);
+}
+
+void IPCClient::flagTransportStop() {
+  pendingStop.store(true);
+  notify();
 }
 
 void IPCClient::requestCaptureReset() {

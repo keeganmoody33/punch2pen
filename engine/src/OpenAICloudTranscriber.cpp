@@ -175,18 +175,37 @@ void OpenAICloudTranscriber::pushAudioBlock(const float *samples, int sampleCoun
     return;
   }
 
-  std::lock_guard<std::mutex> lock(audioMutex);
-  stream.captureLiveOrigin(dawSampleTime);
-  appendResampled(samples, sampleCount);
+  bool sendCommit = false;
+  {
+    std::lock_guard<std::mutex> lock(audioMutex);
+    if (stream.needsFinalizeForOrigin(dawSampleTime)) {
+      if (!pcmAccumulator.empty()) {
+        sendPcm(pcmAccumulator);
+        pcmAccumulator.clear();
+      }
+      if (stream.live.active) {
+        stream.finalize();
+        sendCommit = true;
+      }
+    }
+    stream.captureLiveOrigin(dawSampleTime);
+    appendResampled(samples, sampleCount);
+    stream.noteHostSamples(sampleCount);
 
-  while (pcmAccumulator.size() >= targetChunkSize) {
-    std::vector<int16_t> chunk(pcmAccumulator.begin(),
-                               pcmAccumulator.begin() +
-                                   static_cast<std::ptrdiff_t>(targetChunkSize));
-    pcmAccumulator.erase(pcmAccumulator.begin(),
-                         pcmAccumulator.begin() +
-                             static_cast<std::ptrdiff_t>(targetChunkSize));
-    sendPcm(chunk);
+    while (pcmAccumulator.size() >= targetChunkSize) {
+      std::vector<int16_t> chunk(
+          pcmAccumulator.begin(),
+          pcmAccumulator.begin() + static_cast<std::ptrdiff_t>(targetChunkSize));
+      pcmAccumulator.erase(pcmAccumulator.begin(),
+                           pcmAccumulator.begin() +
+                               static_cast<std::ptrdiff_t>(targetChunkSize));
+      sendPcm(chunk);
+    }
+  }
+
+  if (sendCommit && webSocket) {
+    const json commitEvent = {{"type", "input_audio_buffer.commit"}};
+    webSocket->send(commitEvent.dump());
   }
 }
 

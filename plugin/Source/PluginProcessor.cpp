@@ -130,7 +130,8 @@ void Punch2PenAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     buffer.clear(i, 0, buffer.getNumSamples());
 
   bool isRecording = transportIsRecording.load();
-  double dawSampleTime = 0.0;
+  double dawSampleTime = hostDawSampleTime.load();
+  bool haveAbsoluteHostTime = false;
 
   // 1. Get Transport Info
   if (auto *ph = getPlayHead()) {
@@ -150,29 +151,36 @@ void Punch2PenAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
       isRecording = pos->getIsRecording();
       transportIsRecording.store(isRecording);
 
-      if (auto samples = pos->getTimeInSamples())
+      if (auto samples = pos->getTimeInSamples()) {
         dawSampleTime = static_cast<double>(*samples);
-      else if (auto seconds = pos->getTimeInSeconds()) {
+        haveAbsoluteHostTime = true;
+      } else if (auto seconds = pos->getTimeInSeconds()) {
         const double sr = getSampleRate();
-        if (sr > 0.0)
+        if (sr > 0.0) {
           dawSampleTime = *seconds * sr;
+          haveAbsoluteHostTime = true;
+        }
+      }
+
+      if (!haveAbsoluteHostTime) {
+        const double bpm = currentBpm.load();
+        const double sr = getSampleRate();
+        if (bpm > 0.0 && sr > 0.0)
+          dawSampleTime = transportPpq.load() * (60.0 / bpm) * sr;
+        else if (pos->getIsPlaying() || isRecording)
+          dawSampleTime += static_cast<double>(buffer.getNumSamples());
       }
     }
+  } else if (isRecording || transportIsPlaying.load()) {
+    dawSampleTime += static_cast<double>(buffer.getNumSamples());
   }
   hostDawSampleTime.store(dawSampleTime);
 
-  // 2. Capture Audio if Recording
+  // 2. Capture Audio if Recording. Reset happens after the stop flush on
+  // the IPC thread so the first host block of a new take is not dropped.
   if (isRecording) {
-    if (!wasRecordingLastBlock) {
-      if (ipcClient)
-        ipcClient->requestCaptureReset();
-    }
-
-    if (ipcClient == nullptr || !ipcClient->captureResetPending()) {
-      auto *channelData = buffer.getReadPointer(0);
-      audioRingBuffer->write(channelData, buffer.getNumSamples(),
-                             dawSampleTime);
-    }
+    auto *channelData = buffer.getReadPointer(0);
+    audioRingBuffer->write(channelData, buffer.getNumSamples(), dawSampleTime);
   }
 
   if (wasRecordingLastBlock && !isRecording) {

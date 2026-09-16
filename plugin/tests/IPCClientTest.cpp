@@ -549,6 +549,87 @@ void testRequestCaptureResetDrainsRingOnIpcThread() {
             << std::endl;
 }
 
+void testTransportStopFlushesPartialChunk() {
+  juce::StreamingSocket server;
+  bool bound = server.createListener(TEST_PORT + 8, "127.0.0.1");
+  assert(bound);
+
+  std::atomic<bool> gotChunk{false};
+  std::atomic<bool> gotStop{false};
+  std::atomic<bool> chunkOk{false};
+  const int leftover = 128;
+  const double origin = 24000.0;
+
+  std::thread serverThread([&]() {
+    juce::StreamingSocket *client = server.waitForNextConnection();
+    if (client == nullptr)
+      return;
+
+    Punch2Pen::protocol::Header header;
+    if (!readExact(*client, &header, sizeof(header))) {
+      delete client;
+      return;
+    }
+
+    if (header.type == Punch2Pen::protocol::MessageType::AudioChunk) {
+      Punch2Pen::protocol::AudioChunkHeader chunkHeader;
+      if (!readExact(*client, &chunkHeader, sizeof(chunkHeader))) {
+        delete client;
+        return;
+      }
+      chunkOk = (chunkHeader.numSamples == (uint32_t)leftover &&
+                 chunkHeader.dawSampleTime == origin);
+      std::vector<float> payload(leftover);
+      readExact(*client, payload.data(), leftover * (int)sizeof(float));
+      gotChunk = true;
+
+      if (!readExact(*client, &header, sizeof(header))) {
+        delete client;
+        return;
+      }
+    }
+
+    gotStop = (header.type == Punch2Pen::protocol::MessageType::TransportStop);
+    delete client;
+  });
+
+  juce::Thread::sleep(100);
+  auto ipcClient = std::make_unique<Punch2Pen::IPCClient>(
+      TEST_PORT + 8, /*autoLaunchEngine=*/false);
+  ipcClient->setHostSampleRate(48000.0);
+
+  Punch2Pen::AudioRingBuffer ring(4096);
+  std::vector<float> samples(leftover, 0.25f);
+  assert(ring.write(samples.data(), leftover, origin));
+  ipcClient->setAudioSource(&ring);
+
+  for (int i = 0; i < 50; ++i) {
+    if (ipcClient->isConnected())
+      break;
+    juce::Thread::sleep(100);
+  }
+  assert(ipcClient->isConnected());
+
+  ipcClient->flagTransportStop();
+
+  for (int i = 0; i < 50; ++i) {
+    if (gotStop.load())
+      break;
+    juce::Thread::sleep(100);
+  }
+
+  ipcClient.reset();
+  serverThread.join();
+  server.close();
+
+  assert(gotChunk.load());
+  assert(chunkOk.load());
+  assert(gotStop.load());
+  assert(ring.getNumReady() == 0);
+
+  std::cout << "[PASS] testTransportStopFlushesPartialChunk" << std::endl;
+}
+
 int main() {
   // RAII initializer for JUCE Thread internals. JUCE only ships the _GUI
   // variant; per its own header docs, it's the recommended initializer for
@@ -561,6 +642,7 @@ int main() {
   testOutgoingChunksStampDawSampleTime();
   testTranscriptionResultForwardsTimes();
   testRequestCaptureResetDrainsRingOnIpcThread();
+  testTransportStopFlushesPartialChunk();
   testTransportStop();
   testCorrection();
   testDisconnectDetection();

@@ -18,7 +18,7 @@ public:
   void sendAudioChunk(const float *samples, int numSamples, double sampleRate,
                       double dawSampleTime);
   void sendTransportStop();
-  void flagTransportStop() { pendingStop.store(true); }
+  void flagTransportStop();
   void sendCorrection(const std::string &original, const std::string &corrected);
   void setTranscriptionMode(TranscriptionMode mode);
   TranscriptionMode getTranscriptionMode() const;
@@ -47,7 +47,7 @@ private:
   void launchEngine();
   void handleMessage();
   void applyPendingCaptureReset();
-  void processOutgoingAudio();
+  void processOutgoingAudio(bool flushPartial = false);
 
   juce::StreamingSocket socket;
   std::atomic<bool> connected{false};

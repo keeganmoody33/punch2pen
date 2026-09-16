@@ -39,6 +39,7 @@ private:
   double inputSampleRate = 16000.0;
   double resampleCarry = 0.0;
   double bufferStartDawSample = 0.0;
+  int bufferHostSamples = 0;
 
   std::mutex listenerMutex;
   std::vector<Listener *> listeners;

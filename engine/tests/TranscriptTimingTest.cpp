@@ -107,11 +107,33 @@ void testCloudDeltaAssemblerEmptyDeltaDoesNotConsumeWindow() {
             << std::endl;
 }
 
+void testDawTimelineDiscontinuitySplitsWindow() {
+  assert(!punch2pen::isDawTimelineDiscontinuous(48000.0, 48000.0));
+  assert(!punch2pen::isDawTimelineDiscontinuous(48000.0, 48000.5));
+  assert(punch2pen::isDawTimelineDiscontinuous(144000.0, 48000.0));
+
+  punch2pen::CloudDeltaAssembler stream;
+  stream.captureLiveOrigin(48000.0);
+  stream.noteHostSamples(512);
+  assert(!stream.needsFinalizeForOrigin(48512.0));
+  assert(stream.needsFinalizeForOrigin(48000.0));
+
+  stream.finalize();
+  stream.captureLiveOrigin(48000.0);
+  assert(stream.live.active);
+  assert(approx(stream.live.origin, 48000.0));
+  assert(approx(stream.committed.origin, 48000.0));
+  assert(approx(stream.committed.queuedEnd, 48512.0));
+
+  std::cout << "[PASS] testDawTimelineDiscontinuitySplitsWindow" << std::endl;
+}
+
 int main() {
   testWhisperCentisecondsMapping();
   testSplitWordsProportional();
   testCloudDeltaAssemblerWaitsForCompletion();
   testCloudDeltaAssemblerEmptyDeltaDoesNotConsumeWindow();
+  testDawTimelineDiscontinuitySplitsWindow();
   std::cout << "All TranscriptTiming tests passed!" << std::endl;
   return 0;
 }
