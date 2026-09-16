@@ -123,13 +123,7 @@ void WebViewEditor::resized() {
 void WebViewEditor::timerCallback() {
   auto transport = audioProcessor.getTransportPosition();
 
-  double sampleRate = audioProcessor.getSampleRate();
-  if (sampleRate <= 0.0)
-    sampleRate = 48000.0;
-
-  double currentSamplePosition =
-      transport.ppq * (60.0 / juce::jmax(1.0, transport.bpm)) * sampleRate;
-  jsUpdatePlayhead(currentSamplePosition);
+  jsUpdatePlayhead(audioProcessor.getHostDawSampleTime());
 
   if (transport.bar != lastBar || transport.beat != lastBeat) {
     jsUpdatePosition(transport.bar, transport.beat);

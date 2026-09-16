@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -73,5 +74,90 @@ inline std::vector<TimedWord> splitWordsAcrossRange(const std::string &text,
   }
   return words;
 }
+
+inline bool isBlankTranscript(const std::string &text) {
+  for (const char c : text) {
+    if (std::isspace(static_cast<unsigned char>(c)) == 0)
+      return false;
+  }
+  return true;
+}
+
+// Live vs committed DAW windows for cloud STT. `sentEnd` only moves after
+// resampled PCM has actually been sent, not when host audio is queued.
+struct CloudStreamWindow {
+  double origin = 0.0;
+  double sentEnd = 0.0;
+  size_t pcmSamplesSent = 0;
+  bool active = false;
+
+  void start(double dawOrigin) {
+    origin = dawOrigin;
+    sentEnd = dawOrigin;
+    pcmSamplesSent = 0;
+    active = true;
+  }
+
+  void notePcmSent(size_t pcmCount, double hostSampleRate, int targetRate) {
+    if (pcmCount == 0 || !active || targetRate <= 0)
+      return;
+    pcmSamplesSent += pcmCount;
+    if (hostSampleRate <= 0.0)
+      return;
+    sentEnd = origin + static_cast<double>(pcmSamplesSent) * hostSampleRate /
+                           static_cast<double>(targetRate);
+  }
+};
+
+// Buffer cloud transcript deltas until a completion event, then split once
+// across the committed (or still-live) DAW window. Empty deltas do not
+// consume that window; finalize snapshots live → committed without zeroing.
+struct CloudDeltaAssembler {
+  CloudStreamWindow live;
+  CloudStreamWindow committed;
+  std::string pending;
+  bool awaitingCompletion = false;
+
+  void captureLiveOrigin(double dawSampleTime) {
+    if (!live.active)
+      live.start(dawSampleTime);
+  }
+
+  void noteLivePcmSent(size_t pcmCount, double hostSampleRate, int targetRate) {
+    live.notePcmSent(pcmCount, hostSampleRate, targetRate);
+  }
+
+  void finalize() {
+    committed = live;
+    awaitingCompletion = true;
+    live = CloudStreamWindow{};
+  }
+
+  // Returns false when the delta is ignored (empty / leading whitespace).
+  bool addDelta(const std::string &delta) {
+    if (delta.empty())
+      return false;
+    if (pending.empty() && isBlankTranscript(delta))
+      return false;
+    pending += delta;
+    awaitingCompletion = true;
+    return true;
+  }
+
+  std::vector<TimedWord> complete(const std::string &doneTranscript = {}) {
+    const std::string text =
+        !isBlankTranscript(doneTranscript) ? doneTranscript : pending;
+    pending.clear();
+    awaitingCompletion = false;
+
+    const CloudStreamWindow &window = committed.active ? committed : live;
+    const double start = window.origin;
+    double end = window.sentEnd;
+    if (end < start)
+      end = start;
+    committed = CloudStreamWindow{};
+    return splitWordsAcrossRange(text, start, end);
+  }
+};
 
 } // namespace punch2pen

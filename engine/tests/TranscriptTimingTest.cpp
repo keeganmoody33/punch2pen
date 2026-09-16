@@ -42,9 +42,76 @@ void testSplitWordsProportional() {
   std::cout << "[PASS] testSplitWordsProportional" << std::endl;
 }
 
+void testCloudDeltaAssemblerWaitsForCompletion() {
+  punch2pen::CloudDeltaAssembler stream;
+  stream.captureLiveOrigin(48000.0);
+
+  // Queued host audio must not move sentEnd; only sent PCM does.
+  assert(stream.live.sentEnd == 48000.0);
+  stream.noteLivePcmSent(16000, 48000.0, 16000); // 1s of 16 kHz → 48000 host
+  assert(std::abs(stream.live.sentEnd - 96000.0) < 1e-9);
+
+  assert(!stream.addDelta(""));
+  assert(!stream.addDelta("   "));
+  assert(stream.pending.empty());
+  assert(stream.live.sentEnd == 96000.0);
+
+  assert(stream.addDelta("hel"));
+  assert(stream.addDelta("lo world"));
+  // Partial deltas are buffered, not split into fake words.
+  assert(stream.pending == "hello world");
+
+  stream.finalize();
+  assert(!stream.live.active);
+  assert(stream.committed.active);
+  assert(std::abs(stream.committed.origin - 48000.0) < 1e-9);
+  assert(std::abs(stream.committed.sentEnd - 96000.0) < 1e-9);
+
+  auto words = stream.complete();
+  assert(words.size() == 2);
+  assert(words[0].text == "hello");
+  assert(words[1].text == "world");
+  assert(approx(words[0].startSample, 48000.0));
+  assert(approx(words[1].endSample, 96000.0));
+  assert(!stream.committed.active);
+  assert(stream.pending.empty());
+
+  std::cout << "[PASS] testCloudDeltaAssemblerWaitsForCompletion" << std::endl;
+}
+
+void testCloudDeltaAssemblerEmptyDeltaDoesNotConsumeWindow() {
+  punch2pen::CloudDeltaAssembler stream;
+  stream.captureLiveOrigin(0.0);
+  stream.noteLivePcmSent(8000, 48000.0, 16000); // 0.5s → 24000 host samples
+  stream.finalize();
+
+  assert(!stream.addDelta(""));
+  auto none = stream.complete("");
+  assert(none.empty());
+
+  // A later complete after a real delta still has a window if we didn't
+  // consume it on empty... but complete() always releases committed.
+  // Re-seed to show empty-then-real on the live window before finalize:
+  punch2pen::CloudDeltaAssembler liveStream;
+  liveStream.captureLiveOrigin(1000.0);
+  liveStream.noteLivePcmSent(16000, 48000.0, 16000);
+  assert(!liveStream.addDelta(""));
+  assert(liveStream.addDelta("ok"));
+  auto words = liveStream.complete();
+  assert(words.size() == 1);
+  assert(words[0].text == "ok");
+  assert(approx(words[0].startSample, 1000.0));
+  assert(approx(words[0].endSample, 49000.0));
+
+  std::cout << "[PASS] testCloudDeltaAssemblerEmptyDeltaDoesNotConsumeWindow"
+            << std::endl;
+}
+
 int main() {
   testWhisperCentisecondsMapping();
   testSplitWordsProportional();
+  testCloudDeltaAssemblerWaitsForCompletion();
+  testCloudDeltaAssemblerEmptyDeltaDoesNotConsumeWindow();
   std::cout << "All TranscriptTiming tests passed!" << std::endl;
   return 0;
 }

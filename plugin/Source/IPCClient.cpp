@@ -24,6 +24,7 @@ IPCClient::~IPCClient() {
 void IPCClient::run() {
   tempBuffer.reserve(4096);
   while (!threadShouldExit()) {
+    applyPendingCaptureReset();
     if (!connected) {
       attemptConnection();
       if (!connected) {
@@ -76,6 +77,7 @@ void IPCClient::run() {
 }
 
 void IPCClient::processOutgoingAudio() {
+  applyPendingCaptureReset();
   if (!connected || !ringBuffer)
     return;
 
@@ -94,11 +96,20 @@ void IPCClient::processOutgoingAudio() {
     if (tempBuffer.size() < (size_t)chunkSize)
       tempBuffer.resize((size_t)chunkSize);
 
-    ringBuffer->read(tempBuffer.data(), chunkSize);
-    const double chunkDawSample = nextChunkDawSample.load();
-    nextChunkDawSample.store(chunkDawSample + static_cast<double>(chunkSize));
+    double chunkDawSample = 0.0;
+    ringBuffer->read(tempBuffer.data(), chunkSize, &chunkDawSample);
     sendAudioChunk(tempBuffer.data(), chunkSize, sampleRate, chunkDawSample);
   }
+}
+
+void IPCClient::applyPendingCaptureReset() {
+  if (!pendingCaptureReset.load())
+    return;
+  // Reset while the flag is still set so the audio thread keeps skipping
+  // writes until the FIFO is actually empty.
+  if (ringBuffer)
+    ringBuffer->reset();
+  pendingCaptureReset.store(false);
 }
 
 void IPCClient::attemptConnection() {
@@ -153,8 +164,9 @@ void IPCClient::setHostSampleRate(double sampleRate) {
     hostSampleRate.store(sampleRate);
 }
 
-void IPCClient::setCaptureOrigin(double dawSampleTime) {
-  nextChunkDawSample.store(dawSampleTime);
+void IPCClient::requestCaptureReset() {
+  pendingCaptureReset.store(true);
+  notify();
 }
 
 void IPCClient::sendAudioChunk(const float *samples, int numSamples,

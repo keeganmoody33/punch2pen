@@ -37,12 +37,16 @@ public:
 
   void setAudioSource(class AudioRingBuffer *buffer) { ringBuffer = buffer; }
   void setHostSampleRate(double sampleRate);
-  void setCaptureOrigin(double dawSampleTime);
+  // Consumer-thread FIFO reset. Safe to call from the audio thread; the
+  // IPC thread applies it before the next read. Wakes a reconnect wait.
+  void requestCaptureReset();
+  bool captureResetPending() const { return pendingCaptureReset.load(); }
 
 private:
   void attemptConnection();
   void launchEngine();
   void handleMessage();
+  void applyPendingCaptureReset();
   void processOutgoingAudio();
 
   juce::StreamingSocket socket;
@@ -53,7 +57,7 @@ private:
   std::vector<float> tempBuffer;
   std::atomic<TranscriptionMode> transcriptionMode{TranscriptionMode::Offline};
   std::atomic<double> hostSampleRate{0.0};
-  std::atomic<double> nextChunkDawSample{0.0};
+  std::atomic<bool> pendingCaptureReset{false};
 
   int serverPort;
   bool autoLaunchEngine;

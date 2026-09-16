@@ -166,11 +166,10 @@ void testOutgoingChunksUseHostSampleRate() {
   auto ipcClient = std::make_unique<Punch2Pen::IPCClient>(
       TEST_PORT + 4, /*autoLaunchEngine=*/false);
   ipcClient->setHostSampleRate(hostRate);
-  ipcClient->setCaptureOrigin(96000.0);
 
   Punch2Pen::AudioRingBuffer ring(chunkSize * 2);
   std::vector<float> samples(chunkSize, 0.25f);
-  ring.write(samples.data(), chunkSize);
+  ring.write(samples.data(), chunkSize, 96000.0);
   ipcClient->setAudioSource(&ring);
 
   for (int i = 0; i < 50; ++i) {
@@ -422,11 +421,10 @@ void testOutgoingChunksStampDawSampleTime() {
   auto ipcClient = std::make_unique<Punch2Pen::IPCClient>(
       TEST_PORT + 5, /*autoLaunchEngine=*/false);
   ipcClient->setHostSampleRate(48000.0);
-  ipcClient->setCaptureOrigin(origin);
 
   Punch2Pen::AudioRingBuffer ring(chunkSize * 2);
   std::vector<float> samples(chunkSize, 0.5f);
-  ring.write(samples.data(), chunkSize);
+  ring.write(samples.data(), chunkSize, origin);
   ipcClient->setAudioSource(&ring);
 
   for (int i = 0; i < 50; ++i) {
@@ -525,6 +523,32 @@ void testTranscriptionResultForwardsTimes() {
   std::cout << "[PASS] testTranscriptionResultForwardsTimes" << std::endl;
 }
 
+void testRequestCaptureResetDrainsRingOnIpcThread() {
+  auto ipcClient = std::make_unique<Punch2Pen::IPCClient>(
+      TEST_PORT + 7, /*autoLaunchEngine=*/false);
+
+  Punch2Pen::AudioRingBuffer ring(4096);
+  std::vector<float> samples(128, 0.5f);
+  assert(ring.write(samples.data(), 128, 48000.0));
+  assert(ring.getNumReady() == 128);
+
+  ipcClient->setAudioSource(&ring);
+  ipcClient->requestCaptureReset();
+
+  for (int i = 0; i < 50; ++i) {
+    if (ring.getNumReady() == 0 && !ipcClient->captureResetPending())
+      break;
+    juce::Thread::sleep(50);
+  }
+
+  assert(ring.getNumReady() == 0);
+  assert(!ipcClient->captureResetPending());
+
+  ipcClient.reset();
+  std::cout << "[PASS] testRequestCaptureResetDrainsRingOnIpcThread"
+            << std::endl;
+}
+
 int main() {
   // RAII initializer for JUCE Thread internals. JUCE only ships the _GUI
   // variant; per its own header docs, it's the recommended initializer for
@@ -536,6 +560,7 @@ int main() {
   testOutgoingChunksUseHostSampleRate();
   testOutgoingChunksStampDawSampleTime();
   testTranscriptionResultForwardsTimes();
+  testRequestCaptureResetDrainsRingOnIpcThread();
   testTransportStop();
   testCorrection();
   testDisconnectDetection();

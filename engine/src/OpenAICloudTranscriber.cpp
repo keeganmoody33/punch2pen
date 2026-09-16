@@ -1,5 +1,4 @@
 #include "OpenAICloudTranscriber.h"
-#include "TranscriptTiming.h"
 
 #include <algorithm>
 #include <cmath>
@@ -58,31 +57,19 @@ void OpenAICloudTranscriber::connectToOpenAI() {
 
     try {
       const auto response = json::parse(msg->str);
-      if (response.value("type", "") == "response.audio_transcript.delta") {
+      const std::string type = response.value("type", "");
+      if (type == "response.audio_transcript.delta") {
         const std::string deltaText = response.value("delta", "");
-        double startTime = 0.0;
-        double endTime = 0.0;
-        {
-          std::lock_guard<std::mutex> audioLock(audioMutex);
-          startTime = lastEmittedEndDawSample;
-          endTime = lastPushedEndDawSample;
-          if (endTime < startTime)
-            endTime = startTime;
-          lastEmittedEndDawSample = endTime;
-        }
-        const auto words =
-            splitWordsAcrossRange(deltaText, startTime, endTime);
-        if (words.empty())
-          return;
-        std::lock_guard<std::mutex> lock(listenerMutex);
-        for (auto *listener : listeners) {
-          if (listener == nullptr)
-            continue;
-          for (const auto &word : words) {
-            listener->onTranscriptUpdated(word.text, true, word.startSample,
-                                          word.endSample);
-          }
-        }
+        std::lock_guard<std::mutex> audioLock(audioMutex);
+        stream.addDelta(deltaText);
+        return;
+      }
+      if (type == "response.audio_transcript.done") {
+        flushPendingTranscript(response.value("transcript", ""));
+        return;
+      }
+      if (type == "response.done") {
+        flushPendingTranscript();
       }
     } catch (const std::exception &e) {
       std::cerr << "[OpenAICloudTranscriber] JSON parse error: " << e.what()
@@ -151,6 +138,37 @@ void OpenAICloudTranscriber::appendResampled(const float *samples,
   resampleCarry = pos - static_cast<double>(sampleCount);
 }
 
+void OpenAICloudTranscriber::sendPcm(const std::vector<int16_t> &pcmData) {
+  if (pcmData.empty() || !webSocket)
+    return;
+
+  const json audioAppend = {{"type", "input_audio_buffer.append"},
+                            {"audio", encodeBase64(pcmData)}};
+  webSocket->send(audioAppend.dump());
+  stream.noteLivePcmSent(pcmData.size(), inputSampleRate, targetSampleRate);
+}
+
+void OpenAICloudTranscriber::flushPendingTranscript(
+    const std::string &doneTranscript) {
+  std::vector<TimedWord> words;
+  {
+    std::lock_guard<std::mutex> audioLock(audioMutex);
+    words = stream.complete(doneTranscript);
+  }
+  if (words.empty())
+    return;
+
+  std::lock_guard<std::mutex> lock(listenerMutex);
+  for (auto *listener : listeners) {
+    if (listener == nullptr)
+      continue;
+    for (const auto &word : words) {
+      listener->onTranscriptUpdated(word.text, true, word.startSample,
+                                    word.endSample);
+    }
+  }
+}
+
 void OpenAICloudTranscriber::pushAudioBlock(const float *samples, int sampleCount,
                                             double dawSampleTime) {
   if (samples == nullptr || sampleCount <= 0) {
@@ -158,26 +176,17 @@ void OpenAICloudTranscriber::pushAudioBlock(const float *samples, int sampleCoun
   }
 
   std::lock_guard<std::mutex> lock(audioMutex);
-  if (!haveStreamOrigin) {
-    bufferStartDawSample = dawSampleTime;
-    lastEmittedEndDawSample = dawSampleTime;
-    haveStreamOrigin = true;
-  }
-  lastPushedEndDawSample = dawSampleTime + static_cast<double>(sampleCount);
-
+  stream.captureLiveOrigin(dawSampleTime);
   appendResampled(samples, sampleCount);
 
   while (pcmAccumulator.size() >= targetChunkSize) {
     std::vector<int16_t> chunk(pcmAccumulator.begin(),
-                               pcmAccumulator.begin() + targetChunkSize);
+                               pcmAccumulator.begin() +
+                                   static_cast<std::ptrdiff_t>(targetChunkSize));
     pcmAccumulator.erase(pcmAccumulator.begin(),
-                         pcmAccumulator.begin() + targetChunkSize);
-
-    if (webSocket) {
-      const json audioAppend = {{"type", "input_audio_buffer.append"},
-                                {"audio", encodeBase64(chunk)}};
-      webSocket->send(audioAppend.dump());
-    }
+                         pcmAccumulator.begin() +
+                             static_cast<std::ptrdiff_t>(targetChunkSize));
+    sendPcm(chunk);
   }
 }
 
@@ -189,14 +198,10 @@ void OpenAICloudTranscriber::finalizeStream() {
   {
     std::lock_guard<std::mutex> lock(audioMutex);
     if (!pcmAccumulator.empty()) {
-      const json audioAppend = {{"type", "input_audio_buffer.append"},
-                                {"audio", encodeBase64(pcmAccumulator)}};
-      webSocket->send(audioAppend.dump());
+      sendPcm(pcmAccumulator);
       pcmAccumulator.clear();
     }
-    haveStreamOrigin = false;
-    lastEmittedEndDawSample = 0.0;
-    lastPushedEndDawSample = 0.0;
+    stream.finalize();
   }
 
   const json commitEvent = {{"type", "input_audio_buffer.commit"}};

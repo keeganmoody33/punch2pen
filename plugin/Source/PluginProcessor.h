@@ -55,7 +55,7 @@ public:
 
   TransportPosition getTransportPosition() const;
   double getSampleRate() const { return AudioProcessor::getSampleRate(); }
-  double currentDawSampleTime() const;
+  double getHostDawSampleTime() const { return hostDawSampleTime.load(); }
 
   punch2pen::IPCClient *getIPCClient() const { return ipcClient.get(); }
 
@@ -69,6 +69,7 @@ private:
   std::atomic<int> transportTimeSigDenom{4};
   std::atomic<bool> transportIsPlaying{false};
   std::atomic<bool> transportIsRecording{false};
+  std::atomic<double> hostDawSampleTime{0.0};
 
   // Avoid heap alloc in processBlock
   bool wasRecordingLastBlock = false;

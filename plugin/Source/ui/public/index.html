@@ -546,9 +546,13 @@
       strike.textContent = word;
       original.appendChild(strike);
       input.value = word;
-      // Clamp to plugin window (260x90, 6px padding off edges)
-      const clampedX = Math.max(8, Math.min(x, 400 - 260 - 8));
-      const clampedY = Math.max(50, Math.min(y, 600 - 90 - 8));
+      // Clamp to the live plugin viewport (overlay is 260×90)
+      const overlayW = 260;
+      const overlayH = 90;
+      const vw = document.documentElement.clientWidth || window.innerWidth || 400;
+      const vh = document.documentElement.clientHeight || window.innerHeight || 600;
+      const clampedX = Math.max(8, Math.min(x, vw - overlayW - 8));
+      const clampedY = Math.max(50, Math.min(y, vh - overlayH - 8));
       overlay.style.left = clampedX + 'px';
       overlay.style.top  = clampedY + 'px';
       overlay.dataset.original = word;

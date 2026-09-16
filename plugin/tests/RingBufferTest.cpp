@@ -104,12 +104,49 @@ void testReset() {
   std::cout << "[PASS] testReset" << std::endl;
 }
 
+void testWriteStampsDawSampleTime() {
+  Punch2Pen::AudioRingBuffer rb(256);
+  std::vector<float> data(40, 0.5f);
+  assert(rb.write(data.data(), 40, 48000.0));
+
+  std::vector<float> out(40);
+  double daw = -1.0;
+  assert(rb.read(out.data(), 40, &daw) == 40);
+  assert(daw == 48000.0);
+
+  std::cout << "[PASS] testWriteStampsDawSampleTime" << std::endl;
+}
+
+void testOverflowPreservesLaterDawStamps() {
+  Punch2Pen::AudioRingBuffer rb(64);
+  std::vector<float> first(32, 1.0f);
+  assert(rb.write(first.data(), 32, 1000.0));
+
+  std::vector<float> tooBig(64, 2.0f);
+  assert(!rb.write(tooBig.data(), 64, 2000.0));
+
+  std::vector<float> later(16, 3.0f);
+  assert(rb.write(later.data(), 16, 3000.0));
+
+  std::vector<float> out(32);
+  double daw = -1.0;
+  assert(rb.read(out.data(), 32, &daw) == 32);
+  assert(daw == 1000.0);
+
+  assert(rb.read(out.data(), 16, &daw) == 16);
+  assert(daw == 3000.0);
+
+  std::cout << "[PASS] testOverflowPreservesLaterDawStamps" << std::endl;
+}
+
 int main() {
   testWriteAndReadBack();
   testOverflowDetection();
   testWrapAround();
   testGetNumReady();
   testReset();
+  testWriteStampsDawSampleTime();
+  testOverflowPreservesLaterDawStamps();
 
   std::cout << "All RingBuffer tests passed!" << std::endl;
   return 0;

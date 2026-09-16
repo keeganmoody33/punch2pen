@@ -130,6 +130,7 @@ void Punch2PenAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     buffer.clear(i, 0, buffer.getNumSamples());
 
   bool isRecording = transportIsRecording.load();
+  double dawSampleTime = 0.0;
 
   // 1. Get Transport Info
   if (auto *ph = getPlayHead()) {
@@ -148,23 +149,30 @@ void Punch2PenAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
       transportIsPlaying.store(pos->getIsPlaying());
       isRecording = pos->getIsRecording();
       transportIsRecording.store(isRecording);
+
+      if (auto samples = pos->getTimeInSamples())
+        dawSampleTime = static_cast<double>(*samples);
+      else if (auto seconds = pos->getTimeInSeconds()) {
+        const double sr = getSampleRate();
+        if (sr > 0.0)
+          dawSampleTime = *seconds * sr;
+      }
     }
   }
+  hostDawSampleTime.store(dawSampleTime);
 
   // 2. Capture Audio if Recording
   if (isRecording) {
-    const double dawSampleTime = currentDawSampleTime();
     if (!wasRecordingLastBlock) {
-      audioRingBuffer->reset();
       if (ipcClient)
-        ipcClient->setCaptureOrigin(dawSampleTime);
+        ipcClient->requestCaptureReset();
     }
 
-    // We only take the first channel for voice recognition usually
-    auto *channelData = buffer.getReadPointer(0);
-
-    // If ring buffer is safe, write
-    audioRingBuffer->write(channelData, buffer.getNumSamples());
+    if (ipcClient == nullptr || !ipcClient->captureResetPending()) {
+      auto *channelData = buffer.getReadPointer(0);
+      audioRingBuffer->write(channelData, buffer.getNumSamples(),
+                             dawSampleTime);
+    }
   }
 
   if (wasRecordingLastBlock && !isRecording) {
@@ -246,25 +254,4 @@ Punch2PenAudioProcessor::getTransportPosition() const {
   position.bar = (int)(safePpq / ppqPerBar) + 1;
   position.beat = (int)(std::fmod(safePpq, ppqPerBar) / ppqPerBeat) + 1;
   return position;
-}
-
-double Punch2PenAudioProcessor::currentDawSampleTime() const {
-  if (auto *ph = getPlayHead()) {
-    if (auto pos = ph->getPosition()) {
-      if (auto samples = pos->getTimeInSamples())
-        return static_cast<double>(*samples);
-      if (auto seconds = pos->getTimeInSeconds()) {
-        const double sr = getSampleRate();
-        if (sr > 0.0)
-          return *seconds * sr;
-      }
-    }
-  }
-
-  const double sr = getSampleRate();
-  const double bpm = currentBpm.load();
-  const double ppq = transportPpq.load();
-  if (sr > 0.0 && bpm > 0.0)
-    return ppq * (60.0 / bpm) * sr;
-  return 0.0;
 }
