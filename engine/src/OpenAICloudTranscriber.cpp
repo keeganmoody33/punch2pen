@@ -57,14 +57,19 @@ void OpenAICloudTranscriber::connectToOpenAI() {
 
     try {
       const auto response = json::parse(msg->str);
-      if (response.value("type", "") == "response.audio_transcript.delta") {
+      const std::string type = response.value("type", "");
+      if (type == "response.audio_transcript.delta") {
         const std::string deltaText = response.value("delta", "");
-        std::lock_guard<std::mutex> lock(listenerMutex);
-        for (auto *listener : listeners) {
-          if (listener != nullptr) {
-            listener->onTranscriptUpdated(deltaText, true);
-          }
-        }
+        std::lock_guard<std::mutex> audioLock(audioMutex);
+        stream.addDelta(deltaText);
+        return;
+      }
+      if (type == "response.audio_transcript.done") {
+        flushPendingTranscript(response.value("transcript", ""));
+        return;
+      }
+      if (type == "response.done") {
+        flushPendingTranscript();
       }
     } catch (const std::exception &e) {
       std::cerr << "[OpenAICloudTranscriber] JSON parse error: " << e.what()
@@ -95,8 +100,29 @@ void OpenAICloudTranscriber::setVocabularyBias(
 }
 
 void OpenAICloudTranscriber::setInputSampleRate(double sampleRate) {
-  if (sampleRate > 0.0) {
+  if (sampleRate <= 0.0)
+    return;
+
+  bool sendCommit = false;
+  {
+    std::lock_guard<std::mutex> lock(audioMutex);
+    if (!isHostSampleRateChange(inputSampleRate, sampleRate))
+      return;
+    if (!pcmAccumulator.empty()) {
+      sendPcm(pcmAccumulator);
+      pcmAccumulator.clear();
+    }
+    if (stream.live.active) {
+      stream.finalize();
+      sendCommit = true;
+    }
+    resampleCarry = 0.0;
     inputSampleRate = sampleRate;
+  }
+
+  if (sendCommit && webSocket) {
+    const json commitEvent = {{"type", "input_audio_buffer.commit"}};
+    webSocket->send(commitEvent.dump());
   }
 }
 
@@ -133,27 +159,81 @@ void OpenAICloudTranscriber::appendResampled(const float *samples,
   resampleCarry = pos - static_cast<double>(sampleCount);
 }
 
+void OpenAICloudTranscriber::sendPcm(const std::vector<int16_t> &pcmData) {
+  if (pcmData.empty() || !webSocket)
+    return;
+
+  const json audioAppend = {{"type", "input_audio_buffer.append"},
+                            {"audio", encodeBase64(pcmData)}};
+  webSocket->send(audioAppend.dump());
+  stream.noteLivePcmSent(pcmData.size(), inputSampleRate, targetSampleRate);
+}
+
+void OpenAICloudTranscriber::flushPendingTranscript(
+    const std::string &doneTranscript) {
+  std::vector<TimedWord> words;
+  uint32_t epoch = 0;
+  {
+    std::lock_guard<std::mutex> audioLock(audioMutex);
+    epoch = stream.committed.active ? stream.committed.epoch : stream.live.epoch;
+    words = stream.complete(doneTranscript);
+  }
+  if (words.empty())
+    return;
+
+  std::lock_guard<std::mutex> lock(listenerMutex);
+  for (auto *listener : listeners) {
+    if (listener == nullptr)
+      continue;
+    for (const auto &word : words) {
+      listener->onTranscriptUpdated(word.text, true, word.startSample,
+                                    word.endSample, epoch);
+    }
+  }
+}
+
 void OpenAICloudTranscriber::pushAudioBlock(const float *samples, int sampleCount,
-                                            double dawSampleTime) {
-  (void)dawSampleTime;
+                                            double dawSampleTime,
+                                            uint32_t captureEpoch) {
   if (samples == nullptr || sampleCount <= 0) {
     return;
   }
 
+  // Commit the old DAW window before capturing or sending any PCM from the
+  // new origin. Leftover samples in pcmAccumulator belong to the old window.
+  bool sendCommit = false;
+  {
+    std::lock_guard<std::mutex> lock(audioMutex);
+    if (stream.needsFinalizeForOrigin(dawSampleTime)) {
+      if (!pcmAccumulator.empty()) {
+        sendPcm(pcmAccumulator);
+        pcmAccumulator.clear();
+      }
+      if (stream.live.active) {
+        stream.finalize();
+        sendCommit = true;
+      }
+    }
+  }
+
+  if (sendCommit && webSocket) {
+    const json commitEvent = {{"type", "input_audio_buffer.commit"}};
+    webSocket->send(commitEvent.dump());
+  }
+
   std::lock_guard<std::mutex> lock(audioMutex);
+  stream.captureLiveOrigin(dawSampleTime, captureEpoch);
   appendResampled(samples, sampleCount);
+  stream.noteHostSamples(sampleCount);
 
   while (pcmAccumulator.size() >= targetChunkSize) {
-    std::vector<int16_t> chunk(pcmAccumulator.begin(),
-                               pcmAccumulator.begin() + targetChunkSize);
+    std::vector<int16_t> chunk(
+        pcmAccumulator.begin(),
+        pcmAccumulator.begin() + static_cast<std::ptrdiff_t>(targetChunkSize));
     pcmAccumulator.erase(pcmAccumulator.begin(),
-                         pcmAccumulator.begin() + targetChunkSize);
-
-    if (webSocket) {
-      const json audioAppend = {{"type", "input_audio_buffer.append"},
-                                {"audio", encodeBase64(chunk)}};
-      webSocket->send(audioAppend.dump());
-    }
+                         pcmAccumulator.begin() +
+                             static_cast<std::ptrdiff_t>(targetChunkSize));
+    sendPcm(chunk);
   }
 }
 
@@ -165,11 +245,10 @@ void OpenAICloudTranscriber::finalizeStream() {
   {
     std::lock_guard<std::mutex> lock(audioMutex);
     if (!pcmAccumulator.empty()) {
-      const json audioAppend = {{"type", "input_audio_buffer.append"},
-                                {"audio", encodeBase64(pcmAccumulator)}};
-      webSocket->send(audioAppend.dump());
+      sendPcm(pcmAccumulator);
       pcmAccumulator.clear();
     }
+    stream.finalize();
   }
 
   const json commitEvent = {{"type", "input_audio_buffer.commit"}};

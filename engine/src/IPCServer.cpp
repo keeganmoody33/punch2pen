@@ -52,18 +52,19 @@ void IPCServer::stop() {
 
 bool IPCServer::hasPendingAudio() {
   std::lock_guard<std::mutex> lock(audioQueueLock);
-  return !audioQueue.empty();
+  return !eventQueue.empty() && !eventQueue.front().isStop;
 }
 
 std::vector<float> IPCServer::popAudio() {
   std::lock_guard<std::mutex> lock(audioQueueLock);
-  if (audioQueue.empty())
+  if (eventQueue.empty() || eventQueue.front().isStop)
     return {};
 
-  auto packet = std::move(audioQueue.front());
-  audioQueue.erase(audioQueue.begin());
+  auto packet = std::move(eventQueue.front());
+  eventQueue.erase(eventQueue.begin());
   lastDawSampleTime_ = packet.dawSampleTime;
   lastSampleRate_ = packet.sampleRate;
+  lastCaptureEpoch_ = packet.captureEpoch;
   return std::move(packet.samples);
 }
 
@@ -73,6 +74,10 @@ double IPCServer::lastAudioDawSampleTime() {
 
 double IPCServer::lastAudioSampleRate() {
   return lastSampleRate_;
+}
+
+uint32_t IPCServer::lastAudioCaptureEpoch() {
+  return lastCaptureEpoch_;
 }
 
 bool IPCServer::hasPendingCorrection() {
@@ -91,7 +96,12 @@ IPCServer::CorrectionPair IPCServer::popCorrection() {
 }
 
 bool IPCServer::transportStateChangedToStop() {
-  return transportStopTriggered.exchange(false);
+  std::lock_guard<std::mutex> lock(audioQueueLock);
+  if (eventQueue.empty() || !eventQueue.front().isStop)
+    return false;
+  lastCaptureEpoch_ = eventQueue.front().captureEpoch;
+  eventQueue.erase(eventQueue.begin());
+  return true;
 }
 
 void IPCServer::acceptLoop() {
@@ -137,8 +147,10 @@ void IPCServer::clientHandler(int clientSocket) {
         if (recv(clientSocket, samples.data(), payloadSize, MSG_WAITALL) ==
             (ssize_t)payloadSize) {
           std::lock_guard<std::mutex> lock(audioQueueLock);
-          audioQueue.push_back({std::move(samples), chunkHeader.dawSampleTime,
-                                chunkHeader.sampleRate});
+          eventQueue.push_back({false, std::move(samples),
+                                chunkHeader.dawSampleTime,
+                                chunkHeader.sampleRate,
+                                chunkHeader.captureEpoch});
         }
       }
     } else if (header.type == protocol::MessageType::Correction) {
@@ -160,11 +172,23 @@ void IPCServer::clientHandler(int clientSocket) {
         }
       }
     } else if (header.type == protocol::MessageType::TransportStop) {
-      transportStopTriggered.store(true);
-      if (header.length > 0) {
+      protocol::TransportStopHeader stopHeader{};
+      if (header.length >= sizeof(stopHeader)) {
+        if (recv(clientSocket, &stopHeader, sizeof(stopHeader), MSG_WAITALL) !=
+            sizeof(stopHeader))
+          break;
+        if (header.length > sizeof(stopHeader)) {
+          std::vector<char> trash(header.length - sizeof(stopHeader));
+          recv(clientSocket, trash.data(),
+               header.length - sizeof(stopHeader), MSG_WAITALL);
+        }
+      } else if (header.length > 0) {
         std::vector<char> trash(header.length);
         recv(clientSocket, trash.data(), header.length, MSG_WAITALL);
       }
+      std::lock_guard<std::mutex> lock(audioQueueLock);
+      eventQueue.push_back(
+          {true, {}, 0.0, 0.0, stopHeader.captureEpoch});
     } else {
       if (header.length > 0) {
         std::vector<char> trash(header.length);
@@ -181,7 +205,8 @@ void IPCServer::clientHandler(int clientSocket) {
   close(clientSocket);
 }
 
-void IPCServer::sendResult(const std::string &text) {
+void IPCServer::sendResult(const std::string &text, double startTime,
+                           double endTime, uint32_t captureEpoch) {
   std::lock_guard<std::mutex> lock(clientLock);
   if (activeClientSocket < 0)
     return;
@@ -191,8 +216,9 @@ void IPCServer::sendResult(const std::string &text) {
 
   protocol::TranscriptionResultHeader resultHeader;
   resultHeader.textLength = (uint32_t)text.size();
-  resultHeader.startTime = 0.0;
-  resultHeader.endTime = 0.0;
+  resultHeader.startTime = startTime;
+  resultHeader.endTime = endTime;
+  resultHeader.captureEpoch = captureEpoch;
 
   header.length = sizeof(resultHeader) + resultHeader.textLength;
 

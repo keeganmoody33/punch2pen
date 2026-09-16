@@ -30,12 +30,13 @@ public:
   void resized() override;
   void mouseDown(const juce::MouseEvent &event) override;
 
-  void appendStreamingText(const std::string &newText, double sampleTime,
-                           bool isProvisional);
+  void appendStreamingText(const std::string &newText, double startSample,
+                           double endSample, bool isProvisional);
   void updatePlaybackPosition(double currentDAWSample);
 
   // IPCClient::Listener implementation
-  void onTranscriptionReceived(const std::string &text) override;
+  void onTranscriptionReceived(const std::string &text, double startTime,
+                               double endTime, uint32_t captureEpoch) override;
   void onStatusChanged(bool isConnected) override;
 
   using WordClickCallback = std::function<void(const std::string &word,

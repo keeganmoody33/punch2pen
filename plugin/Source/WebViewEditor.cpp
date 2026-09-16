@@ -123,13 +123,7 @@ void WebViewEditor::resized() {
 void WebViewEditor::timerCallback() {
   auto transport = audioProcessor.getTransportPosition();
 
-  double sampleRate = audioProcessor.getSampleRate();
-  if (sampleRate <= 0.0)
-    sampleRate = 48000.0;
-
-  double currentSamplePosition =
-      transport.ppq * (60.0 / juce::jmax(1.0, transport.bpm)) * sampleRate;
-  jsUpdatePlayhead(currentSamplePosition);
+  jsUpdatePlayhead(audioProcessor.getHostDawSampleTime());
 
   if (transport.bar != lastBar || transport.beat != lastBeat) {
     jsUpdatePosition(transport.bar, transport.beat);
@@ -152,8 +146,7 @@ void WebViewEditor::timerCallback() {
   else                             state = "idle";
   if (state != lastState) {
     if (state == "recording" && lastState != "recording") {
-      ++takeGeneration;
-      streamCursorSample = 0.0;
+      displayedCaptureEpoch.store(audioProcessor.getCaptureEpoch());
       runJs("window.resetTranscript();");
     }
     jsSetState(state);
@@ -162,17 +155,22 @@ void WebViewEditor::timerCallback() {
 }
 
 // ── IPCClient::Listener ─────────────────────────────────────────────────────
-void WebViewEditor::onTranscriptionReceived(const std::string &text) {
+void WebViewEditor::onTranscriptionReceived(const std::string &text,
+                                            double startTime, double endTime,
+                                            uint32_t captureEpoch) {
   juce::Component::SafePointer<WebViewEditor> safeThis(this);
-  auto generation = takeGeneration.load();
-  juce::MessageManager::callAsync([safeThis, text, generation] {
+  juce::MessageManager::callAsync([safeThis, text, startTime, endTime,
+                                   captureEpoch] {
     if (safeThis == nullptr) return;
-    if (safeThis->takeGeneration.load() != generation) return;
-    safeThis->streamCursorSample += 4800.0;
-    double start = safeThis->streamCursorSample;
-    double end   = start + 4800.0;
+    const uint32_t displayed = safeThis->displayedCaptureEpoch.load();
+    if (captureEpoch < displayed)
+      return;
+    if (captureEpoch > displayed) {
+      safeThis->displayedCaptureEpoch.store(captureEpoch);
+      safeThis->runJs("window.resetTranscript();");
+    }
     int bar = juce::jmax(1, safeThis->lastBar);
-    safeThis->jsAppendWord(juce::String(text), start, end, bar);
+    safeThis->jsAppendWord(juce::String(text), startTime, endTime, bar);
   });
 }
 

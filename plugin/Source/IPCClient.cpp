@@ -10,7 +10,7 @@
 namespace punch2pen {
 
 IPCClient::IPCClient(int port, bool autoLaunchEngineFlag)
-    : Thread("Punch2Pen_IPC"), serverPort(port),
+    : Thread("Punch2Pen_IPC"), stopEpochs(64, 0), serverPort(port),
       autoLaunchEngine(autoLaunchEngineFlag) {
   startThread();
 }
@@ -24,6 +24,7 @@ IPCClient::~IPCClient() {
 void IPCClient::run() {
   tempBuffer.reserve(4096);
   while (!threadShouldExit()) {
+    applyPendingCaptureReset();
     if (!connected) {
       attemptConnection();
       if (!connected) {
@@ -50,7 +51,9 @@ void IPCClient::run() {
 
               juce::ScopedLock lock(listenerLock);
               for (auto *l : listeners)
-                l->onTranscriptionReceived(text);
+                l->onTranscriptionReceived(text, resultHeader.startTime,
+                                           resultHeader.endTime,
+                                           resultHeader.captureEpoch);
             }
           }
         } else {
@@ -67,14 +70,20 @@ void IPCClient::run() {
       }
     }
 
-    processOutgoingAudio();
-
-    if (pendingStop.exchange(false))
-      sendTransportStop();
+    // Drain every queued punch-out: matching epoch then one TransportStop.
+    uint32_t stopEpoch = 0;
+    bool drainedStop = false;
+    while (popStopEpoch(stopEpoch)) {
+      processOutgoingAudio(true, stopEpoch);
+      sendTransportStop(stopEpoch);
+      drainedStop = true;
+    }
+    if (!drainedStop)
+      processOutgoingAudio(false);
   }
 }
 
-void IPCClient::processOutgoingAudio() {
+void IPCClient::processOutgoingAudio(bool flushPartial, uint32_t stopEpoch) {
   if (!connected || !ringBuffer)
     return;
 
@@ -82,20 +91,48 @@ void IPCClient::processOutgoingAudio() {
   if (sampleRate <= 0.0)
     return;
 
-  int available = ringBuffer->getNumReady();
-  if (available > 0) {
-    const int chunkSize = transcriptionMode.load() == TranscriptionMode::Online
-                              ? 1600
-                              : 4096;
-    if (available < chunkSize)
+  const int chunkSize = transcriptionMode.load() == TranscriptionMode::Online
+                            ? 1600
+                            : 4096;
+
+  while (true) {
+    const int available = ringBuffer->getNumReady();
+    if (available <= 0)
       return;
 
-    if (tempBuffer.size() < (size_t)chunkSize)
-      tempBuffer.resize((size_t)chunkSize);
+    if (flushPartial && ringBuffer->peekEpoch() != stopEpoch)
+      return;
 
-    ringBuffer->read(tempBuffer.data(), chunkSize);
-    sendAudioChunk(tempBuffer.data(), chunkSize, sampleRate);
+    int toRead = chunkSize;
+    if (available < chunkSize) {
+      if (!flushPartial)
+        return;
+      toRead = available;
+    }
+
+    if (tempBuffer.size() < (size_t)toRead)
+      tempBuffer.resize((size_t)toRead);
+
+    double chunkDawSample = 0.0;
+    uint32_t epoch = 0;
+    const int n = ringBuffer->read(tempBuffer.data(), toRead, &chunkDawSample,
+                                   &epoch);
+    if (n <= 0)
+      return;
+    sendAudioChunk(tempBuffer.data(), n, sampleRate, chunkDawSample, epoch);
+    if (!flushPartial)
+      return;
   }
+}
+
+void IPCClient::applyPendingCaptureReset() {
+  if (!pendingCaptureReset.load())
+    return;
+  // Consumer-only. Punch-out drains by epoch instead of reset(), so a
+  // concurrent punch-in is not discarded.
+  if (ringBuffer)
+    ringBuffer->reset();
+  pendingCaptureReset.store(false);
 }
 
 void IPCClient::attemptConnection() {
@@ -150,8 +187,40 @@ void IPCClient::setHostSampleRate(double sampleRate) {
     hostSampleRate.store(sampleRate);
 }
 
+void IPCClient::flagTransportStop(uint32_t epoch) {
+  int start1 = 0, size1 = 0, start2 = 0, size2 = 0;
+  stopFifo.prepareToWrite(1, start1, size1, start2, size2);
+  if (size1 > 0)
+    stopEpochs[static_cast<size_t>(start1)] = epoch;
+  else if (size2 > 0)
+    stopEpochs[static_cast<size_t>(start2)] = epoch;
+  else
+    return;
+  stopFifo.finishedWrite(1);
+  notify();
+}
+
+bool IPCClient::popStopEpoch(uint32_t &epoch) {
+  int start1 = 0, size1 = 0, start2 = 0, size2 = 0;
+  stopFifo.prepareToRead(1, start1, size1, start2, size2);
+  if (size1 > 0)
+    epoch = stopEpochs[static_cast<size_t>(start1)];
+  else if (size2 > 0)
+    epoch = stopEpochs[static_cast<size_t>(start2)];
+  else
+    return false;
+  stopFifo.finishedRead(1);
+  return true;
+}
+
+void IPCClient::requestCaptureReset() {
+  pendingCaptureReset.store(true);
+  notify();
+}
+
 void IPCClient::sendAudioChunk(const float *samples, int numSamples,
-                               double sampleRate) {
+                               double sampleRate, double dawSampleTime,
+                               uint32_t captureEpoch) {
   if (!connected)
     return;
 
@@ -161,7 +230,8 @@ void IPCClient::sendAudioChunk(const float *samples, int numSamples,
   protocol::AudioChunkHeader chunkHeader;
   chunkHeader.sampleRate = sampleRate;
   chunkHeader.numSamples = (uint32_t)numSamples;
-  chunkHeader.dawSampleTime = 0.0;
+  chunkHeader.dawSampleTime = dawSampleTime;
+  chunkHeader.captureEpoch = captureEpoch;
 
   size_t payloadSize =
       sizeof(protocol::AudioChunkHeader) + ((size_t)numSamples * sizeof(float));
@@ -182,15 +252,21 @@ void IPCClient::sendAudioChunk(const float *samples, int numSamples,
   }
 }
 
-void IPCClient::sendTransportStop() {
+void IPCClient::sendTransportStop(uint32_t captureEpoch) {
   if (!connected)
     return;
 
   protocol::Header header;
   header.type = protocol::MessageType::TransportStop;
-  header.length = 0;
+  protocol::TransportStopHeader stopHeader;
+  stopHeader.captureEpoch = captureEpoch;
+  header.length = (uint32_t)sizeof(stopHeader);
 
   if (socket.write(&header, sizeof(header)) != sizeof(header)) {
+    connected = false;
+    return;
+  }
+  if (socket.write(&stopHeader, sizeof(stopHeader)) != sizeof(stopHeader)) {
     connected = false;
   }
 }

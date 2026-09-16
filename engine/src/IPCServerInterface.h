@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -13,6 +14,7 @@ public:
   virtual std::vector<float> popAudio() = 0;
   virtual double lastAudioDawSampleTime() = 0;
   virtual double lastAudioSampleRate() = 0;
+  virtual uint32_t lastAudioCaptureEpoch() = 0;
   virtual bool transportStateChangedToStop() = 0;
 
   struct CorrectionPair {

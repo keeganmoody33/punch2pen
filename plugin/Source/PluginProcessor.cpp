@@ -130,6 +130,8 @@ void Punch2PenAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     buffer.clear(i, 0, buffer.getNumSamples());
 
   bool isRecording = transportIsRecording.load();
+  double dawSampleTime = hostDawSampleTime.load();
+  bool haveAbsoluteHostTime = false;
 
   // 1. Get Transport Info
   if (auto *ph = getPlayHead()) {
@@ -148,21 +150,44 @@ void Punch2PenAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
       transportIsPlaying.store(pos->getIsPlaying());
       isRecording = pos->getIsRecording();
       transportIsRecording.store(isRecording);
+
+      if (auto samples = pos->getTimeInSamples()) {
+        dawSampleTime = static_cast<double>(*samples);
+        haveAbsoluteHostTime = true;
+      } else if (auto seconds = pos->getTimeInSeconds()) {
+        const double sr = getSampleRate();
+        if (sr > 0.0) {
+          dawSampleTime = *seconds * sr;
+          haveAbsoluteHostTime = true;
+        }
+      }
+
+      if (!haveAbsoluteHostTime) {
+        const double bpm = currentBpm.load();
+        const double sr = getSampleRate();
+        if (bpm > 0.0 && sr > 0.0)
+          dawSampleTime = transportPpq.load() * (60.0 / bpm) * sr;
+        else if (pos->getIsPlaying() || isRecording)
+          dawSampleTime += static_cast<double>(buffer.getNumSamples());
+      }
     }
+  } else if (isRecording || transportIsPlaying.load()) {
+    dawSampleTime += static_cast<double>(buffer.getNumSamples());
   }
+  hostDawSampleTime.store(dawSampleTime);
 
-  // 2. Capture Audio if Recording
+  // 2. Capture audio while recording. Writes carry captureEpoch so a punch-out
+  // drain can stop at take A and leave a concurrent punch-in's samples.
   if (isRecording) {
-    // We only take the first channel for voice recognition usually
     auto *channelData = buffer.getReadPointer(0);
-
-    // If ring buffer is safe, write
-    audioRingBuffer->write(channelData, buffer.getNumSamples());
+    audioRingBuffer->write(channelData, buffer.getNumSamples(), dawSampleTime,
+                           captureEpoch.load());
   }
 
   if (wasRecordingLastBlock && !isRecording) {
     if (ipcClient)
-      ipcClient->flagTransportStop();
+      ipcClient->flagTransportStop(captureEpoch.load());
+    captureEpoch.fetch_add(1);
   }
 
   wasRecordingLastBlock = isRecording;

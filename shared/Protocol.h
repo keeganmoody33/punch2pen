@@ -31,6 +31,7 @@ struct AudioChunkHeader {
   double sampleRate;
   uint32_t numSamples;
   double dawSampleTime;
+  uint32_t captureEpoch;
   // Followed by float32 payload
 };
 
@@ -38,7 +39,12 @@ struct TranscriptionResultHeader {
   uint32_t textLength;
   double startTime;
   double endTime;
+  uint32_t captureEpoch;
   // Followed by text payload
+};
+
+struct TransportStopHeader {
+  uint32_t captureEpoch;
 };
 
 struct CorrectionHeader {
