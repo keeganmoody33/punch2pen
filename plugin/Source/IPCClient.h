@@ -15,7 +15,8 @@ public:
   void run() override;
 
   bool isConnected() const;
-  void sendAudioChunk(const float *samples, int numSamples, double sampleRate);
+  void sendAudioChunk(const float *samples, int numSamples, double sampleRate,
+                      double dawSampleTime);
   void sendTransportStop();
   void flagTransportStop() { pendingStop.store(true); }
   void sendCorrection(const std::string &original, const std::string &corrected);
@@ -25,7 +26,9 @@ public:
   // Callback interface for receiving messages
   struct Listener {
     virtual ~Listener() = default;
-    virtual void onTranscriptionReceived(const std::string &text) = 0;
+    virtual void onTranscriptionReceived(const std::string &text,
+                                         double startTime,
+                                         double endTime) = 0;
     virtual void onStatusChanged(bool isConnected) = 0;
   };
 
@@ -34,6 +37,7 @@ public:
 
   void setAudioSource(class AudioRingBuffer *buffer) { ringBuffer = buffer; }
   void setHostSampleRate(double sampleRate);
+  void setCaptureOrigin(double dawSampleTime);
 
 private:
   void attemptConnection();
@@ -49,6 +53,7 @@ private:
   std::vector<float> tempBuffer;
   std::atomic<TranscriptionMode> transcriptionMode{TranscriptionMode::Offline};
   std::atomic<double> hostSampleRate{0.0};
+  std::atomic<double> nextChunkDawSample{0.0};
 
   int serverPort;
   bool autoLaunchEngine;

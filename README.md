@@ -60,7 +60,7 @@ flowchart LR
 
 ## Prerequisites
 
-- **CMake 3.20** or higher
+- **CMake 3.22** or higher
 - **C++20** compliant compiler
 - **macOS** with Accelerate framework (used by whisper.cpp)
 - ~150 MB disk space for the whisper GGML model

@@ -31,7 +31,7 @@ public:
   bool hasPendingCorrection() override;
   CorrectionPair popCorrection() override;
 
-  void sendResult(const std::string &text);
+  void sendResult(const std::string &text, double startTime, double endTime);
 
 private:
   void acceptLoop();

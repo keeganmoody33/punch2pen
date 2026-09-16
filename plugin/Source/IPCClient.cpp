@@ -50,7 +50,8 @@ void IPCClient::run() {
 
               juce::ScopedLock lock(listenerLock);
               for (auto *l : listeners)
-                l->onTranscriptionReceived(text);
+                l->onTranscriptionReceived(text, resultHeader.startTime,
+                                           resultHeader.endTime);
             }
           }
         } else {
@@ -94,7 +95,9 @@ void IPCClient::processOutgoingAudio() {
       tempBuffer.resize((size_t)chunkSize);
 
     ringBuffer->read(tempBuffer.data(), chunkSize);
-    sendAudioChunk(tempBuffer.data(), chunkSize, sampleRate);
+    const double chunkDawSample = nextChunkDawSample.load();
+    nextChunkDawSample.store(chunkDawSample + static_cast<double>(chunkSize));
+    sendAudioChunk(tempBuffer.data(), chunkSize, sampleRate, chunkDawSample);
   }
 }
 
@@ -150,8 +153,12 @@ void IPCClient::setHostSampleRate(double sampleRate) {
     hostSampleRate.store(sampleRate);
 }
 
+void IPCClient::setCaptureOrigin(double dawSampleTime) {
+  nextChunkDawSample.store(dawSampleTime);
+}
+
 void IPCClient::sendAudioChunk(const float *samples, int numSamples,
-                               double sampleRate) {
+                               double sampleRate, double dawSampleTime) {
   if (!connected)
     return;
 
@@ -161,7 +168,7 @@ void IPCClient::sendAudioChunk(const float *samples, int numSamples,
   protocol::AudioChunkHeader chunkHeader;
   chunkHeader.sampleRate = sampleRate;
   chunkHeader.numSamples = (uint32_t)numSamples;
-  chunkHeader.dawSampleTime = 0.0;
+  chunkHeader.dawSampleTime = dawSampleTime;
 
   size_t payloadSize =
       sizeof(protocol::AudioChunkHeader) + ((size_t)numSamples * sizeof(float));

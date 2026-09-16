@@ -13,7 +13,7 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -DPUNCH2PEN_BUILD_PLUGIN=OFF
       - name: Build test targets
-        run: cmake --build build --target databaseManagerTest profileManagerTest protocolSerializationTest openAIJsonTest transcriptionCoordinatorTest -j4
+        run: cmake --build build --target databaseManagerTest profileManagerTest protocolSerializationTest openAIJsonTest transcriptionCoordinatorTest transcriptTimingTest -j4
       - name: Run tests
         run: |
           ./build/bin/databaseManagerTest
@@ -21,6 +21,7 @@ jobs:
           ./build/bin/protocolSerializationTest
           ./build/bin/openAIJsonTest
           ./build/bin/transcriptionCoordinatorTest
+          ./build/bin/transcriptTimingTest
 
   plugin-tests:
     runs-on: macos-latest

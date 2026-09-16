@@ -30,11 +30,11 @@ public:
   explicit EngineTranscriberListener(punch2pen::IPCServer &serverRef)
       : server(serverRef) {}
 
-  void onTranscriptUpdated(const std::string &text,
-                           bool isProvisional) override {
+  void onTranscriptUpdated(const std::string &text, bool isProvisional,
+                           double startTime, double endTime) override {
     (void)isProvisional;
     std::cout << "Transcription: " << text << std::endl;
-    server.sendResult(text);
+    server.sendResult(text, startTime, endTime);
   }
 
 private:

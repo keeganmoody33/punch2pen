@@ -15,6 +15,8 @@ Punch2PenAudioProcessorEditor::Punch2PenAudioProcessorEditor(
     Punch2PenAudioProcessor &p)
     : AudioProcessorEditor(&p) {
   setSize(400, 600);
+  setResizable(true, true);
+  setResizeLimits(400, 400, 4096, 4096);
   webEditor = std::make_unique<punch2pen::WebViewEditor>(p);
   addAndMakeVisible(*webEditor);
 }

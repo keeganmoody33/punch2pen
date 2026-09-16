@@ -41,6 +41,10 @@ private:
   std::mutex audioMutex;
   double inputSampleRate = 48000.0;
   double resampleCarry = 0.0;
+  double bufferStartDawSample = 0.0;
+  double lastPushedEndDawSample = 0.0;
+  double lastEmittedEndDawSample = 0.0;
+  bool haveStreamOrigin = false;
   static constexpr int targetSampleRate = 16000;
   const size_t targetChunkSize = 1600;
 };

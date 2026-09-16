@@ -11,7 +11,8 @@ public:
   public:
     virtual ~Listener() = default;
     virtual void onTranscriptUpdated(const std::string &text,
-                                     bool isProvisional) = 0;
+                                     bool isProvisional, double startTime,
+                                     double endTime) = 0;
   };
 
   virtual ~TranscriberInterface() = default;

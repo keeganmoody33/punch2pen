@@ -181,7 +181,8 @@ void IPCServer::clientHandler(int clientSocket) {
   close(clientSocket);
 }
 
-void IPCServer::sendResult(const std::string &text) {
+void IPCServer::sendResult(const std::string &text, double startTime,
+                           double endTime) {
   std::lock_guard<std::mutex> lock(clientLock);
   if (activeClientSocket < 0)
     return;
@@ -191,8 +192,8 @@ void IPCServer::sendResult(const std::string &text) {
 
   protocol::TranscriptionResultHeader resultHeader;
   resultHeader.textLength = (uint32_t)text.size();
-  resultHeader.startTime = 0.0;
-  resultHeader.endTime = 0.0;
+  resultHeader.startTime = startTime;
+  resultHeader.endTime = endTime;
 
   header.length = sizeof(resultHeader) + resultHeader.textLength;
 

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.22)
 
 add_executable(punch2penEngine
     src/main.cpp
@@ -116,6 +116,19 @@ target_include_directories(protocolSerializationTest
 )
 
 set_target_properties(protocolSerializationTest PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+)
+
+add_executable(transcriptTimingTest
+    tests/TranscriptTimingTest.cpp
+)
+
+target_include_directories(transcriptTimingTest
+    PRIVATE src
+)
+
+set_target_properties(transcriptTimingTest PROPERTIES
     CXX_STANDARD 20
     CXX_STANDARD_REQUIRED ON
 )

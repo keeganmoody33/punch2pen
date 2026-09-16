@@ -153,7 +153,6 @@ void WebViewEditor::timerCallback() {
   if (state != lastState) {
     if (state == "recording" && lastState != "recording") {
       ++takeGeneration;
-      streamCursorSample = 0.0;
       runJs("window.resetTranscript();");
     }
     jsSetState(state);
@@ -162,17 +161,16 @@ void WebViewEditor::timerCallback() {
 }
 
 // ── IPCClient::Listener ─────────────────────────────────────────────────────
-void WebViewEditor::onTranscriptionReceived(const std::string &text) {
+void WebViewEditor::onTranscriptionReceived(const std::string &text,
+                                            double startTime, double endTime) {
   juce::Component::SafePointer<WebViewEditor> safeThis(this);
   auto generation = takeGeneration.load();
-  juce::MessageManager::callAsync([safeThis, text, generation] {
+  juce::MessageManager::callAsync([safeThis, text, startTime, endTime,
+                                   generation] {
     if (safeThis == nullptr) return;
     if (safeThis->takeGeneration.load() != generation) return;
-    safeThis->streamCursorSample += 4800.0;
-    double start = safeThis->streamCursorSample;
-    double end   = start + 4800.0;
     int bar = juce::jmax(1, safeThis->lastBar);
-    safeThis->jsAppendWord(juce::String(text), start, end, bar);
+    safeThis->jsAppendWord(juce::String(text), startTime, endTime, bar);
   });
 }
 

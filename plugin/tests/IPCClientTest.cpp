@@ -63,6 +63,7 @@ void testConnectionAndAudioChunk() {
 
     assert(chunkHeader.sampleRate == sampleRate);
     assert(chunkHeader.numSamples == (uint32_t)numSamples);
+    assert(chunkHeader.dawSampleTime == 0.0);
 
     // Read float payload
     std::vector<float> payload(numSamples);
@@ -103,7 +104,7 @@ void testConnectionAndAudioChunk() {
   for (int i = 0; i < numSamples; ++i)
     samples[i] = (float)i * 0.1f;
 
-  ipcClient->sendAudioChunk(samples.data(), numSamples, sampleRate);
+  ipcClient->sendAudioChunk(samples.data(), numSamples, sampleRate, 0.0);
 
   // Wait for server to receive
   for (int i = 0; i < 50; ++i) {
@@ -152,7 +153,8 @@ void testOutgoingChunksUseHostSampleRate() {
     }
 
     rateOk = (chunkHeader.sampleRate == hostRate &&
-              chunkHeader.numSamples == (uint32_t)chunkSize);
+              chunkHeader.numSamples == (uint32_t)chunkSize &&
+              chunkHeader.dawSampleTime == 96000.0);
 
     std::vector<float> payload(chunkSize);
     readExact(*client, payload.data(), chunkSize * (int)sizeof(float));
@@ -164,6 +166,7 @@ void testOutgoingChunksUseHostSampleRate() {
   auto ipcClient = std::make_unique<Punch2Pen::IPCClient>(
       TEST_PORT + 4, /*autoLaunchEngine=*/false);
   ipcClient->setHostSampleRate(hostRate);
+  ipcClient->setCaptureOrigin(96000.0);
 
   Punch2Pen::AudioRingBuffer ring(chunkSize * 2);
   std::vector<float> samples(chunkSize, 0.25f);
@@ -379,6 +382,149 @@ void testDisconnectDetection() {
   std::cout << "[PASS] testDisconnectDetection" << std::endl;
 }
 
+void testOutgoingChunksStampDawSampleTime() {
+  juce::StreamingSocket server;
+  bool bound = server.createListener(TEST_PORT + 5, "127.0.0.1");
+  assert(bound);
+
+  std::atomic<bool> gotAudioChunk{false};
+  std::atomic<bool> timeOk{false};
+  const double origin = 48000.0;
+  const int chunkSize = 4096;
+
+  std::thread serverThread([&]() {
+    juce::StreamingSocket *client = server.waitForNextConnection();
+    if (client == nullptr)
+      return;
+
+    Punch2Pen::protocol::Header header;
+    if (!readExact(*client, &header, sizeof(header))) {
+      delete client;
+      return;
+    }
+
+    Punch2Pen::protocol::AudioChunkHeader chunkHeader;
+    if (!readExact(*client, &chunkHeader, sizeof(chunkHeader))) {
+      delete client;
+      return;
+    }
+
+    timeOk = (chunkHeader.dawSampleTime == origin &&
+              chunkHeader.numSamples == (uint32_t)chunkSize);
+
+    std::vector<float> payload(chunkSize);
+    readExact(*client, payload.data(), chunkSize * (int)sizeof(float));
+    gotAudioChunk = true;
+    delete client;
+  });
+
+  juce::Thread::sleep(100);
+  auto ipcClient = std::make_unique<Punch2Pen::IPCClient>(
+      TEST_PORT + 5, /*autoLaunchEngine=*/false);
+  ipcClient->setHostSampleRate(48000.0);
+  ipcClient->setCaptureOrigin(origin);
+
+  Punch2Pen::AudioRingBuffer ring(chunkSize * 2);
+  std::vector<float> samples(chunkSize, 0.5f);
+  ring.write(samples.data(), chunkSize);
+  ipcClient->setAudioSource(&ring);
+
+  for (int i = 0; i < 50; ++i) {
+    if (ipcClient->isConnected())
+      break;
+    juce::Thread::sleep(100);
+  }
+  assert(ipcClient->isConnected());
+
+  for (int i = 0; i < 50; ++i) {
+    if (gotAudioChunk)
+      break;
+    juce::Thread::sleep(100);
+  }
+
+  ipcClient.reset();
+  serverThread.join();
+  server.close();
+
+  assert(gotAudioChunk);
+  assert(timeOk);
+
+  std::cout << "[PASS] testOutgoingChunksStampDawSampleTime" << std::endl;
+}
+
+void testTranscriptionResultForwardsTimes() {
+  juce::StreamingSocket server;
+  bool bound = server.createListener(TEST_PORT + 6, "127.0.0.1");
+  assert(bound);
+
+  struct TestListener : Punch2Pen::IPCClient::Listener {
+    std::atomic<bool> got{false};
+    std::atomic<bool> ok{false};
+    void onTranscriptionReceived(const std::string &text, double startTime,
+                                 double endTime) override {
+      ok = (text == "hello" && startTime == 48000.0 && endTime == 52800.0);
+      got = true;
+    }
+    void onStatusChanged(bool) override {}
+  };
+
+  std::thread serverThread([&]() {
+    juce::StreamingSocket *client = server.waitForNextConnection();
+    if (client == nullptr)
+      return;
+
+    juce::Thread::sleep(150);
+
+    const std::string text = "hello";
+    Punch2Pen::protocol::Header header;
+    header.type = Punch2Pen::protocol::MessageType::TranscriptionResult;
+
+    Punch2Pen::protocol::TranscriptionResultHeader resultHeader;
+    resultHeader.textLength = (uint32_t)text.size();
+    resultHeader.startTime = 48000.0;
+    resultHeader.endTime = 52800.0;
+    header.length =
+        (uint32_t)(sizeof(resultHeader) + resultHeader.textLength);
+
+    client->write(&header, sizeof(header));
+    client->write(&resultHeader, sizeof(resultHeader));
+    client->write(text.data(), (int)text.size());
+
+    juce::Thread::sleep(200);
+    client->close();
+    delete client;
+  });
+
+  juce::Thread::sleep(100);
+  auto ipcClient = std::make_unique<Punch2Pen::IPCClient>(
+      TEST_PORT + 6, /*autoLaunchEngine=*/false);
+  TestListener listener;
+  ipcClient->addListener(&listener);
+
+  for (int i = 0; i < 50; ++i) {
+    if (ipcClient->isConnected())
+      break;
+    juce::Thread::sleep(100);
+  }
+  assert(ipcClient->isConnected());
+
+  for (int i = 0; i < 50; ++i) {
+    if (listener.got.load())
+      break;
+    juce::Thread::sleep(100);
+  }
+
+  ipcClient->removeListener(&listener);
+  ipcClient.reset();
+  serverThread.join();
+  server.close();
+
+  assert(listener.got.load());
+  assert(listener.ok.load());
+
+  std::cout << "[PASS] testTranscriptionResultForwardsTimes" << std::endl;
+}
+
 int main() {
   // RAII initializer for JUCE Thread internals. JUCE only ships the _GUI
   // variant; per its own header docs, it's the recommended initializer for
@@ -388,6 +534,8 @@ int main() {
 
   testConnectionAndAudioChunk();
   testOutgoingChunksUseHostSampleRate();
+  testOutgoingChunksStampDawSampleTime();
+  testTranscriptionResultForwardsTimes();
   testTransportStop();
   testCorrection();
   testDisconnectDetection();

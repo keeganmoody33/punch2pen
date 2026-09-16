@@ -94,28 +94,30 @@ void TranscriptView::updatePlaybackPosition(double currentDAWSample) {
 }
 
 void TranscriptView::appendStreamingText(const std::string &newText,
-                                         double sampleTime,
+                                         double startSample, double endSample,
                                          bool isProvisional) {
   juce::ignoreUnused(isProvisional);
 
   juce::ScopedLock lock(dataLock);
   if (transcriptLines.empty() || transcriptLines.back().words.size() >= 8) {
     LyricLine line;
-    line.lineStartSample = sampleTime;
+    line.lineStartSample = startSample;
     transcriptLines.push_back(line);
   }
 
   LyricWord word;
   word.text = newText;
-  word.startSample = sampleTime;
-  word.endSample = sampleTime + 4800.0;
+  word.startSample = startSample;
+  word.endSample = endSample;
   transcriptLines.back().words.push_back(word);
 }
 
-void TranscriptView::onTranscriptionReceived(const std::string &text) {
-  juce::MessageManager::callAsync([this, text] {
-    streamCursorSample += 4800.0;
-    appendStreamingText(text, streamCursorSample, true);
+void TranscriptView::onTranscriptionReceived(const std::string &text,
+                                             double startTime,
+                                             double endTime) {
+  juce::MessageManager::callAsync([this, text, startTime, endTime] {
+    streamCursorSample = endTime;
+    appendStreamingText(text, startTime, endTime, true);
     repaint();
   });
 }

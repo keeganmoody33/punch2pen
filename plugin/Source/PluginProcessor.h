@@ -55,6 +55,7 @@ public:
 
   TransportPosition getTransportPosition() const;
   double getSampleRate() const { return AudioProcessor::getSampleRate(); }
+  double currentDawSampleTime() const;
 
   punch2pen::IPCClient *getIPCClient() const { return ipcClient.get(); }
 

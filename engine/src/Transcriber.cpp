@@ -1,6 +1,8 @@
 #include "Transcriber.h"
+#include "TranscriptTiming.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <iostream>
 
@@ -12,6 +14,7 @@ Transcriber::Transcriber(const std::string &modelPath) {
   params.print_special = false;
   params.print_realtime = false;
   params.print_timestamps = false;
+  params.token_timestamps = true;
   params.translate = false;
   params.language = "en";
   params.n_threads = 4;
@@ -71,9 +74,12 @@ void Transcriber::setInputSampleRate(double sampleRate) {
 
 void Transcriber::pushAudioBlock(const float *samples, int sampleCount,
                                  double dawSampleTime) {
-  (void)dawSampleTime;
   if (samples == nullptr || sampleCount <= 0) {
     return;
+  }
+
+  if (audioBuffer.empty()) {
+    bufferStartDawSample = dawSampleTime;
   }
 
   appendResampled(samples, sampleCount);
@@ -127,24 +133,111 @@ void Transcriber::processAvailableAudio(bool force) {
     return;
   }
 
-  std::string result;
+  audioBuffer.clear();
+  resampleCarry = 0.0;
+  emitWordsFromWhisper();
+}
+
+void Transcriber::emitWordsFromWhisper() {
   const int n_segments = whisper_full_n_segments(ctx);
   for (int i = 0; i < n_segments; ++i) {
-    result += whisper_full_get_segment_text(ctx, i);
-  }
+    const double segmentStart = whisperCentisecondsToDawSamples(
+        bufferStartDawSample, whisper_full_get_segment_t0(ctx, i),
+        inputSampleRate);
+    const double segmentEnd = whisperCentisecondsToDawSamples(
+        bufferStartDawSample, whisper_full_get_segment_t1(ctx, i),
+        inputSampleRate);
 
-  audioBuffer.clear();
+    std::vector<TimedWord> tokenWords;
+    std::string currentWord;
+    double wordStartCs = -1.0;
+    double wordEndCs = -1.0;
+    bool anyTokenTime = false;
 
-  if (!result.empty()) {
-    notifyListeners(result, false);
+    const int n_tokens = whisper_full_n_tokens(ctx, i);
+    auto flushTokenWord = [&]() {
+      if (currentWord.empty())
+        return;
+      TimedWord word;
+      word.text = currentWord;
+      if (wordStartCs >= 0.0 && wordEndCs >= 0.0) {
+        word.startSample = whisperCentisecondsToDawSamples(
+            bufferStartDawSample, static_cast<long long>(wordStartCs),
+            inputSampleRate);
+        word.endSample = whisperCentisecondsToDawSamples(
+            bufferStartDawSample, static_cast<long long>(wordEndCs),
+            inputSampleRate);
+        anyTokenTime = true;
+      } else {
+        word.startSample = segmentStart;
+        word.endSample = segmentEnd;
+      }
+      tokenWords.push_back(std::move(word));
+      currentWord.clear();
+      wordStartCs = -1.0;
+      wordEndCs = -1.0;
+    };
+
+    for (int j = 0; j < n_tokens; ++j) {
+      if (whisper_full_get_token_id(ctx, i, j) >= whisper_token_eot(ctx))
+        continue;
+
+      const char *tok = whisper_full_get_token_text(ctx, i, j);
+      std::string tokenText = tok != nullptr ? tok : "";
+      const whisper_token_data data = whisper_full_get_token_data(ctx, i, j);
+
+      bool startsNewWord = currentWord.empty();
+      if (!tokenText.empty() &&
+          std::isspace(static_cast<unsigned char>(tokenText.front())) != 0) {
+        startsNewWord = true;
+      }
+
+      size_t firstNonSpace = 0;
+      while (firstNonSpace < tokenText.size() &&
+             std::isspace(static_cast<unsigned char>(
+                 tokenText[firstNonSpace])) != 0) {
+        ++firstNonSpace;
+      }
+      tokenText.erase(0, firstNonSpace);
+      while (!tokenText.empty() &&
+             std::isspace(static_cast<unsigned char>(tokenText.back())) != 0) {
+        tokenText.pop_back();
+      }
+      if (tokenText.empty())
+        continue;
+
+      if (startsNewWord)
+        flushTokenWord();
+
+      if (currentWord.empty() && data.t0 >= 0)
+        wordStartCs = static_cast<double>(data.t0);
+      if (data.t1 >= 0)
+        wordEndCs = static_cast<double>(data.t1);
+      currentWord += tokenText;
+    }
+    flushTokenWord();
+
+    const std::vector<TimedWord> words =
+        anyTokenTime ? tokenWords
+                     : splitWordsAcrossRange(
+                           whisper_full_get_segment_text(ctx, i)
+                               ? whisper_full_get_segment_text(ctx, i)
+                               : "",
+                           segmentStart, segmentEnd);
+
+    for (const auto &word : words) {
+      if (!word.text.empty())
+        notifyListeners(word.text, false, word.startSample, word.endSample);
+    }
   }
 }
 
-void Transcriber::notifyListeners(const std::string &text, bool isProvisional) {
+void Transcriber::notifyListeners(const std::string &text, bool isProvisional,
+                                 double startTime, double endTime) {
   std::lock_guard<std::mutex> lock(listenerMutex);
   for (auto *listener : listeners) {
     if (listener != nullptr) {
-      listener->onTranscriptUpdated(text, isProvisional);
+      listener->onTranscriptUpdated(text, isProvisional, startTime, endTime);
     }
   }
 }

@@ -1,4 +1,5 @@
 #include "OpenAICloudTranscriber.h"
+#include "TranscriptTiming.h"
 
 #include <algorithm>
 #include <cmath>
@@ -59,10 +60,27 @@ void OpenAICloudTranscriber::connectToOpenAI() {
       const auto response = json::parse(msg->str);
       if (response.value("type", "") == "response.audio_transcript.delta") {
         const std::string deltaText = response.value("delta", "");
+        double startTime = 0.0;
+        double endTime = 0.0;
+        {
+          std::lock_guard<std::mutex> audioLock(audioMutex);
+          startTime = lastEmittedEndDawSample;
+          endTime = lastPushedEndDawSample;
+          if (endTime < startTime)
+            endTime = startTime;
+          lastEmittedEndDawSample = endTime;
+        }
+        const auto words =
+            splitWordsAcrossRange(deltaText, startTime, endTime);
+        if (words.empty())
+          return;
         std::lock_guard<std::mutex> lock(listenerMutex);
         for (auto *listener : listeners) {
-          if (listener != nullptr) {
-            listener->onTranscriptUpdated(deltaText, true);
+          if (listener == nullptr)
+            continue;
+          for (const auto &word : words) {
+            listener->onTranscriptUpdated(word.text, true, word.startSample,
+                                          word.endSample);
           }
         }
       }
@@ -135,12 +153,18 @@ void OpenAICloudTranscriber::appendResampled(const float *samples,
 
 void OpenAICloudTranscriber::pushAudioBlock(const float *samples, int sampleCount,
                                             double dawSampleTime) {
-  (void)dawSampleTime;
   if (samples == nullptr || sampleCount <= 0) {
     return;
   }
 
   std::lock_guard<std::mutex> lock(audioMutex);
+  if (!haveStreamOrigin) {
+    bufferStartDawSample = dawSampleTime;
+    lastEmittedEndDawSample = dawSampleTime;
+    haveStreamOrigin = true;
+  }
+  lastPushedEndDawSample = dawSampleTime + static_cast<double>(sampleCount);
+
   appendResampled(samples, sampleCount);
 
   while (pcmAccumulator.size() >= targetChunkSize) {
@@ -170,6 +194,9 @@ void OpenAICloudTranscriber::finalizeStream() {
       webSocket->send(audioAppend.dump());
       pcmAccumulator.clear();
     }
+    haveStreamOrigin = false;
+    lastEmittedEndDawSample = 0.0;
+    lastPushedEndDawSample = 0.0;
   }
 
   const json commitEvent = {{"type", "input_audio_buffer.commit"}};
