@@ -22,7 +22,7 @@ Preconditions:
 
 - Repository root is a punch2pen checkout at this skill's revision.
 - Nothing is listening on `127.0.0.1:7483`.
-- CMake ≥ 3.22 and a C++20 compiler are on `PATH`.
+- CMake ≥ 3.22 and a C++20 compiler are on `PATH`. On Linux, `g++` with libstdc++ is enough; a Clang `c++` that cannot find `<iostream>` is not.
 - Local mode (no `--cloud`).
 
 - **Launch isolated engine.** Run `.cursor/skills/verify-punch2pen/scripts/control-punch2pen launch`. Exit code `0`. Log contains `Mode: [LOCAL] whisper.cpp`, `IPC Server started on 127.0.0.1:7483`, and `Engine ready.`

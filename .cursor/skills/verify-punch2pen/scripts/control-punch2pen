@@ -109,7 +109,13 @@ cmd_launch() {
     plugin_flag="ON"
   fi
 
-  log "launch: repo=$REPO build=$BUILD_DIR plugin=$plugin_flag run=$run_id"
+  if ! is_darwin && [[ -z "${CXX:-}" ]] && command -v g++ >/dev/null 2>&1; then
+    export CXX=g++
+    export CC="${CC:-gcc}"
+    log "launch: using g++ (default c++ on this host cannot find a C++ standard library)"
+  fi
+
+  log "launch: repo=$REPO build=$BUILD_DIR plugin=$plugin_flag run=$run_id CXX=${CXX:-c++}"
   cmake -S "$REPO" -B "$BUILD_DIR" -DPUNCH2PEN_BUILD_PLUGIN="$plugin_flag" -DCMAKE_BUILD_TYPE=Release
   cmake --build "$BUILD_DIR" --config Release --target punch2penEngine -j"${PUNCH2PEN_VERIFY_JOBS:-4}"
 

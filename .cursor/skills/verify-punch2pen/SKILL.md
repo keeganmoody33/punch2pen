@@ -33,7 +33,7 @@ From the repo root. The helper is the launch path.
 What that does:
 
 1. Refuses if **`127.0.0.1:7483` is already listening**. Port is hardcoded in `engine/src/main.cpp` / `IPCServer(7483)`. **Two engines cannot run side by side.** Do not hijack a user's engine.
-2. Configures CMake into `build/` (gitignored). On Darwin: `-DPUNCH2PEN_BUILD_PLUGIN=ON`. On Linux/CI: engine only (`OFF`) — AU/VST3 proof is skipped, not faked.
+2. Configures CMake into `build/` (gitignored). On Darwin: `-DPUNCH2PEN_BUILD_PLUGIN=ON`. On Linux/CI: engine only (`OFF`) — AU/VST3 proof is skipped, not faked. If `c++` cannot find a standard library (common when `c++` is Clang without libc++), the helper sets `CXX=g++` when `g++` exists.
 3. Builds `punch2penEngine` if missing.
 4. Starts the engine with an **isolated `HOME`** under `/tmp/punch2pen-verify-<run-id>/home` so `~/.punch2pen` is not the user's studio data. Copies or downloads `ggml-base.bin` into that HOME (`scripts/download_model.sh`).
 5. Ready when the engine log contains **`Engine ready.`** and **`IPC Server started on 127.0.0.1:7483`**, and port 7483 accepts a TCP connect. First whisper load can take tens of seconds.
