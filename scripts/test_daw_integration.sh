@@ -298,7 +298,7 @@ fi
 
 section "Unit and helper tests"
 if [[ "$RUN_TESTS" -eq 1 ]]; then
-  ENGINE_TESTS=(databaseManagerTest profileManagerTest protocolSerializationTest openAIJsonTest transcriptionCoordinatorTest)
+  ENGINE_TESTS=(databaseManagerTest profileManagerTest protocolSerializationTest openAIJsonTest transcriptionCoordinatorTest transcriptTimingTest)
   for test_name in "${ENGINE_TESTS[@]}"; do
     test_bin="$BUILD_DIR/bin/$test_name"
     if [[ -x "$test_bin" ]]; then
@@ -430,7 +430,7 @@ fi
 
 if command_exists auval && [[ -d "$USER_AU_DIR/punch2pen.component" ]]; then
   AUVAL_LOG="$(mktemp -t punch2pen-auval.XXXXXX)"
-  if auval -v aufx P2pn Dcta >"$AUVAL_LOG" 2>&1; then
+  if auval -strict -v aufx P2pn Dcta >"$AUVAL_LOG" 2>&1; then
     record pass "AU validation" "aufx/P2pn/Dcta, log $AUVAL_LOG"
   else
     record fail "AU validation" "aufx/P2pn/Dcta failed; log $AUVAL_LOG"
@@ -445,7 +445,7 @@ section "Manual DAW checklist"
 cat <<CHECKLIST
 1. Start with Logic Pro if that is your target DAW:
    - Install the AU with: $0 --install-plugin
-   - Quit Logic, then run: auval -v aufx P2pn Dcta
+   - Quit Logic, then run: auval -strict -v aufx P2pn Dcta
    - If needed, reset Audio Unit cache:
      killall -9 AudioComponentRegistrar 2>/dev/null || true
      rm -f ~/Library/Caches/AudioUnitCache/com.apple.audiounits.cache

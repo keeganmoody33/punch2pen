@@ -20,7 +20,9 @@ public:
   explicit IPCServer(int port = 7483);
   ~IPCServer() override;
 
-  void start();
+  // Binds 127.0.0.1 and starts the accept thread. Returns false if the
+  // socket cannot listen; the process should exit rather than claim ready.
+  bool start();
   void stop();
 
   bool hasPendingAudio() override;
@@ -39,6 +41,8 @@ public:
 private:
   void acceptLoop();
   void clientHandler(int clientSocket);
+  bool sendHandshakeResponse(int clientSocket, uint32_t version,
+                             uint32_t accepted);
 
   int serverSocket = -1;
   int activeClientSocket = -1;

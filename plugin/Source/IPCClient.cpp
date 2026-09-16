@@ -2,12 +2,46 @@
 #include "RingBuffer.h"
 
 #include <algorithm>
+#include <cstdlib>
+#include <mutex>
 
 #if JUCE_MAC || JUCE_IOS
+#include <fcntl.h>
+#include <spawn.h>
 #include <sys/socket.h>
+#include <unistd.h>
+extern char **environ;
 #endif
 
 namespace punch2pen {
+
+namespace {
+std::once_flag g_engineLaunchOnce;
+
+bool writeExact(juce::StreamingSocket &socket, const void *data, int len) {
+  const auto *p = static_cast<const char *>(data);
+  int sent = 0;
+  while (sent < len) {
+    const int n = socket.write(p + sent, len - sent);
+    if (n <= 0)
+      return false;
+    sent += n;
+  }
+  return true;
+}
+
+bool readExact(juce::StreamingSocket &socket, void *data, int len) {
+  auto *p = static_cast<char *>(data);
+  int got = 0;
+  while (got < len) {
+    const int n = socket.read(p + got, len - got, true);
+    if (n <= 0)
+      return false;
+    got += n;
+  }
+  return true;
+}
+} // namespace
 
 IPCClient::IPCClient(int port, bool autoLaunchEngineFlag)
     : Thread("Punch2Pen_IPC"), stopEpochs(64, 0), serverPort(port),
@@ -143,6 +177,13 @@ void IPCClient::attemptConnection() {
     setsockopt(socket.getRawSocketHandle(), SOL_SOCKET, SO_NOSIGPIPE,
                &disableSigPipe, sizeof(disableSigPipe));
 #endif
+    if (!completeHandshake()) {
+      socket.close();
+      connected = false;
+      if (autoLaunchEngine)
+        launchEngine();
+      return;
+    }
     connected = true;
 
     juce::ScopedLock lock(listenerLock);
@@ -155,29 +196,95 @@ void IPCClient::attemptConnection() {
   }
 }
 
-void IPCClient::launchEngine() {
-  juce::File home =
+bool IPCClient::completeHandshake() {
+  protocol::Header header{};
+  header.type = protocol::MessageType::Handshake;
+  protocol::Handshake handshake{};
+  handshake.version = protocol::kProtocolVersion;
+  header.length = (uint32_t)sizeof(handshake);
+
+  if (!writeExact(socket, &header, sizeof(header)))
+    return false;
+  if (!writeExact(socket, &handshake, sizeof(handshake)))
+    return false;
+
+  if (!socket.waitUntilReady(true, 1000))
+    return false;
+
+  protocol::Header reply{};
+  if (!readExact(socket, &reply, sizeof(reply)))
+    return false;
+  if (reply.type != protocol::MessageType::HandshakeResponse ||
+      reply.length != (uint32_t)sizeof(protocol::HandshakeResponse))
+    return false;
+
+  protocol::HandshakeResponse response{};
+  if (!readExact(socket, &response, sizeof(response)))
+    return false;
+
+  return response.accepted != 0 &&
+         response.version == protocol::kProtocolVersion;
+}
+
+juce::File IPCClient::resolveEngineBinary() const {
+  if (const char *overridePath = std::getenv("PUNCH2PEN_ENGINE")) {
+    juce::File fromEnv(overridePath);
+    if (fromEnv.existsAsFile())
+      return fromEnv;
+  }
+
+  const juce::File home =
       juce::File::getSpecialLocation(juce::File::userHomeDirectory);
-
-  // Prefer the user-writable helper path so local test installs do not get
-  // shadowed by an older system-wide engine.
+  // Prefer the user-writable helper so a local test install is not shadowed
+  // by an older system-wide engine from the pkg.
   juce::File engineApp = home.getChildFile("punch2pen/bin/punch2penEngine");
+  if (engineApp.existsAsFile())
+    return engineApp;
 
-  if (!engineApp.existsAsFile()) {
-    engineApp = home.getChildFile("punch2pen/build/bin/punch2penEngine");
-  }
+  engineApp = juce::File("/Applications/Punch2Pen/punch2penEngine");
+  if (engineApp.existsAsFile())
+    return engineApp;
 
-  // Fall back to a packaged/system install location.
-  if (!engineApp.existsAsFile()) {
-    engineApp = juce::File("/Applications/Punch2Pen/punch2penEngine");
-  }
+  return {};
+}
 
-  if (engineApp.existsAsFile()) {
-    // Launch in background
-    juce::String command =
-        "nohup \"" + engineApp.getFullPathName() + "\" > /dev/null 2>&1 &";
-    system(command.toRawUTF8());
-  }
+void IPCClient::launchEngine() {
+  std::call_once(g_engineLaunchOnce, [this]() {
+    const juce::File engineApp = resolveEngineBinary();
+    if (!engineApp.existsAsFile())
+      return;
+
+#if JUCE_MAC
+    const juce::File dataDir =
+        juce::File::getSpecialLocation(juce::File::userHomeDirectory)
+            .getChildFile(".punch2pen");
+    dataDir.createDirectory();
+    const juce::File logFile = dataDir.getChildFile("engine.log");
+    const juce::String enginePath = engineApp.getFullPathName();
+    const juce::String logPath = logFile.getFullPathName();
+
+    posix_spawn_file_actions_t actions;
+    posix_spawnattr_t attr;
+    posix_spawn_file_actions_init(&actions);
+    posix_spawnattr_init(&attr);
+    posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETPGROUP);
+    posix_spawnattr_setpgroup(&attr, 0);
+    posix_spawn_file_actions_addopen(&actions, STDOUT_FILENO,
+                                     logPath.toRawUTF8(),
+                                     O_WRONLY | O_CREAT | O_APPEND, 0644);
+    posix_spawn_file_actions_adddup2(&actions, STDOUT_FILENO, STDERR_FILENO);
+
+    const char *argv[] = {enginePath.toRawUTF8(), nullptr};
+    pid_t pid = 0;
+    const int rc = posix_spawn(&pid, enginePath.toRawUTF8(), &actions, &attr,
+                               const_cast<char **>(argv), environ);
+
+    posix_spawnattr_destroy(&attr);
+    posix_spawn_file_actions_destroy(&actions);
+    if (rc != 0)
+      return;
+#endif
+  });
 }
 
 bool IPCClient::isConnected() const { return connected; }

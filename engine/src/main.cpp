@@ -44,6 +44,7 @@ private:
 };
 
 int main(int argc, char *argv[]) {
+  std::signal(SIGPIPE, SIG_IGN);
   std::cout << "punch2pen Engine v1.0.0" << std::endl;
 
   bool useCloudMode = false;
@@ -116,7 +117,10 @@ int main(int argc, char *argv[]) {
   EngineTranscriberListener transcriberListener(server);
   activeTranscriber->addListener(&transcriberListener);
 
-  server.start();
+  if (!server.start()) {
+    std::cerr << "Engine cannot listen on 127.0.0.1:7483" << std::endl;
+    return 1;
+  }
   std::cout << "Engine ready." << std::endl;
 
   punch2pen::TranscriptionCoordinator coordinator(server, *activeTranscriber, db,

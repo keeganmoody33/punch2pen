@@ -25,7 +25,7 @@ done
 echo -e "\n[3] Checking Critical Source Files..."
 REQUIRED_FILES=(
     "plugin/Source/PluginProcessor.cpp"
-    "plugin/Source/TranscriptView.cpp"
+    "plugin/Source/WebViewEditor.cpp"
     "engine/src/main.cpp"
     "shared/Protocol.h"
     "installer/macos/build_pkg.sh"

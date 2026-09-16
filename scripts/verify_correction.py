@@ -1,11 +1,37 @@
 import socket
 import struct
 import sys
-import time
 
+MESSAGE_TYPE_HANDSHAKE = 3
+MESSAGE_TYPE_HANDSHAKE_RESPONSE = 4
 MESSAGE_TYPE_CORRECTION = 5
+PROTOCOL_VERSION = 1
 HOST = '127.0.0.1'
 PORT = 7483
+
+def recv_exact(sock, nbytes):
+    buf = bytearray()
+    while len(buf) < nbytes:
+        chunk = sock.recv(nbytes - len(buf))
+        if not chunk:
+            raise RuntimeError(
+                f'handshake: connection closed after {len(buf)}/{nbytes} bytes')
+        buf.extend(chunk)
+    return bytes(buf)
+
+def complete_handshake(sock):
+    sock.sendall(struct.pack('<II', MESSAGE_TYPE_HANDSHAKE, 4))
+    sock.sendall(struct.pack('<I', PROTOCOL_VERSION))
+    header = recv_exact(sock, 8)
+    msg_type, length = struct.unpack('<II', header)
+    if msg_type != MESSAGE_TYPE_HANDSHAKE_RESPONSE or length != 8:
+        raise RuntimeError(
+            f'handshake: unexpected type {msg_type} length {length}')
+    payload = recv_exact(sock, length)
+    version, accepted = struct.unpack('<II', payload)
+    if accepted != 1 or version != PROTOCOL_VERSION:
+        raise RuntimeError(
+            f'handshake rejected (version={version} accepted={accepted})')
 
 def send_correction(sock, original, corrected):
     orig_bytes = original.encode('utf-8')
@@ -36,7 +62,8 @@ def main():
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((HOST, PORT))
         print(f"Connected to Engine at {HOST}:{PORT}")
-        
+        complete_handshake(sock)
+
         # Send a test correction
         send_correction(sock, "punch 2 pen", "Punch2Pen")
         

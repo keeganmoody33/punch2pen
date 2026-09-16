@@ -24,10 +24,8 @@ plugin/
 ```
 
 The legacy native components (`TranscriptView`, `CorrectionEditor`,
-`PositionDisplay`) are still listed in `target_sources` so unit tests
-continue to link. They are no longer instantiated by the editor and can
-be deleted in a follow-up PR once you confirm the WebView build is good
-on every CI target.
+`PositionDisplay`) have been dropped from `target_sources` and deleted.
+The shipping face is `index.html` in `juce::WebBrowserComponent`.
 
 ---
 
@@ -76,8 +74,7 @@ window.hideCorrection()
 `updatePlayhead` iterates `.lyric-word`, classifies each as
 `past`/`active`/`upcoming` per the spec's alpha system (1.0 / 0.6 / 0.4),
 and updates `#transcript-inner.style.transform` via a `requestAnimationFrame`
-spring loop tuned to the same `0.15` ease factor used by
-`juce::VBlankAttachment` in `TranscriptView.cpp`.
+spring loop in `plugin/Source/ui/public/index.html` (`scroll += (target - scroll) * 0.15`).
 
 ## JS → C++ API (registered as native functions on `window.punch2pen`)
 
@@ -117,19 +114,19 @@ transport flags and IPC connection status (see
 
 ---
 
-## Color tokens (from existing JUCE constants)
+## Color tokens (from `plugin/Source/ui/public/index.html`)
 
 | Token              | Hex      | Source                                              |
 |--------------------|----------|-----------------------------------------------------|
-| `--bg-primary`     | #1C1917  | `TranscriptView.h` line 65                          |
-| `--text-primary`   | #FAFAF9  | `TranscriptView.h` line 66                          |
-| `--accent-primary` | #FCD34D  | `TranscriptView.h` line 67                          |
-| `--window-bg`      | #1E1E1E  | `PluginEditor.cpp` paint() line 61                  |
-| `--header-bg`      | #2D2D2D  | `CorrectionEditor.cpp` line 17                      |
-| `--input-bg`       | #3A3A3A  | `CorrectionEditor.cpp` line 19                      |
-| `--border-color`   | #505050  | `CorrectionEditor.cpp` line 18 (popup outline)      |
-| `--submit-green`   | #4A9F4A  | `CorrectionEditor.cpp` line 22                      |
-| `--cancel-red`     | #9F4A4A  | `CorrectionEditor.cpp` line 26                      |
+| `--bg-primary`     | #1C1917  | `index.html` `:root`                                |
+| `--text-primary`   | #FAFAF9  | `index.html` `:root`                                |
+| `--accent-primary` | #FCD34D  | `index.html` `:root`                                |
+| `--window-bg`      | #1E1E1E  | `index.html` `:root`; `PluginEditor.cpp` paint()    |
+| `--header-bg`      | #2D2D2D  | `index.html` `:root`                                |
+| `--input-bg`       | #3A3A3A  | `index.html` `:root`                                |
+| `--border-color`   | #505050  | `index.html` `:root`                                |
+| `--submit-green`   | #4A9F4A  | `index.html` `:root`                                |
+| `--cancel-red`     | #9F4A4A  | `index.html` `:root`                                |
 
 ---
 
@@ -160,20 +157,12 @@ transport flags and IPC connection status (see
    backend on Windows; macOS uses WKWebView automatically. CEF is *not*
    pulled in — keeps the binary small.
 
-3. **`getSampleRate()` on the processor.** The editor's `timerCallback`
-   computes `currentSamplePosition` from `transport.ppq · bpm · sr`.
-   `Punch2PenAudioProcessor` currently has no public `getSampleRate()` —
-   add one (or use `AudioProcessor::getSampleRate()` directly, which is
-   the same thing) before this compiles cleanly. One-liner.
+3. **`getSampleRate()` on the processor.** Done — `Punch2PenAudioProcessor::getSampleRate()`.
 
-4. **Streaming sample placement.** The bridge mirrors the existing
-   heuristic (`streamCursorSample += 4800.0` per word) from
-   `TranscriptView::onTranscriptionReceived`. If you change that on the
-   engine side to send real timestamps, propagate them through the
-   `appendWord` call and remove the heuristic here.
+4. **Streaming sample placement.** Done on main (#17) — the bridge uses
+   engine `startTime`/`endTime` rather than the old +4800 heuristic.
 
-5. **Retire the legacy components.** Once the WebView build is green on
-   every CI target, drop `TranscriptView.*`, `CorrectionEditor.*`, and
-   `PositionDisplay.*` from `target_sources` and delete them. The unit
-   tests in `tests/` that touch the old editor will need to be updated
-   or scoped to processor-only behaviour.
+5. **Retire the legacy components.** Done — `TranscriptView.*`,
+   `CorrectionEditor.*`, and `PositionDisplay.*` are no longer compiled
+   and the files have been deleted. Processor tests link WebView sources
+   only.

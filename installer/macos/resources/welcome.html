@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Punch2Pen</title>
+</head>
+<body>
+  <h1>Punch2Pen</h1>
+  <p>This package installs the unsigned macOS AU and VST3 plugin plus the local <code>punch2penEngine</code> companion process.</p>
+  <ul>
+    <li>AU: <code>/Library/Audio/Plug-Ins/Components/punch2pen.component</code></li>
+    <li>VST3: <code>/Library/Audio/Plug-Ins/VST3/punch2pen.vst3</code></li>
+    <li>Engine: <code>/Applications/Punch2Pen/punch2penEngine</code></li>
+  </ul>
+  <p>Local transcription needs a Whisper model at <code>~/.punch2pen/models/ggml-base.bin</code>. This installer does not download a model and does not contain any vendor API keys.</p>
+  <p>The plugin is not sandbox-safe. It talks to the engine over <code>127.0.0.1:7483</code>. GarageBand may refuse it; Logic, REAPER, and Ableton are the intended hosts.</p>
+</body>
+</html>

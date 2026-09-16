@@ -45,7 +45,9 @@ public:
 
 private:
   void attemptConnection();
+  bool completeHandshake();
   void launchEngine();
+  juce::File resolveEngineBinary() const;
   void handleMessage();
   void applyPendingCaptureReset();
   bool popStopEpoch(uint32_t &epoch);

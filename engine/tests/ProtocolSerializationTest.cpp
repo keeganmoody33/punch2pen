@@ -106,6 +106,34 @@ void testMessageTypeCoverage() {
   std::cout << "[PASS] testMessageTypeCoverage" << std::endl;
 }
 
+void testHandshakeSerialization() {
+  punch2pen::protocol::Handshake handshake;
+  handshake.version = punch2pen::protocol::kProtocolVersion;
+
+  std::vector<char> buf(sizeof(handshake));
+  std::memcpy(buf.data(), &handshake, sizeof(handshake));
+
+  punch2pen::protocol::Handshake deserialized;
+  std::memcpy(&deserialized, buf.data(), sizeof(deserialized));
+
+  assert(deserialized.version == punch2pen::protocol::kProtocolVersion);
+
+  punch2pen::protocol::HandshakeResponse response;
+  response.version = punch2pen::protocol::kProtocolVersion;
+  response.accepted = 1;
+
+  std::vector<char> respBuf(sizeof(response));
+  std::memcpy(respBuf.data(), &response, sizeof(response));
+
+  punch2pen::protocol::HandshakeResponse parsed;
+  std::memcpy(&parsed, respBuf.data(), sizeof(parsed));
+
+  assert(parsed.version == punch2pen::protocol::kProtocolVersion);
+  assert(parsed.accepted == 1);
+
+  std::cout << "[PASS] testHandshakeSerialization" << std::endl;
+}
+
 void testFullMessageRoundTrip() {
   // Simulate constructing and parsing a full Correction message
   std::string original = "helo";
@@ -161,6 +189,7 @@ int main() {
   testTranscriptionResultHeaderSerialization();
   testTransportStopHeaderSerialization();
   testMessageTypeCoverage();
+  testHandshakeSerialization();
   testFullMessageRoundTrip();
   std::cout << "All Protocol serialization tests passed!" << std::endl;
   return 0;
