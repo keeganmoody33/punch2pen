@@ -1,0 +1,112 @@
+name: macOS Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to create or reuse (e.g. v1.0.0)
+        required: true
+        default: v1.0.0
+        type: string
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: macos-release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  macos-unsigned-pkg:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve release tag and package version
+        id: meta
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            RAW="$INPUT_TAG"
+          else
+            RAW="$REF_NAME"
+          fi
+          RAW="${RAW#"${RAW%%[![:space:]]*}"}"
+          RAW="${RAW%"${RAW##*[![:space:]]}"}"
+          if [[ -z "$RAW" ]]; then
+            echo "Release tag is empty" >&2
+            exit 1
+          fi
+          if [[ "$RAW" == v* ]]; then
+            TAG="$RAW"
+          else
+            TAG="v$RAW"
+          fi
+          VERSION="${TAG#v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+(\.[0-9]+){1,3}([.-][A-Za-z0-9]+)?$ ]]; then
+            echo "Using pkg version 1.0.0; tag $TAG is not dotted-numeric" >&2
+            VERSION="1.0.0"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "asset=Punch2Pen-${VERSION}-macOS-unsigned.pkg" >> "$GITHUB_OUTPUT"
+
+      - name: Configure plugin + engine
+        run: cmake -S . -B build -DPUNCH2PEN_BUILD_PLUGIN=ON -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build AU, VST3, and engine
+        run: cmake --build build --config Release --target punch2penEngine punch2pen_plugin_AU punch2pen_plugin_VST3 -j4
+
+      - name: auval
+        run: |
+          echo "Skipping auval on GitHub-hosted macos runners."
+          echo "auval does not need Logic, but these runners have no signed AU host session,"
+          echo "and this unsigned WebView AU (AU_SANDBOX_SAFE FALSE) is not a reliable CI gate."
+          echo "Identity stays aufx / P2pn / Dcta."
+          echo "After installing the pkg on a Mac: auval -strict -v aufx P2pn Dcta"
+
+      - name: Package unsigned macOS installer
+        run: ./installer/macos/build_pkg.sh --skip-build --build-dir build --version "${{ steps.meta.outputs.version }}"
+
+      - name: Name the download asset
+        run: |
+          set -euo pipefail
+          test -f dist/Punch2Pen_Installer.pkg
+          cp dist/Punch2Pen_Installer.pkg "dist/${{ steps.meta.outputs.asset }}"
+          ls -lh "dist/${{ steps.meta.outputs.asset }}"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          ASSET: ${{ steps.meta.outputs.asset }}
+        run: |
+          set -euo pipefail
+          NOTES="$(mktemp)"
+          cat > "$NOTES" <<'EOF'
+          Unsigned macOS installer (AU + VST3 + punch2penEngine).
+
+          - Bundle ID: `com.doctaaa.punch2pen`
+          - Manufacturer / plugin / type: **Dcta / P2pn / aufx**
+          - Not signed or notarized. Gatekeeper will warn.
+          - Place the Whisper model at `~/.punch2pen/models/ggml-base.bin` (not included).
+          - `auval` is skipped in GitHub Actions. On a Mac after install: `auval -strict -v aufx P2pn Dcta`
+
+          No Windows build, prices, or vendor keys.
+          EOF
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "dist/$ASSET" --clobber
+          else
+            gh release create "$TAG" "dist/$ASSET" \
+              --title "Punch2Pen $TAG (macOS unsigned)" \
+              --notes-file "$NOTES" \
+              --target "${{ github.sha }}"
+          fi

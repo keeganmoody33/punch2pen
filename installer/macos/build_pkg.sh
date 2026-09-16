@@ -20,6 +20,7 @@ or embed vendor API keys.
 Options:
   --build-dir PATH   CMake build directory (default: ${BUILD_DIR})
   --skip-build       Package existing artefacts; do not reconfigure/build
+  --version VER      Package version (default: ${VERSION})
   -h, --help         Show this help
 USAGE
 }
@@ -28,10 +29,16 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --build-dir) BUILD_DIR="$2"; shift 2 ;;
     --skip-build) SKIP_BUILD=1; shift ;;
+    --version) VERSION="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; usage; exit 2 ;;
   esac
 done
+
+if [[ -z "$VERSION" ]]; then
+  echo "--version must not be empty" >&2
+  exit 2
+fi
 
 echo "=== Punch2Pen macOS Build & Package ==="
 echo "Project Root: ${PROJECT_ROOT}"

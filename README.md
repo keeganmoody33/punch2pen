@@ -117,6 +117,23 @@ auval -strict -v aufx P2pn Dcta
 
 The plugin must instantiate with the engine down. Auto-launch is a background helper, not part of AU initialize.
 
+### GitHub Release (unsigned Mac pkg)
+
+`auval` is **skipped** on GitHub-hosted macos runners: they have no signed AU host session, and this unsigned WebView AU (`AU_SANDBOX_SAFE FALSE`) is not a reliable CI gate. Run `auval -strict -v aufx P2pn Dcta` on a Mac after install. Identity stays **Dcta / P2pn / aufx**, bundle ID `com.doctaaa.punch2pen`.
+
+Cut a downloadable installer:
+
+1. Tag the commit and push (this is the path that works before the workflow is on `main`):
+
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+
+2. After this workflow is on `main`, you can also use **Actions → macOS Release → Run workflow** and enter tag `v1.0.0`.
+
+Wait for the **macOS Release** workflow. Download `Punch2Pen-1.0.0-macOS-unsigned.pkg` from [Releases](https://github.com/keeganmoody33/punch2pen/releases). The package is unsigned; Gatekeeper will warn. Place `ggml-base.bin` at `~/.punch2pen/models/ggml-base.bin`.
+
 ## Repository Structure
 
 | Path | Description |
