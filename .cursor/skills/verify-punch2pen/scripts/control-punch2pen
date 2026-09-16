@@ -1,0 +1,471 @@
+#!/usr/bin/env bash
+# control-punch2pen — launch, doctor, drive, and cleanup for punch2pen verify.
+# Run from anywhere; resolves the repo root. See ../SKILL.md.
+set -euo pipefail
+
+PORT=7483
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+die() { printf 'control-punch2pen: %s\n' "$*" >&2; exit 1; }
+log() { printf '%s\n' "$*"; }
+
+repo_root() {
+  local dir="$SCRIPT_DIR"
+  while [[ "$dir" != "/" ]]; do
+    if [[ -f "$dir/CMakeLists.txt" && -d "$dir/engine" && -d "$dir/plugin" ]]; then
+      printf '%s\n' "$dir"
+      return 0
+    fi
+    dir="$(dirname "$dir")"
+  done
+  die "could not find punch2pen repo root (CMakeLists.txt + engine/ + plugin/)"
+}
+
+REPO="$(repo_root)"
+BUILD_DIR="${PUNCH2PEN_VERIFY_BUILD_DIR:-$REPO/build}"
+ARTIFACTS="$SKILL_DIR/artifacts"
+CURRENT_FILE="$ARTIFACTS/CURRENT_RUN"
+REAL_HOME="${HOME}"
+
+is_darwin() { [[ "$(uname -s)" == "Darwin" ]]; }
+
+port_state() {
+  python3 - "$PORT" <<'PY'
+import socket, sys
+port = int(sys.argv[1])
+s = socket.socket()
+s.settimeout(0.4)
+try:
+    r = s.connect_ex(("127.0.0.1", port))
+    sys.exit(0 if r == 0 else 1)
+finally:
+    s.close()
+PY
+}
+
+port_listener_pid() {
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -iTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | awk 'NR>1 {print $2; exit}'
+  fi
+}
+
+run_id_from_env_or_current() {
+  if [[ -n "${PUNCH2PEN_VERIFY_RUN_ID:-}" ]]; then
+    printf '%s\n' "$PUNCH2PEN_VERIFY_RUN_ID"
+    return 0
+  fi
+  if [[ -f "$CURRENT_FILE" ]]; then
+    tr -d '[:space:]' < "$CURRENT_FILE"
+    return 0
+  fi
+  return 1
+}
+
+instance_dir() { printf '/tmp/punch2pen-verify-%s\n' "$1"; }
+evidence_dir() { printf '%s/%s\n' "$ARTIFACTS" "$1"; }
+
+write_current() {
+  mkdir -p "$ARTIFACTS"
+  printf '%s\n' "$1" > "$CURRENT_FILE"
+}
+
+usage() {
+  cat <<'USAGE'
+Usage: control-punch2pen <command> [subcommand]
+
+Commands:
+  help       Show this help
+  launch     Build punch2penEngine if needed, start isolated local engine on 127.0.0.1:7483
+  doctor     Read-only: is this run's engine worth driving?
+  drive      correction | identity | studio-receipt-contract | daw-transcript
+  cleanup    Stop the pid this run started; keep artifacts/
+
+Never kill by process name. Never rename Dcta/P2pn/aufx. No Windows path.
+USAGE
+}
+
+cmd_launch() {
+  if port_state; then
+    local owner
+    owner="$(port_listener_pid || true)"
+    die "127.0.0.1:${PORT} is already listening (pid ${owner:-unknown}). Refuse to double-drive. cleanup the run you started, or stop that listener."
+  fi
+
+  local run_id
+  run_id="${PUNCH2PEN_VERIFY_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
+  write_current "$run_id"
+
+  local inst evid home_iso logf pidf
+  inst="$(instance_dir "$run_id")"
+  evid="$(evidence_dir "$run_id")"
+  home_iso="$inst/home"
+  logf="$inst/engine.log"
+  pidf="$inst/engine.pid"
+  mkdir -p "$home_iso/.punch2pen/models" "$evid"
+
+  local plugin_flag="OFF"
+  if is_darwin; then
+    plugin_flag="ON"
+  fi
+
+  log "launch: repo=$REPO build=$BUILD_DIR plugin=$plugin_flag run=$run_id"
+  cmake -S "$REPO" -B "$BUILD_DIR" -DPUNCH2PEN_BUILD_PLUGIN="$plugin_flag" -DCMAKE_BUILD_TYPE=Release
+  cmake --build "$BUILD_DIR" --config Release --target punch2penEngine -j"${PUNCH2PEN_VERIFY_JOBS:-4}"
+
+  local engine="$BUILD_DIR/bin/punch2penEngine"
+  [[ -x "$engine" ]] || die "missing $engine"
+
+  local src_model="$REAL_HOME/.punch2pen/models/ggml-base.bin"
+  local dst_model="$home_iso/.punch2pen/models/ggml-base.bin"
+  if [[ ! -f "$dst_model" ]]; then
+    if [[ -f "$src_model" ]]; then
+      log "launch: copying whisper model from $src_model"
+      cp "$src_model" "$dst_model"
+    else
+      log "launch: downloading whisper base model into isolated HOME"
+      HOME="$home_iso" "$REPO/scripts/download_model.sh" base
+    fi
+  fi
+  [[ -f "$dst_model" ]] || die "whisper model missing at $dst_model"
+
+  HOME="$home_iso" "$engine" >"$logf" 2>&1 &
+  local pid=$!
+  printf '%s\n' "$pid" > "$pidf"
+  log "launch: pid $pid log $logf"
+
+  local i
+  for i in $(seq 1 90); do
+    if ! kill -0 "$pid" >/dev/null 2>&1; then
+      tail -n 40 "$logf" >&2 || true
+      die "engine exited before ready; see $logf"
+    fi
+    if grep -q 'Engine ready.' "$logf" 2>/dev/null && port_state; then
+      local owner
+      owner="$(port_listener_pid || true)"
+      if [[ -n "$owner" && "$owner" != "$pid" ]]; then
+        kill "$pid" >/dev/null 2>&1 || true
+        die "port ${PORT} is owned by pid $owner, not launched pid $pid"
+      fi
+      printf '%s\n' "$run_id" > "$evid/run-id.txt"
+      printf 'engine-ready\nlaunch\n' > "$evid/feature-id.txt"
+      cp "$logf" "$evid/engine-ready.log"
+      log "launch: ready pid=$pid port=$PORT isolated HOME=$home_iso"
+      log "launch: evidence $evid"
+      return 0
+    fi
+    sleep 1
+  done
+  tail -n 40 "$logf" >&2 || true
+  die "timed out waiting for Engine ready. on 127.0.0.1:${PORT}"
+}
+
+cmd_doctor() {
+  local run_id inst evid logf pidf home_iso pid owner
+  run_id="$(run_id_from_env_or_current)" || die "no run id (launch first, or set PUNCH2PEN_VERIFY_RUN_ID)"
+  inst="$(instance_dir "$run_id")"
+  evid="$(evidence_dir "$run_id")"
+  logf="$inst/engine.log"
+  pidf="$inst/engine.pid"
+  home_iso="$inst/home"
+  mkdir -p "$evid"
+  local report="$evid/doctor.txt"
+
+  {
+    log "doctor: run=$run_id"
+    log "doctor: host=$(uname -s) $(uname -m)"
+    log "doctor: repo=$REPO"
+    log "doctor: isolated_HOME=$home_iso"
+
+    [[ -f "$pidf" ]] || die "no pidfile at $pidf (this instance was not launched, or cleanup already ran)"
+    pid="$(tr -d '[:space:]' < "$pidf")"
+    [[ -n "$pid" ]] || die "empty pidfile"
+    if ! kill -0 "$pid" >/dev/null 2>&1; then
+      die "pid $pid is not running"
+    fi
+    log "doctor: engine_pid=$pid alive"
+
+    port_state || die "127.0.0.1:${PORT} is not listening"
+    owner="$(port_listener_pid || true)"
+    if [[ -z "$owner" ]]; then
+      die "could not resolve listener pid for port ${PORT} (need lsof)"
+    fi
+    if [[ "$owner" != "$pid" ]]; then
+      die "port ${PORT} owned by pid $owner, not this run's pid $pid — not worth driving"
+    fi
+    log "doctor: port ${PORT} owned by pid $pid"
+
+    [[ -f "$logf" ]] || die "missing engine log $logf"
+    grep -q 'Engine ready.' "$logf" || die "engine log missing 'Engine ready.'"
+    grep -q '127.0.0.1:'"$PORT" "$logf" || die "engine log missing 127.0.0.1:${PORT}"
+    log "doctor: log has Engine ready. and 127.0.0.1:${PORT}"
+
+    if [[ "$home_iso" == "$REAL_HOME" ]]; then
+      die "isolated HOME collapsed onto the user HOME"
+    fi
+    log "doctor: data dir is isolated (not ${REAL_HOME}/.punch2pen)"
+
+    local cmake_plugin="$REPO/plugin/CMakeLists.txt"
+    grep -q 'PLUGIN_MANUFACTURER_CODE "Dcta"' "$cmake_plugin" || die "identity drift: PLUGIN_MANUFACTURER_CODE is not Dcta"
+    grep -q 'PLUGIN_CODE "P2pn"' "$cmake_plugin" || die "identity drift: PLUGIN_CODE is not P2pn"
+    grep -q 'FORMATS VST3 AU' "$cmake_plugin" || die "identity drift: FORMATS is not VST3 AU"
+    log "doctor: identity Dcta/P2pn VST3 AU unchanged"
+
+    if is_darwin; then
+      local vst3 au
+      vst3="$(find "$BUILD_DIR" -path '*/punch2pen.vst3' -print -quit 2>/dev/null || true)"
+      au="$(find "$BUILD_DIR" -path '*/punch2pen.component' -print -quit 2>/dev/null || true)"
+      if [[ -n "$vst3" ]]; then
+        log "doctor: vst3=$vst3"
+      else
+        log "doctor: vst3=missing under $BUILD_DIR (configure with -DPUNCH2PEN_BUILD_PLUGIN=ON)"
+      fi
+      if [[ -n "$au" ]]; then
+        log "doctor: au=$au"
+      else
+        log "doctor: au=missing under $BUILD_DIR"
+      fi
+    else
+      log "doctor: plugin-au-vst3: skipped (not Darwin)"
+    fi
+
+    log "doctor: PASS"
+  } >"$report"
+  cat "$report"
+}
+
+send_correction() {
+  local original="$1" corrected="$2"
+  python3 - "$PORT" "$original" "$corrected" <<'PY'
+import socket, struct, sys
+port, original, corrected = int(sys.argv[1]), sys.argv[2], sys.argv[3]
+orig_b, corr_b = original.encode("utf-8"), corrected.encode("utf-8")
+payload = 8 + len(orig_b) + len(corr_b)
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.settimeout(5)
+try:
+    sock.connect(("127.0.0.1", port))
+    sock.sendall(struct.pack("<II", 5, payload))
+    sock.sendall(struct.pack("<II", len(orig_b), len(corr_b)))
+    sock.sendall(orig_b + corr_b)
+    print(f"Sent Correction: '{original}' -> '{corrected}'")
+except ConnectionRefusedError:
+    print("connection refused on 127.0.0.1:%s" % port, file=sys.stderr)
+    sys.exit(1)
+finally:
+    sock.close()
+PY
+}
+
+cmd_drive_correction() {
+  cmd_doctor >/dev/null
+  local run_id inst evid logf home_iso csv
+  run_id="$(run_id_from_env_or_current)"
+  inst="$(instance_dir "$run_id")"
+  evid="$(evidence_dir "$run_id")"
+  logf="$inst/engine.log"
+  home_iso="$inst/home"
+  csv="$home_iso/.punch2pen/corrections.csv"
+  mkdir -p "$evid"
+
+  local original="punch 2 pen"
+  local corrected="Punch2Pen"
+  if [[ -f "$csv" ]] && grep -qxF "${original},${corrected}" "$csv"; then
+    die "fixture pair already in $csv; cleanup/relaunch for a fresh isolated HOME"
+  fi
+
+  local send_out="$evid/correction-send.txt"
+  send_correction "$original" "$corrected" | tee "$send_out"
+  grep -q "Sent Correction:" "$send_out" || die "send did not confirm"
+
+  local i found=0
+  for i in $(seq 1 20); do
+    if grep -q "Received Correction: '${original}' -> '${corrected}'" "$logf" \
+      && grep -q "Applied correction." "$logf"; then
+      found=1
+      break
+    fi
+    sleep 0.25
+  done
+  [[ "$found" -eq 1 ]] || {
+    tail -n 50 "$logf" >&2 || true
+    die "engine log missing Received/Applied correction lines"
+  }
+
+  [[ -f "$csv" ]] || die "missing $csv after correction"
+  grep -qxF "${original},${corrected}" "$csv" || die "CSV missing line ${original},${corrected}"
+
+  cp "$csv" "$evid/corrections.csv"
+  grep -E "Client connected!|Received Correction:|Applied correction." "$logf" > "$evid/correction-engine.log" || true
+  printf 'correction-ipc\ndrive correction\n' > "$evid/feature-id.txt"
+  log "drive correction: PASS csv=$csv evidence=$evid"
+}
+
+cmd_drive_identity() {
+  local run_id evid
+  run_id="$(run_id_from_env_or_current 2>/dev/null || true)"
+  if [[ -z "$run_id" ]]; then
+    run_id="identity-$(date -u +%Y%m%dT%H%M%SZ)"
+  fi
+  evid="$(evidence_dir "$run_id")"
+  mkdir -p "$evid"
+  local out="$evid/plugin-identity.txt"
+  local cmake_plugin="$REPO/plugin/CMakeLists.txt"
+  {
+    log "identity: $cmake_plugin"
+    grep -n 'PLUGIN_MANUFACTURER_CODE\|PLUGIN_CODE\|FORMATS\|COMPANY_NAME\|PRODUCT_NAME' "$cmake_plugin" || true
+    grep -q 'PLUGIN_MANUFACTURER_CODE "Dcta"' "$cmake_plugin" || die "PLUGIN_MANUFACTURER_CODE is not Dcta"
+    grep -q 'PLUGIN_CODE "P2pn"' "$cmake_plugin" || die "PLUGIN_CODE is not P2pn"
+    grep -q 'FORMATS VST3 AU' "$cmake_plugin" || die "FORMATS is not VST3 AU"
+    log "identity: auval command would be: auval -v aufx P2pn Dcta"
+    if is_darwin; then
+      local vst3 au
+      vst3="$(find "$BUILD_DIR" -path '*/punch2pen.vst3' -print -quit 2>/dev/null || true)"
+      au="$(find "$BUILD_DIR" -path '*/punch2pen.component' -print -quit 2>/dev/null || true)"
+      [[ -n "$vst3" ]] && log "identity: vst3=$vst3" || log "identity: vst3=missing"
+      [[ -n "$au" ]] && log "identity: au=$au" || log "identity: au=missing"
+      if command -v auval >/dev/null 2>&1 && [[ -d "$REAL_HOME/Library/Audio/Plug-Ins/Components/punch2pen.component" ]]; then
+        auval -v aufx P2pn Dcta | tee "$evid/auval.log"
+      else
+        log "identity: auval skipped (auval missing or AU not installed in ~/Library/Audio/Plug-Ins/Components)"
+      fi
+    else
+      log "identity: bundles skipped (not Darwin)"
+      log "identity: auval skipped (not Darwin)"
+    fi
+    log "identity: PASS (codes Dcta/P2pn/aufx unchanged)"
+  } >"$out"
+  cat "$out"
+  printf 'plugin-identity\ndrive identity\n' > "$evid/feature-id.txt"
+}
+
+cmd_drive_studio_receipt_contract() {
+  local run_id evid html
+  run_id="$(run_id_from_env_or_current 2>/dev/null || true)"
+  if [[ -z "$run_id" ]]; then
+    run_id="studio-receipt-$(date -u +%Y%m%dT%H%M%SZ)"
+  fi
+  evid="$(evidence_dir "$run_id")"
+  mkdir -p "$evid"
+  html="$REPO/plugin/Source/ui/public/index.html"
+  [[ -f "$html" ]] || die "missing $html"
+  python3 - "$html" <<'PY' | tee "$evid/studio-receipt-contract.txt"
+import pathlib, sys
+html = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+required_ids = [
+    "app-title", "status-badge", "connection-banner", "transcript-container",
+    "correction-overlay", "correction-input", "correction-submit",
+    "correction-cancel", "logo-mark", "header-bar", "position-display",
+]
+states = ["disconnected", "idle", "recording", "playback", "correction"]
+missing = [i for i in required_ids if f'id="{i}"' not in html]
+if missing:
+    print("FAIL missing ids:", ", ".join(missing))
+    sys.exit(1)
+for state in states:
+    if f'"{state}"' not in html and f"'{state}'" not in html:
+        print("FAIL missing state name:", state)
+        sys.exit(1)
+if "[ PUNCH" not in html:
+    print("FAIL wordmark [ PUNCH not found")
+    sys.exit(1)
+if "Waiting for engine connection" not in html:
+    print("FAIL connection banner copy missing")
+    sys.exit(1)
+print("studio-receipt-contract: PASS")
+print("ids:", ", ".join(required_ids))
+print("states:", ", ".join(states))
+print("wordmark: [ PUNCH2PEN ] present")
+print("path:", sys.argv[1])
+PY
+  printf 'studio-receipt-states\ndrive studio-receipt-contract\n' > "$evid/feature-id.txt"
+}
+
+cmd_drive_daw_transcript() {
+  local run_id evid reasons
+  run_id="$(run_id_from_env_or_current 2>/dev/null || true)"
+  if [[ -z "$run_id" ]]; then
+    run_id="daw-transcript-$(date -u +%Y%m%dT%H%M%SZ)"
+  fi
+  evid="$(evidence_dir "$run_id")"
+  mkdir -p "$evid"
+  reasons=()
+  if ! is_darwin; then
+    reasons+=("host is $(uname -s), not Darwin")
+  fi
+  if [[ ! -d "/Applications/Logic Pro.app" && ! -d "/Applications/REAPER.app" ]] \
+     && ! find /Applications -maxdepth 1 -name 'Ableton Live*.app' -print -quit 2>/dev/null | grep -q .; then
+    reasons+=("no Logic/REAPER/Ableton app detected")
+  fi
+  reasons+=("this repo has no DAW GUI driver (README roadmap: host validation unimplemented)")
+  reasons+=("scripts/verify_transcription.py is protocol-stale (AudioChunk missing dawSampleTime/captureEpoch) and is not vocals")
+  {
+    log "daw-transcript: SKIP"
+    local r
+    for r in "${reasons[@]}"; do
+      log "daw-transcript: unmet: $r"
+    done
+    log "daw-transcript: do not invent host automation; human punch-in only"
+  } | tee "$evid/daw-transcript-skip.txt"
+  printf 'daw-record-transcript\ndrive daw-transcript SKIP\n' > "$evid/feature-id.txt"
+}
+
+cmd_cleanup() {
+  local run_id inst pidf pid evid
+  run_id="$(run_id_from_env_or_current)" || die "no run id to clean up"
+  inst="$(instance_dir "$run_id")"
+  pidf="$inst/engine.pid"
+  evid="$(evidence_dir "$run_id")"
+  if [[ -f "$pidf" ]]; then
+    pid="$(tr -d '[:space:]' < "$pidf")"
+    if [[ -n "$pid" ]] && kill -0 "$pid" >/dev/null 2>&1; then
+      kill "$pid" >/dev/null 2>&1 || true
+      local i
+      for i in $(seq 1 20); do
+        kill -0 "$pid" >/dev/null 2>&1 || break
+        sleep 0.2
+      done
+      if kill -0 "$pid" >/dev/null 2>&1; then
+        kill -9 "$pid" >/dev/null 2>&1 || true
+      fi
+      log "cleanup: stopped pid $pid"
+    else
+      log "cleanup: pid ${pid:-unknown} already stopped"
+    fi
+  else
+    log "cleanup: no pidfile at $pidf"
+  fi
+  if [[ -d "$inst" ]]; then
+    rm -rf "$inst"
+    log "cleanup: removed $inst"
+  fi
+  if [[ -d "$evid" ]]; then
+    log "cleanup: kept evidence at $evid"
+  else
+    log "cleanup: warning: evidence dir missing at $evid"
+  fi
+}
+
+main() {
+  local cmd="${1:-help}"
+  shift || true
+  case "$cmd" in
+    help|-h|--help) usage ;;
+    launch) cmd_launch ;;
+    doctor) cmd_doctor ;;
+    drive)
+      local sub="${1:-}"
+      case "$sub" in
+        correction) cmd_drive_correction ;;
+        identity) cmd_drive_identity ;;
+        studio-receipt-contract) cmd_drive_studio_receipt_contract ;;
+        daw-transcript) cmd_drive_daw_transcript ;;
+        *) die "unknown drive subcommand '${sub}'. Use correction|identity|studio-receipt-contract|daw-transcript" ;;
+      esac
+      ;;
+    cleanup) cmd_cleanup ;;
+    *) usage; die "unknown command: $cmd" ;;
+  esac
+}
+
+main "$@"
