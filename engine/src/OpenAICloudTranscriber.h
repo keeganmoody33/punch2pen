@@ -28,6 +28,7 @@ public:
 
 private:
   void connectToOpenAI();
+  void appendResampled(const float *samples, int sampleCount);
   std::string encodeBase64(const std::vector<int16_t> &pcmData);
 
   std::string apiKey;
@@ -38,7 +39,8 @@ private:
 
   std::vector<int16_t> pcmAccumulator;
   std::mutex audioMutex;
-  int inputSampleRate = 48000;
+  double inputSampleRate = 48000.0;
+  double resampleCarry = 0.0;
   static constexpr int targetSampleRate = 16000;
   const size_t targetChunkSize = 1600;
 };

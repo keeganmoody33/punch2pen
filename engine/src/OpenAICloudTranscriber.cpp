@@ -96,8 +96,41 @@ void OpenAICloudTranscriber::setVocabularyBias(
 
 void OpenAICloudTranscriber::setInputSampleRate(double sampleRate) {
   if (sampleRate > 0.0) {
-    inputSampleRate = static_cast<int>(std::lround(sampleRate));
+    inputSampleRate = sampleRate;
   }
+}
+
+void OpenAICloudTranscriber::appendResampled(const float *samples,
+                                            int sampleCount) {
+  const double targetRate = static_cast<double>(targetSampleRate);
+  auto toPcm = [](float sample) {
+    sample = std::max(-1.0f, std::min(1.0f, sample));
+    return static_cast<int16_t>(sample * 32767.0f);
+  };
+
+  if (inputSampleRate <= 0.0) {
+    return;
+  }
+
+  if (std::abs(inputSampleRate - targetRate) < 0.5) {
+    for (int i = 0; i < sampleCount; ++i) {
+      pcmAccumulator.push_back(toPcm(samples[i]));
+    }
+    return;
+  }
+
+  const double step = inputSampleRate / targetRate;
+  double pos = resampleCarry;
+  while (pos < static_cast<double>(sampleCount)) {
+    const int index = static_cast<int>(pos);
+    const int nextIndex = std::min(index + 1, sampleCount - 1);
+    const float frac = static_cast<float>(pos - static_cast<double>(index));
+    const float sample =
+        samples[index] * (1.0f - frac) + samples[nextIndex] * frac;
+    pcmAccumulator.push_back(toPcm(sample));
+    pos += step;
+  }
+  resampleCarry = pos - static_cast<double>(sampleCount);
 }
 
 void OpenAICloudTranscriber::pushAudioBlock(const float *samples, int sampleCount,
@@ -108,13 +141,7 @@ void OpenAICloudTranscriber::pushAudioBlock(const float *samples, int sampleCoun
   }
 
   std::lock_guard<std::mutex> lock(audioMutex);
-
-  const int decimationFactor =
-      std::max(1, inputSampleRate / targetSampleRate);
-  for (int i = 0; i < sampleCount; i += decimationFactor) {
-    const float sample = std::max(-1.0f, std::min(1.0f, samples[i]));
-    pcmAccumulator.push_back(static_cast<int16_t>(sample * 32767.0f));
-  }
+  appendResampled(samples, sampleCount);
 
   while (pcmAccumulator.size() >= targetChunkSize) {
     std::vector<int16_t> chunk(pcmAccumulator.begin(),
