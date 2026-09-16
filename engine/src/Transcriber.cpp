@@ -1,6 +1,7 @@
 #include "Transcriber.h"
 
 #include <algorithm>
+#include <cmath>
 #include <iostream>
 
 namespace punch2pen {
@@ -60,8 +61,12 @@ void Transcriber::setVocabularyBias(const std::vector<std::string> &words) {
 
 void Transcriber::finalizeStream() { processAvailableAudio(true); }
 
+bool Transcriber::isReady() const { return ctx != nullptr; }
+
 void Transcriber::setInputSampleRate(double sampleRate) {
-  inputSampleRate = sampleRate;
+  if (sampleRate > 0.0) {
+    inputSampleRate = sampleRate;
+  }
 }
 
 void Transcriber::pushAudioBlock(const float *samples, int sampleCount,
@@ -71,18 +76,32 @@ void Transcriber::pushAudioBlock(const float *samples, int sampleCount,
     return;
   }
 
-  if (inputSampleRate == 48000.0) {
-    audioBuffer.reserve(audioBuffer.size() + static_cast<size_t>(sampleCount) / 3);
-    for (int i = 0; i < sampleCount; i += 3) {
-      audioBuffer.push_back(samples[i]);
-    }
-  } else if (inputSampleRate == 16000.0) {
-    audioBuffer.insert(audioBuffer.end(), samples, samples + sampleCount);
-  } else {
-    audioBuffer.insert(audioBuffer.end(), samples, samples + sampleCount);
+  appendResampled(samples, sampleCount);
+  processAvailableAudio();
+}
+
+void Transcriber::appendResampled(const float *samples, int sampleCount) {
+  constexpr double kWhisperRate = 16000.0;
+  if (inputSampleRate <= 0.0) {
+    return;
   }
 
-  processAvailableAudio();
+  if (std::abs(inputSampleRate - kWhisperRate) < 0.5) {
+    audioBuffer.insert(audioBuffer.end(), samples, samples + sampleCount);
+    return;
+  }
+
+  const double step = inputSampleRate / kWhisperRate;
+  double pos = resampleCarry;
+  while (pos < static_cast<double>(sampleCount)) {
+    const int index = static_cast<int>(pos);
+    const int nextIndex = std::min(index + 1, sampleCount - 1);
+    const float frac = static_cast<float>(pos - static_cast<double>(index));
+    audioBuffer.push_back(samples[index] * (1.0f - frac) +
+                          samples[nextIndex] * frac);
+    pos += step;
+  }
+  resampleCarry = pos - static_cast<double>(sampleCount);
 }
 
 void Transcriber::setInitialPrompt(const std::string &prompt) {
@@ -103,6 +122,8 @@ void Transcriber::processAvailableAudio(bool force) {
   if (whisper_full(ctx, params, audioBuffer.data(),
                    static_cast<int>(audioBuffer.size())) != 0) {
     std::cerr << "Failed to process audio" << std::endl;
+    audioBuffer.clear();
+    resampleCarry = 0.0;
     return;
   }
 

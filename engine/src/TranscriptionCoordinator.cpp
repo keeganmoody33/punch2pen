@@ -21,6 +21,10 @@ void TranscriptionCoordinator::run() {
     if (ipcServer.hasPendingAudio()) {
       auto block = ipcServer.popAudio();
       if (!block.empty()) {
+        const double sampleRate = ipcServer.lastAudioSampleRate();
+        if (sampleRate > 0.0) {
+          transcriber.setInputSampleRate(sampleRate);
+        }
         double dawSampleTime = ipcServer.lastAudioDawSampleTime();
         transcriber.pushAudioBlock(block.data(), static_cast<int>(block.size()),
                                    dawSampleTime);

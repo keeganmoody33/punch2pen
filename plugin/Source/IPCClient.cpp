@@ -78,6 +78,10 @@ void IPCClient::processOutgoingAudio() {
   if (!connected || !ringBuffer)
     return;
 
+  const double sampleRate = hostSampleRate.load();
+  if (sampleRate <= 0.0)
+    return;
+
   int available = ringBuffer->getNumReady();
   if (available > 0) {
     const int chunkSize = transcriptionMode.load() == TranscriptionMode::Online
@@ -90,8 +94,7 @@ void IPCClient::processOutgoingAudio() {
       tempBuffer.resize((size_t)chunkSize);
 
     ringBuffer->read(tempBuffer.data(), chunkSize);
-    // Using standard 48k for now, realistically should get from processor
-    sendAudioChunk(tempBuffer.data(), chunkSize, 48000.0);
+    sendAudioChunk(tempBuffer.data(), chunkSize, sampleRate);
   }
 }
 
@@ -141,6 +144,11 @@ void IPCClient::launchEngine() {
 }
 
 bool IPCClient::isConnected() const { return connected; }
+
+void IPCClient::setHostSampleRate(double sampleRate) {
+  if (sampleRate > 0.0)
+    hostSampleRate.store(sampleRate);
+}
 
 void IPCClient::sendAudioChunk(const float *samples, int numSamples,
                                double sampleRate) {

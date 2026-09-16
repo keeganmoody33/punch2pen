@@ -19,20 +19,23 @@ public:
   void addListener(Listener *newListener) override;
   void removeListener(Listener *listenerToRemove) override;
   void setVocabularyBias(const std::vector<std::string> &words) override;
+  void setInputSampleRate(double sampleRate) override;
   void finalizeStream() override;
 
-  void setInputSampleRate(double sampleRate);
+  bool isReady() const;
   void setInitialPrompt(const std::string &prompt);
 
 private:
   void processAvailableAudio(bool force = false);
   void notifyListeners(const std::string &text, bool isProvisional);
+  void appendResampled(const float *samples, int sampleCount);
 
   std::string currentPrompt;
   std::vector<float> audioBuffer;
   struct whisper_context *ctx = nullptr;
   struct whisper_full_params params;
   double inputSampleRate = 16000.0;
+  double resampleCarry = 0.0;
 
   std::mutex listenerMutex;
   std::vector<Listener *> listeners;

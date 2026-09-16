@@ -32,6 +32,7 @@ JuceLibraryCode/
 *.vcxproj
 *.vcxproj.user
 *.code-workspace
+.cache/
 
 # OS
 .DS_Store
@@ -48,3 +49,9 @@ lib/
 *.component
 *.pkg
 *.exe
+dist/
+staging/
+
+# Abandoned Vite UI (production UI is plugin/Source/ui/public/)
+node_modules/
+plugin/ui/
