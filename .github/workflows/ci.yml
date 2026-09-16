@@ -40,3 +40,7 @@ jobs:
         run: cmake --build build --config Release --target punch2penEngine punch2pen_plugin_AU punch2pen_plugin_VST3 -j4
       - name: Package unsigned macOS installer
         run: ./installer/macos/build_pkg.sh --skip-build --build-dir build
+      - name: auval
+        run: |
+          echo "Skipping auval on GitHub-hosted macos runners (no signed AU host session)."
+          echo "After install on a Mac: auval -strict -v aufx P2pn Dcta"
