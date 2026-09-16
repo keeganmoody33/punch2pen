@@ -52,16 +52,16 @@ void IPCServer::stop() {
 
 bool IPCServer::hasPendingAudio() {
   std::lock_guard<std::mutex> lock(audioQueueLock);
-  return !audioQueue.empty();
+  return !eventQueue.empty() && !eventQueue.front().isStop;
 }
 
 std::vector<float> IPCServer::popAudio() {
   std::lock_guard<std::mutex> lock(audioQueueLock);
-  if (audioQueue.empty())
+  if (eventQueue.empty() || eventQueue.front().isStop)
     return {};
 
-  auto packet = std::move(audioQueue.front());
-  audioQueue.erase(audioQueue.begin());
+  auto packet = std::move(eventQueue.front());
+  eventQueue.erase(eventQueue.begin());
   lastDawSampleTime_ = packet.dawSampleTime;
   lastSampleRate_ = packet.sampleRate;
   return std::move(packet.samples);
@@ -91,7 +91,11 @@ IPCServer::CorrectionPair IPCServer::popCorrection() {
 }
 
 bool IPCServer::transportStateChangedToStop() {
-  return transportStopTriggered.exchange(false);
+  std::lock_guard<std::mutex> lock(audioQueueLock);
+  if (eventQueue.empty() || !eventQueue.front().isStop)
+    return false;
+  eventQueue.erase(eventQueue.begin());
+  return true;
 }
 
 void IPCServer::acceptLoop() {
@@ -137,7 +141,8 @@ void IPCServer::clientHandler(int clientSocket) {
         if (recv(clientSocket, samples.data(), payloadSize, MSG_WAITALL) ==
             (ssize_t)payloadSize) {
           std::lock_guard<std::mutex> lock(audioQueueLock);
-          audioQueue.push_back({std::move(samples), chunkHeader.dawSampleTime,
+          eventQueue.push_back({false, std::move(samples),
+                                chunkHeader.dawSampleTime,
                                 chunkHeader.sampleRate});
         }
       }
@@ -160,7 +165,10 @@ void IPCServer::clientHandler(int clientSocket) {
         }
       }
     } else if (header.type == protocol::MessageType::TransportStop) {
-      transportStopTriggered.store(true);
+      {
+        std::lock_guard<std::mutex> lock(audioQueueLock);
+        eventQueue.push_back({true, {}, 0.0, 0.0});
+      }
       if (header.length > 0) {
         std::vector<char> trash(header.length);
         recv(clientSocket, trash.data(), header.length, MSG_WAITALL);

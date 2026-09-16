@@ -2,6 +2,7 @@
 
 #include "../../shared/Protocol.h"
 #include <JuceHeader.h>
+#include <cstdint>
 
 namespace punch2pen {
 
@@ -18,7 +19,7 @@ public:
   void sendAudioChunk(const float *samples, int numSamples, double sampleRate,
                       double dawSampleTime);
   void sendTransportStop();
-  void flagTransportStop();
+  void flagTransportStop(uint32_t epoch = 0);
   void sendCorrection(const std::string &original, const std::string &corrected);
   void setTranscriptionMode(TranscriptionMode mode);
   TranscriptionMode getTranscriptionMode() const;
@@ -47,7 +48,8 @@ private:
   void launchEngine();
   void handleMessage();
   void applyPendingCaptureReset();
-  void processOutgoingAudio(bool flushPartial = false);
+  void processOutgoingAudio(bool flushPartial = false,
+                            uint32_t stopEpoch = 0);
 
   juce::StreamingSocket socket;
   std::atomic<bool> connected{false};
@@ -58,6 +60,7 @@ private:
   std::atomic<TranscriptionMode> transcriptionMode{TranscriptionMode::Offline};
   std::atomic<double> hostSampleRate{0.0};
   std::atomic<bool> pendingCaptureReset{false};
+  std::atomic<uint32_t> pendingStopEpoch{0};
 
   int serverPort;
   bool autoLaunchEngine;

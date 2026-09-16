@@ -29,10 +29,12 @@ void TranscriptionCoordinator::run() {
         transcriber.pushAudioBlock(block.data(), static_cast<int>(block.size()),
                                    dawSampleTime);
       }
+      continue;
     }
 
     if (ipcServer.transportStateChangedToStop()) {
       transcriber.finalizeStream();
+      continue;
     }
 
     while (ipcServer.hasPendingCorrection()) {

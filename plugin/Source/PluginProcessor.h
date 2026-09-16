@@ -2,6 +2,7 @@
 
 #include "IPCClient.h"
 #include <JuceHeader.h>
+#include <cstdint>
 
 namespace punch2pen {
 class AudioRingBuffer;
@@ -70,6 +71,7 @@ private:
   std::atomic<bool> transportIsPlaying{false};
   std::atomic<bool> transportIsRecording{false};
   std::atomic<double> hostDawSampleTime{0.0};
+  std::atomic<uint32_t> captureEpoch{0};
 
   // Avoid heap alloc in processBlock
   bool wasRecordingLastBlock = false;

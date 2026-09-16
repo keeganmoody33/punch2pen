@@ -69,18 +69,18 @@ void IPCClient::run() {
       }
     }
 
-    processOutgoingAudio(false);
-
+    // Handle stop before any regular drain so a full chunk of take B cannot
+    // overtake take A's TransportStop.
     if (pendingStop.exchange(false)) {
-      processOutgoingAudio(true);
+      processOutgoingAudio(true, pendingStopEpoch.load());
       sendTransportStop();
-      if (ringBuffer)
-        ringBuffer->reset();
+    } else {
+      processOutgoingAudio(false);
     }
   }
 }
 
-void IPCClient::processOutgoingAudio(bool flushPartial) {
+void IPCClient::processOutgoingAudio(bool flushPartial, uint32_t stopEpoch) {
   if (!connected || !ringBuffer)
     return;
 
@@ -97,6 +97,9 @@ void IPCClient::processOutgoingAudio(bool flushPartial) {
     if (available <= 0)
       return;
 
+    if (flushPartial && ringBuffer->peekEpoch() != stopEpoch)
+      return;
+
     int toRead = chunkSize;
     if (available < chunkSize) {
       if (!flushPartial)
@@ -108,7 +111,9 @@ void IPCClient::processOutgoingAudio(bool flushPartial) {
       tempBuffer.resize((size_t)toRead);
 
     double chunkDawSample = 0.0;
-    const int n = ringBuffer->read(tempBuffer.data(), toRead, &chunkDawSample);
+    uint32_t epoch = 0;
+    const int n = ringBuffer->read(tempBuffer.data(), toRead, &chunkDawSample,
+                                   &epoch);
     if (n <= 0)
       return;
     sendAudioChunk(tempBuffer.data(), n, sampleRate, chunkDawSample);
@@ -120,8 +125,8 @@ void IPCClient::processOutgoingAudio(bool flushPartial) {
 void IPCClient::applyPendingCaptureReset() {
   if (!pendingCaptureReset.load())
     return;
-  // Consumer-only. Stop-flush also resets after draining so a new take
-  // can write its first host block without skipping.
+  // Consumer-only. Punch-out drains by epoch instead of reset(), so a
+  // concurrent punch-in is not discarded.
   if (ringBuffer)
     ringBuffer->reset();
   pendingCaptureReset.store(false);
@@ -179,7 +184,8 @@ void IPCClient::setHostSampleRate(double sampleRate) {
     hostSampleRate.store(sampleRate);
 }
 
-void IPCClient::flagTransportStop() {
+void IPCClient::flagTransportStop(uint32_t epoch) {
+  pendingStopEpoch.store(epoch);
   pendingStop.store(true);
   notify();
 }

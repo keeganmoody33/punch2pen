@@ -45,19 +45,18 @@ private:
   std::mutex clientLock;
 
   std::mutex audioQueueLock;
-  struct AudioPacket {
+  struct QueuedEvent {
+    bool isStop = false;
     std::vector<float> samples;
     double dawSampleTime = 0.0;
     double sampleRate = 0.0;
   };
-  std::vector<AudioPacket> audioQueue;
+  std::vector<QueuedEvent> eventQueue;
   double lastDawSampleTime_ = 0.0;
   double lastSampleRate_ = 0.0;
 
   std::mutex correctionQueueLock;
   std::vector<CorrectionPair> correctionQueue;
-
-  std::atomic<bool> transportStopTriggered{false};
 };
 
 } // namespace punch2pen

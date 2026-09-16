@@ -176,16 +176,18 @@ void Punch2PenAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
   }
   hostDawSampleTime.store(dawSampleTime);
 
-  // 2. Capture Audio if Recording. Reset happens after the stop flush on
-  // the IPC thread so the first host block of a new take is not dropped.
+  // 2. Capture audio while recording. Writes carry captureEpoch so a punch-out
+  // drain can stop at take A and leave a concurrent punch-in's samples.
   if (isRecording) {
     auto *channelData = buffer.getReadPointer(0);
-    audioRingBuffer->write(channelData, buffer.getNumSamples(), dawSampleTime);
+    audioRingBuffer->write(channelData, buffer.getNumSamples(), dawSampleTime,
+                           captureEpoch.load());
   }
 
   if (wasRecordingLastBlock && !isRecording) {
     if (ipcClient)
-      ipcClient->flagTransportStop();
+      ipcClient->flagTransportStop(captureEpoch.load());
+    captureEpoch.fetch_add(1);
   }
 
   wasRecordingLastBlock = isRecording;

@@ -13,16 +13,25 @@
 
 class MockIPCServer : public Punch2Pen::IPCServerInterface {
 public:
-  bool hasPendingAudio() override { return !audioQueue.empty(); }
+  struct QueuedEvent {
+    bool isStop = false;
+    std::vector<float> samples;
+    double dawSampleTime = 0.0;
+    double sampleRate = 0.0;
+  };
+
+  bool hasPendingAudio() override {
+    return !eventQueue.empty() && !eventQueue.front().isStop;
+  }
 
   std::vector<float> popAudio() override {
-    if (audioQueue.empty())
+    if (eventQueue.empty() || eventQueue.front().isStop)
       return {};
-    auto block = audioQueue.front();
-    audioQueue.erase(audioQueue.begin());
-    lastDawSampleTime_ = nextDawSampleTime;
-    lastSampleRate_ = nextSampleRate;
-    return block;
+    auto packet = std::move(eventQueue.front());
+    eventQueue.erase(eventQueue.begin());
+    lastDawSampleTime_ = packet.dawSampleTime;
+    lastSampleRate_ = packet.sampleRate;
+    return std::move(packet.samples);
   }
 
   double lastAudioDawSampleTime() override { return lastDawSampleTime_; }
@@ -30,9 +39,10 @@ public:
   double lastAudioSampleRate() override { return lastSampleRate_; }
 
   bool transportStateChangedToStop() override {
-    bool status = simulatedStopTriggered;
-    simulatedStopTriggered = false;
-    return status;
+    if (eventQueue.empty() || !eventQueue.front().isStop)
+      return false;
+    eventQueue.erase(eventQueue.begin());
+    return true;
   }
 
   bool hasPendingCorrection() override { return !correctionQueue.empty(); }
@@ -45,12 +55,17 @@ public:
     return c;
   }
 
-  std::vector<std::vector<float>> audioQueue;
-  bool simulatedStopTriggered = false;
+  void queueAudio(std::vector<float> samples, double dawSampleTime = 0.0,
+                  double sampleRate = 0.0) {
+    eventQueue.push_back(
+        {false, std::move(samples), dawSampleTime, sampleRate});
+  }
+
+  void queueStop() { eventQueue.push_back({true, {}, 0.0, 0.0}); }
+
+  std::vector<QueuedEvent> eventQueue;
   std::vector<CorrectionPair> correctionQueue;
-  double nextDawSampleTime = 0.0;
   double lastDawSampleTime_ = 0.0;
-  double nextSampleRate = 0.0;
   double lastSampleRate_ = 0.0;
 };
 
@@ -68,6 +83,8 @@ public:
     pushAudioBlockCalled = true;
     lastSampleCountReceived = sampleCount;
     lastDawSampleTime = dawSampleTime;
+    receivedSampleCounts.push_back(sampleCount);
+    callOrder.push_back("audio");
   }
 
   void setVocabularyBias(const std::vector<std::string> &words) override {
@@ -79,7 +96,10 @@ public:
     lastInputSampleRate = sampleRate;
   }
 
-  void finalizeStream() override { finalizeStreamCalled = true; }
+  void finalizeStream() override {
+    finalizeStreamCalled = true;
+    callOrder.push_back("stop");
+  }
 
   Listener *listener = nullptr;
   bool pushAudioBlockCalled = false;
@@ -89,6 +109,8 @@ public:
   double lastDawSampleTime = 0.0;
   double lastInputSampleRate = 0.0;
   std::vector<std::string> lastVocabularyReceived;
+  std::vector<int> receivedSampleCounts;
+  std::vector<std::string> callOrder;
 };
 
 void testCoordinatorRouting() {
@@ -108,10 +130,8 @@ void testCoordinatorRouting() {
                                                   profileManager);
 
   std::vector<float> fakeDAWAudio(1600, 0.5f);
-  mockServer.audioQueue.push_back(fakeDAWAudio);
-  mockServer.simulatedStopTriggered = true;
-  mockServer.nextDawSampleTime = 48000.0;
-  mockServer.nextSampleRate = 44100.0;
+  mockServer.queueAudio(fakeDAWAudio, 48000.0, 44100.0);
+  mockServer.queueStop();
 
   std::thread worker([&]() { coordinator.run(); });
 
@@ -228,10 +248,57 @@ void testCoordinatorProfileCorrections() {
   std::filesystem::remove_all(tmpProfileDir);
 }
 
+void testCoordinatorDrainThreeChunksThenStop() {
+  MockIPCServer mockServer;
+  MockTranscriber mockTranscriber;
+
+  std::string tmpDir = "/tmp/punch2pen_test_coord_drain";
+  std::filesystem::create_directories(tmpDir);
+  punch2pen::DatabaseManager db;
+  db.initialize(tmpDir + "/test_corrections.csv");
+
+  punch2pen::ProfileManager profileManager;
+  profileManager.setDataDirectory(tmpDir);
+  profileManager.loadProfile("test");
+
+  Punch2Pen::TranscriptionCoordinator coordinator(mockServer, mockTranscriber, db,
+                                                  profileManager);
+
+  mockServer.queueAudio(std::vector<float>(100, 0.1f), 48000.0, 48000.0);
+  mockServer.queueAudio(std::vector<float>(200, 0.2f), 48100.0, 48000.0);
+  mockServer.queueAudio(std::vector<float>(300, 0.3f), 48300.0, 48000.0);
+  mockServer.queueStop();
+  mockServer.queueAudio(std::vector<float>(50, 0.4f), 96000.0, 48000.0);
+
+  std::thread worker([&]() { coordinator.run(); });
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  coordinator.stop();
+  worker.join();
+
+  assert(mockTranscriber.callOrder.size() == 5 &&
+         "Error: expected three audio packets, stop, then the next-take packet");
+  assert(mockTranscriber.callOrder[0] == "audio");
+  assert(mockTranscriber.callOrder[1] == "audio");
+  assert(mockTranscriber.callOrder[2] == "audio");
+  assert(mockTranscriber.callOrder[3] == "stop" &&
+         "Error: finalizeStream ran before every pre-stop audio packet");
+  assert(mockTranscriber.callOrder[4] == "audio");
+  assert(mockTranscriber.receivedSampleCounts.size() == 4);
+  assert(mockTranscriber.receivedSampleCounts[0] == 100);
+  assert(mockTranscriber.receivedSampleCounts[1] == 200);
+  assert(mockTranscriber.receivedSampleCounts[2] == 300);
+  assert(mockTranscriber.receivedSampleCounts[3] == 50);
+
+  std::cout << "[PASS] testCoordinatorDrainThreeChunksThenStop" << std::endl;
+
+  std::filesystem::remove_all(tmpDir);
+}
+
 int main() {
   testCoordinatorRouting();
   testCoordinatorCorrections();
   testCoordinatorProfileCorrections();
+  testCoordinatorDrainThreeChunksThenStop();
   std::cout << "All TranscriptionCoordinator tests passed!" << std::endl;
   return 0;
 }
