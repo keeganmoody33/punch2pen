@@ -74,6 +74,7 @@ Harness: `control-punch2pen`. Read `features/README.md`, then the feature file. 
 Stable handles (do not use click coordinates):
 
 - Engine stdout: `Engine ready.`, `Client connected!`, `Received Correction:`, `Applied correction. Vocabulary terms:`
+- Listening port: `lsof` on `127.0.0.1:7483` (connect probes are real engine clients; avoid them for doctor)
 - Wire: Correction message type **5**, little-endian headers matching `shared/Protocol.h`
 - Files: `$VERIFY_HOME/.punch2pen/corrections.csv` (`original,corrected` per line), `profile_default.json` on engine shutdown
 - Studio Receipt IDs: `#app-title`, `#status-badge`, `#connection-banner`, `#transcript-container`, `#correction-overlay`, `#correction-input`, `#correction-submit`, `#correction-cancel`; `body[data-state]`

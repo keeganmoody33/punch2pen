@@ -31,6 +31,13 @@ REAL_HOME="${HOME}"
 is_darwin() { [[ "$(uname -s)" == "Darwin" ]]; }
 
 port_state() {
+  # Prefer lsof so we do not open extra TCP clients the engine logs as
+  # "Client connected!" (a connect() probe is a real accept).
+  local pid
+  pid="$(port_listener_pid || true)"
+  if [[ -n "$pid" ]]; then
+    return 0
+  fi
   python3 - "$PORT" <<'PY'
 import socket, sys
 port = int(sys.argv[1])
