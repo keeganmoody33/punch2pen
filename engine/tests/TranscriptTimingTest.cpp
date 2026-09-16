@@ -130,12 +130,51 @@ void testDawTimelineDiscontinuitySplitsWindow() {
   std::cout << "[PASS] testDawTimelineDiscontinuitySplitsWindow" << std::endl;
 }
 
+void testHostSampleRateChangeClosesWindow() {
+  assert(!punch2pen::isHostSampleRateChange(48000.0, 48000.0));
+  assert(!punch2pen::isHostSampleRateChange(48000.0, 48000.25));
+  assert(!punch2pen::isHostSampleRateChange(48000.0, 0.0));
+  assert(punch2pen::isHostSampleRateChange(48000.0, 96000.0));
+  assert(punch2pen::isHostSampleRateChange(16000.0, 48000.0));
+
+  // 1s token at 48 kHz is 48000 DAW samples, not 96000.
+  const double at48k =
+      punch2pen::whisperCentisecondsToDawSamples(0.0, 100, 48000.0);
+  const double at96k =
+      punch2pen::whisperCentisecondsToDawSamples(0.0, 100, 96000.0);
+  assert(approx(at48k, 48000.0));
+  assert(approx(at96k, 96000.0));
+
+  punch2pen::CloudDeltaAssembler stream;
+  stream.captureLiveOrigin(0.0);
+  stream.noteLivePcmSent(16000, 48000.0, 16000);
+  assert(approx(stream.live.sentEnd, 48000.0));
+
+  if (punch2pen::isHostSampleRateChange(48000.0, 96000.0)) {
+    stream.finalize();
+    stream.captureLiveOrigin(48000.0);
+  }
+  stream.noteLivePcmSent(16000, 96000.0, 16000);
+  assert(approx(stream.live.origin, 48000.0));
+  assert(approx(stream.live.sentEnd, 48000.0 + 96000.0));
+  assert(approx(stream.committed.sentEnd, 48000.0));
+
+  punch2pen::CloudStreamWindow mixed;
+  mixed.start(0.0);
+  mixed.notePcmSent(16000, 48000.0, 16000);
+  mixed.notePcmSent(16000, 96000.0, 16000);
+  assert(!approx(mixed.sentEnd, 48000.0 + 96000.0));
+
+  std::cout << "[PASS] testHostSampleRateChangeClosesWindow" << std::endl;
+}
+
 int main() {
   testWhisperCentisecondsMapping();
   testSplitWordsProportional();
   testCloudDeltaAssemblerWaitsForCompletion();
   testCloudDeltaAssemblerEmptyDeltaDoesNotConsumeWindow();
   testDawTimelineDiscontinuitySplitsWindow();
+  testHostSampleRateChangeClosesWindow();
   std::cout << "All TranscriptTiming tests passed!" << std::endl;
   return 0;
 }

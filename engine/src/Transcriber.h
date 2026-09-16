@@ -38,6 +38,7 @@ private:
   struct whisper_context *ctx = nullptr;
   struct whisper_full_params params;
   double inputSampleRate = 16000.0;
+  double bufferHostSampleRate = 16000.0;
   double resampleCarry = 0.0;
   double bufferStartDawSample = 0.0;
   int bufferHostSamples = 0;

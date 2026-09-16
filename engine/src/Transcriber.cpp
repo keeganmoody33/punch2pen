@@ -67,9 +67,16 @@ void Transcriber::finalizeStream() { processAvailableAudio(true); }
 bool Transcriber::isReady() const { return ctx != nullptr; }
 
 void Transcriber::setInputSampleRate(double sampleRate) {
-  if (sampleRate > 0.0) {
-    inputSampleRate = sampleRate;
-  }
+  if (sampleRate <= 0.0)
+    return;
+  if (!isHostSampleRateChange(inputSampleRate, sampleRate))
+    return;
+  // Emit the current window at its capture rate before adopting the new one.
+  processAvailableAudio(true);
+  audioBuffer.clear();
+  resampleCarry = 0.0;
+  bufferHostSamples = 0;
+  inputSampleRate = sampleRate;
 }
 
 void Transcriber::pushAudioBlock(const float *samples, int sampleCount,
@@ -89,6 +96,7 @@ void Transcriber::pushAudioBlock(const float *samples, int sampleCount,
     bufferStartDawSample = dawSampleTime;
     bufferHostSamples = 0;
     bufferCaptureEpoch = captureEpoch;
+    bufferHostSampleRate = inputSampleRate;
   }
 
   appendResampled(samples, sampleCount);
@@ -155,10 +163,10 @@ void Transcriber::emitWordsFromWhisper() {
   for (int i = 0; i < n_segments; ++i) {
     const double segmentStart = whisperCentisecondsToDawSamples(
         bufferStartDawSample, whisper_full_get_segment_t0(ctx, i),
-        inputSampleRate);
+        bufferHostSampleRate);
     const double segmentEnd = whisperCentisecondsToDawSamples(
         bufferStartDawSample, whisper_full_get_segment_t1(ctx, i),
-        inputSampleRate);
+        bufferHostSampleRate);
 
     std::vector<TimedWord> tokenWords;
     std::string currentWord;
@@ -175,10 +183,10 @@ void Transcriber::emitWordsFromWhisper() {
       if (wordStartCs >= 0.0 && wordEndCs >= 0.0) {
         word.startSample = whisperCentisecondsToDawSamples(
             bufferStartDawSample, static_cast<long long>(wordStartCs),
-            inputSampleRate);
+            bufferHostSampleRate);
         word.endSample = whisperCentisecondsToDawSamples(
             bufferStartDawSample, static_cast<long long>(wordEndCs),
-            inputSampleRate);
+            bufferHostSampleRate);
         anyTokenTime = true;
       } else {
         word.startSample = segmentStart;

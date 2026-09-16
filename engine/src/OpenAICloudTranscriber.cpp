@@ -100,8 +100,29 @@ void OpenAICloudTranscriber::setVocabularyBias(
 }
 
 void OpenAICloudTranscriber::setInputSampleRate(double sampleRate) {
-  if (sampleRate > 0.0) {
+  if (sampleRate <= 0.0)
+    return;
+
+  bool sendCommit = false;
+  {
+    std::lock_guard<std::mutex> lock(audioMutex);
+    if (!isHostSampleRateChange(inputSampleRate, sampleRate))
+      return;
+    if (!pcmAccumulator.empty()) {
+      sendPcm(pcmAccumulator);
+      pcmAccumulator.clear();
+    }
+    if (stream.live.active) {
+      stream.finalize();
+      sendCommit = true;
+    }
+    resampleCarry = 0.0;
     inputSampleRate = sampleRate;
+  }
+
+  if (sendCommit && webSocket) {
+    const json commitEvent = {{"type", "input_audio_buffer.commit"}};
+    webSocket->send(commitEvent.dump());
   }
 }
 

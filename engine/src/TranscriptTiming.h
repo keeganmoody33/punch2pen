@@ -84,6 +84,14 @@ inline bool isDawTimelineDiscontinuous(double expectedOrigin,
   return std::abs(actualOrigin - expectedOrigin) > 1.0;
 }
 
+// Host rate is stored once per capture window. A change means token offsets
+// and resampler phase belong to a different timeline — close the window.
+inline bool isHostSampleRateChange(double currentRate, double nextRate) {
+  if (nextRate <= 0.0)
+    return false;
+  return std::abs(nextRate - currentRate) >= 0.5;
+}
+
 inline bool isBlankTranscript(const std::string &text) {
   for (const char c : text) {
     if (std::isspace(static_cast<unsigned char>(c)) == 0)
