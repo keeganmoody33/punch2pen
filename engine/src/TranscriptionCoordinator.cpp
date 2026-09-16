@@ -18,6 +18,7 @@ void TranscriptionCoordinator::run() {
   running.store(true);
 
   while (running.load()) {
+    bool didWork = false;
     if (ipcServer.hasPendingAudio()) {
       auto block = ipcServer.popAudio();
       if (!block.empty()) {
@@ -27,14 +28,13 @@ void TranscriptionCoordinator::run() {
         }
         double dawSampleTime = ipcServer.lastAudioDawSampleTime();
         transcriber.pushAudioBlock(block.data(), static_cast<int>(block.size()),
-                                   dawSampleTime);
+                                   dawSampleTime,
+                                   ipcServer.lastAudioCaptureEpoch());
       }
-      continue;
-    }
-
-    if (ipcServer.transportStateChangedToStop()) {
+      didWork = true;
+    } else if (ipcServer.transportStateChangedToStop()) {
       transcriber.finalizeStream();
-      continue;
+      didWork = true;
     }
 
     while (ipcServer.hasPendingCorrection()) {
@@ -51,9 +51,11 @@ void TranscriptionCoordinator::run() {
 
       std::cout << "Applied correction. Vocabulary terms: " << vocab.size()
                 << std::endl;
+      didWork = true;
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    if (!didWork)
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
 }
 

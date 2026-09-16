@@ -114,7 +114,9 @@ void TranscriptView::appendStreamingText(const std::string &newText,
 
 void TranscriptView::onTranscriptionReceived(const std::string &text,
                                              double startTime,
-                                             double endTime) {
+                                             double endTime,
+                                             uint32_t captureEpoch) {
+  juce::ignoreUnused(captureEpoch);
   juce::MessageManager::callAsync([this, text, startTime, endTime] {
     streamCursorSample = endTime;
     appendStreamingText(text, startTime, endTime, true);

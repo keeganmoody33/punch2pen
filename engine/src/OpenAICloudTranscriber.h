@@ -24,7 +24,7 @@ public:
   void removeListener(Listener *listener) override;
   void setVocabularyBias(const std::vector<std::string> &words) override;
   void pushAudioBlock(const float *samples, int sampleCount,
-                      double dawSampleTime) override;
+                      double dawSampleTime, uint32_t captureEpoch) override;
   void setInputSampleRate(double sampleRate) override;
   void finalizeStream() override;
 

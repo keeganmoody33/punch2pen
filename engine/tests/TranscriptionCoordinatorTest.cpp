@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cassert>
 #include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <iostream>
 #include <thread>
@@ -18,6 +19,7 @@ public:
     std::vector<float> samples;
     double dawSampleTime = 0.0;
     double sampleRate = 0.0;
+    uint32_t captureEpoch = 0;
   };
 
   bool hasPendingAudio() override {
@@ -31,6 +33,7 @@ public:
     eventQueue.erase(eventQueue.begin());
     lastDawSampleTime_ = packet.dawSampleTime;
     lastSampleRate_ = packet.sampleRate;
+    lastCaptureEpoch_ = packet.captureEpoch;
     return std::move(packet.samples);
   }
 
@@ -38,9 +41,12 @@ public:
 
   double lastAudioSampleRate() override { return lastSampleRate_; }
 
+  uint32_t lastAudioCaptureEpoch() override { return lastCaptureEpoch_; }
+
   bool transportStateChangedToStop() override {
     if (eventQueue.empty() || !eventQueue.front().isStop)
       return false;
+    lastCaptureEpoch_ = eventQueue.front().captureEpoch;
     eventQueue.erase(eventQueue.begin());
     return true;
   }
@@ -56,17 +62,20 @@ public:
   }
 
   void queueAudio(std::vector<float> samples, double dawSampleTime = 0.0,
-                  double sampleRate = 0.0) {
+                  double sampleRate = 0.0, uint32_t captureEpoch = 0) {
     eventQueue.push_back(
-        {false, std::move(samples), dawSampleTime, sampleRate});
+        {false, std::move(samples), dawSampleTime, sampleRate, captureEpoch});
   }
 
-  void queueStop() { eventQueue.push_back({true, {}, 0.0, 0.0}); }
+  void queueStop(uint32_t captureEpoch = 0) {
+    eventQueue.push_back({true, {}, 0.0, 0.0, captureEpoch});
+  }
 
   std::vector<QueuedEvent> eventQueue;
   std::vector<CorrectionPair> correctionQueue;
   double lastDawSampleTime_ = 0.0;
   double lastSampleRate_ = 0.0;
+  uint32_t lastCaptureEpoch_ = 0;
 };
 
 class MockTranscriber : public Punch2Pen::TranscriberInterface {
@@ -78,11 +87,12 @@ public:
   }
 
   void pushAudioBlock(const float *samples, int sampleCount,
-                      double dawSampleTime) override {
+                      double dawSampleTime, uint32_t captureEpoch) override {
     (void)samples;
     pushAudioBlockCalled = true;
     lastSampleCountReceived = sampleCount;
     lastDawSampleTime = dawSampleTime;
+    lastCaptureEpoch = captureEpoch;
     receivedSampleCounts.push_back(sampleCount);
     callOrder.push_back("audio");
   }
@@ -90,6 +100,8 @@ public:
   void setVocabularyBias(const std::vector<std::string> &words) override {
     setVocabularyBiasCalled = true;
     lastVocabularyReceived = words;
+    audioCountAtBias = static_cast<int>(receivedSampleCounts.size());
+    callOrder.push_back("correction");
   }
 
   void setInputSampleRate(double sampleRate) override {
@@ -107,7 +119,9 @@ public:
   bool finalizeStreamCalled = false;
   int lastSampleCountReceived = 0;
   double lastDawSampleTime = 0.0;
+  uint32_t lastCaptureEpoch = 0;
   double lastInputSampleRate = 0.0;
+  int audioCountAtBias = 0;
   std::vector<std::string> lastVocabularyReceived;
   std::vector<int> receivedSampleCounts;
   std::vector<std::string> callOrder;
@@ -294,11 +308,52 @@ void testCoordinatorDrainThreeChunksThenStop() {
   std::filesystem::remove_all(tmpDir);
 }
 
+void testCoordinatorServicesCorrectionsDuringAudio() {
+  MockIPCServer mockServer;
+  MockTranscriber mockTranscriber;
+
+  std::string tmpDir = "/tmp/punch2pen_test_coord_corr_audio";
+  std::filesystem::create_directories(tmpDir);
+  punch2pen::DatabaseManager db;
+  db.initialize(tmpDir + "/test_corrections.csv");
+
+  punch2pen::ProfileManager profileManager;
+  profileManager.setDataDirectory(tmpDir);
+  profileManager.loadProfile("test");
+
+  Punch2Pen::TranscriptionCoordinator coordinator(mockServer, mockTranscriber, db,
+                                                  profileManager);
+
+  mockServer.queueAudio(std::vector<float>(100, 0.1f), 0.0, 48000.0);
+  mockServer.queueAudio(std::vector<float>(100, 0.2f), 100.0, 48000.0);
+  mockServer.queueAudio(std::vector<float>(100, 0.3f), 200.0, 48000.0);
+  mockServer.correctionQueue.push_back({"hello", "world"});
+
+  std::thread worker([&]() { coordinator.run(); });
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  coordinator.stop();
+  worker.join();
+
+  assert(mockTranscriber.setVocabularyBiasCalled);
+  assert(mockTranscriber.receivedSampleCounts.size() == 3);
+  assert(mockTranscriber.audioCountAtBias == 1 &&
+         "Error: correction waited until the audio queue drained");
+  assert(mockTranscriber.callOrder.size() >= 4);
+  assert(mockTranscriber.callOrder[0] == "audio");
+  assert(mockTranscriber.callOrder[1] == "correction");
+
+  std::cout << "[PASS] testCoordinatorServicesCorrectionsDuringAudio"
+            << std::endl;
+
+  std::filesystem::remove_all(tmpDir);
+}
+
 int main() {
   testCoordinatorRouting();
   testCoordinatorCorrections();
   testCoordinatorProfileCorrections();
   testCoordinatorDrainThreeChunksThenStop();
+  testCoordinatorServicesCorrectionsDuringAudio();
   std::cout << "All TranscriptionCoordinator tests passed!" << std::endl;
   return 0;
 }

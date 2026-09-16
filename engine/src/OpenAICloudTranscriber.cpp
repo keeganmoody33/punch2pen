@@ -151,8 +151,10 @@ void OpenAICloudTranscriber::sendPcm(const std::vector<int16_t> &pcmData) {
 void OpenAICloudTranscriber::flushPendingTranscript(
     const std::string &doneTranscript) {
   std::vector<TimedWord> words;
+  uint32_t epoch = 0;
   {
     std::lock_guard<std::mutex> audioLock(audioMutex);
+    epoch = stream.committed.active ? stream.committed.epoch : stream.live.epoch;
     words = stream.complete(doneTranscript);
   }
   if (words.empty())
@@ -164,13 +166,14 @@ void OpenAICloudTranscriber::flushPendingTranscript(
       continue;
     for (const auto &word : words) {
       listener->onTranscriptUpdated(word.text, true, word.startSample,
-                                    word.endSample);
+                                    word.endSample, epoch);
     }
   }
 }
 
 void OpenAICloudTranscriber::pushAudioBlock(const float *samples, int sampleCount,
-                                            double dawSampleTime) {
+                                            double dawSampleTime,
+                                            uint32_t captureEpoch) {
   if (samples == nullptr || sampleCount <= 0) {
     return;
   }
@@ -198,7 +201,7 @@ void OpenAICloudTranscriber::pushAudioBlock(const float *samples, int sampleCoun
   }
 
   std::lock_guard<std::mutex> lock(audioMutex);
-  stream.captureLiveOrigin(dawSampleTime);
+  stream.captureLiveOrigin(dawSampleTime, captureEpoch);
   appendResampled(samples, sampleCount);
   stream.noteHostSamples(sampleCount);
 

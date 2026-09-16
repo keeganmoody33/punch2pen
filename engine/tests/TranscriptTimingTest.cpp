@@ -119,7 +119,9 @@ void testDawTimelineDiscontinuitySplitsWindow() {
   assert(stream.needsFinalizeForOrigin(48000.0));
 
   stream.finalize();
-  stream.captureLiveOrigin(48000.0);
+  assert(stream.committed.epoch == 0);
+  stream.captureLiveOrigin(48000.0, 4);
+  assert(stream.live.epoch == 4);
   assert(stream.live.active);
   assert(approx(stream.live.origin, 48000.0));
   assert(approx(stream.committed.origin, 48000.0));

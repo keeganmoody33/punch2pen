@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -98,13 +99,15 @@ struct CloudStreamWindow {
   double sentEnd = 0.0;
   double queuedEnd = 0.0;
   size_t pcmSamplesSent = 0;
+  uint32_t epoch = 0;
   bool active = false;
 
-  void start(double dawOrigin) {
+  void start(double dawOrigin, uint32_t captureEpoch = 0) {
     origin = dawOrigin;
     sentEnd = dawOrigin;
     queuedEnd = dawOrigin;
     pcmSamplesSent = 0;
+    epoch = captureEpoch;
     active = true;
   }
 
@@ -128,9 +131,9 @@ struct CloudDeltaAssembler {
   std::string pending;
   bool awaitingCompletion = false;
 
-  void captureLiveOrigin(double dawSampleTime) {
+  void captureLiveOrigin(double dawSampleTime, uint32_t captureEpoch = 0) {
     if (!live.active)
-      live.start(dawSampleTime);
+      live.start(dawSampleTime, captureEpoch);
   }
 
   bool needsFinalizeForOrigin(double dawSampleTime) const {

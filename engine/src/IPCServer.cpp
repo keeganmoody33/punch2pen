@@ -64,6 +64,7 @@ std::vector<float> IPCServer::popAudio() {
   eventQueue.erase(eventQueue.begin());
   lastDawSampleTime_ = packet.dawSampleTime;
   lastSampleRate_ = packet.sampleRate;
+  lastCaptureEpoch_ = packet.captureEpoch;
   return std::move(packet.samples);
 }
 
@@ -73,6 +74,10 @@ double IPCServer::lastAudioDawSampleTime() {
 
 double IPCServer::lastAudioSampleRate() {
   return lastSampleRate_;
+}
+
+uint32_t IPCServer::lastAudioCaptureEpoch() {
+  return lastCaptureEpoch_;
 }
 
 bool IPCServer::hasPendingCorrection() {
@@ -94,6 +99,7 @@ bool IPCServer::transportStateChangedToStop() {
   std::lock_guard<std::mutex> lock(audioQueueLock);
   if (eventQueue.empty() || !eventQueue.front().isStop)
     return false;
+  lastCaptureEpoch_ = eventQueue.front().captureEpoch;
   eventQueue.erase(eventQueue.begin());
   return true;
 }
@@ -143,7 +149,8 @@ void IPCServer::clientHandler(int clientSocket) {
           std::lock_guard<std::mutex> lock(audioQueueLock);
           eventQueue.push_back({false, std::move(samples),
                                 chunkHeader.dawSampleTime,
-                                chunkHeader.sampleRate});
+                                chunkHeader.sampleRate,
+                                chunkHeader.captureEpoch});
         }
       }
     } else if (header.type == protocol::MessageType::Correction) {
@@ -165,14 +172,23 @@ void IPCServer::clientHandler(int clientSocket) {
         }
       }
     } else if (header.type == protocol::MessageType::TransportStop) {
-      {
-        std::lock_guard<std::mutex> lock(audioQueueLock);
-        eventQueue.push_back({true, {}, 0.0, 0.0});
-      }
-      if (header.length > 0) {
+      protocol::TransportStopHeader stopHeader{};
+      if (header.length >= sizeof(stopHeader)) {
+        if (recv(clientSocket, &stopHeader, sizeof(stopHeader), MSG_WAITALL) !=
+            sizeof(stopHeader))
+          break;
+        if (header.length > sizeof(stopHeader)) {
+          std::vector<char> trash(header.length - sizeof(stopHeader));
+          recv(clientSocket, trash.data(),
+               header.length - sizeof(stopHeader), MSG_WAITALL);
+        }
+      } else if (header.length > 0) {
         std::vector<char> trash(header.length);
         recv(clientSocket, trash.data(), header.length, MSG_WAITALL);
       }
+      std::lock_guard<std::mutex> lock(audioQueueLock);
+      eventQueue.push_back(
+          {true, {}, 0.0, 0.0, stopHeader.captureEpoch});
     } else {
       if (header.length > 0) {
         std::vector<char> trash(header.length);
@@ -190,7 +206,7 @@ void IPCServer::clientHandler(int clientSocket) {
 }
 
 void IPCServer::sendResult(const std::string &text, double startTime,
-                           double endTime) {
+                           double endTime, uint32_t captureEpoch) {
   std::lock_guard<std::mutex> lock(clientLock);
   if (activeClientSocket < 0)
     return;
@@ -202,6 +218,7 @@ void IPCServer::sendResult(const std::string &text, double startTime,
   resultHeader.textLength = (uint32_t)text.size();
   resultHeader.startTime = startTime;
   resultHeader.endTime = endTime;
+  resultHeader.captureEpoch = captureEpoch;
 
   header.length = sizeof(resultHeader) + resultHeader.textLength;
 

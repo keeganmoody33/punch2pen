@@ -73,7 +73,7 @@ void Transcriber::setInputSampleRate(double sampleRate) {
 }
 
 void Transcriber::pushAudioBlock(const float *samples, int sampleCount,
-                                 double dawSampleTime) {
+                                 double dawSampleTime, uint32_t captureEpoch) {
   if (samples == nullptr || sampleCount <= 0) {
     return;
   }
@@ -88,6 +88,7 @@ void Transcriber::pushAudioBlock(const float *samples, int sampleCount,
   if (audioBuffer.empty()) {
     bufferStartDawSample = dawSampleTime;
     bufferHostSamples = 0;
+    bufferCaptureEpoch = captureEpoch;
   }
 
   appendResampled(samples, sampleCount);
@@ -248,7 +249,8 @@ void Transcriber::notifyListeners(const std::string &text, bool isProvisional,
   std::lock_guard<std::mutex> lock(listenerMutex);
   for (auto *listener : listeners) {
     if (listener != nullptr) {
-      listener->onTranscriptUpdated(text, isProvisional, startTime, endTime);
+      listener->onTranscriptUpdated(text, isProvisional, startTime, endTime,
+                                    bufferCaptureEpoch);
     }
   }
 }

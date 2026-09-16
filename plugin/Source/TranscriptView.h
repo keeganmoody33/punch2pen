@@ -36,7 +36,7 @@ public:
 
   // IPCClient::Listener implementation
   void onTranscriptionReceived(const std::string &text, double startTime,
-                               double endTime) override;
+                               double endTime, uint32_t captureEpoch) override;
   void onStatusChanged(bool isConnected) override;
 
   using WordClickCallback = std::function<void(const std::string &word,

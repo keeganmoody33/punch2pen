@@ -41,7 +41,7 @@ public:
 
   // IPCClient::Listener
   void onTranscriptionReceived(const std::string &text, double startTime,
-                               double endTime) override;
+                               double endTime, uint32_t captureEpoch) override;
   void onStatusChanged(bool connected) override;
 
 private:
@@ -74,7 +74,7 @@ private:
   // Tracks what we last told the page, so we don't spam the bridge.
   bool   lastConnected     = false;
   double lastPlayheadSample = 0.0;
-  std::atomic<uint32_t> takeGeneration { 0 };
+  std::atomic<uint32_t> displayedCaptureEpoch{0};
   int    lastBar           = -1;
   int    lastBeat          = -1;
   juce::String lastState   = {};

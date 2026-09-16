@@ -26,6 +26,7 @@ void testAudioChunkHeaderSerialization() {
   chunkHeader.sampleRate = 48000.0;
   chunkHeader.numSamples = 256;
   chunkHeader.dawSampleTime = 96000.0;
+  chunkHeader.captureEpoch = 7;
 
   std::vector<char> buf(sizeof(chunkHeader));
   std::memcpy(buf.data(), &chunkHeader, sizeof(chunkHeader));
@@ -36,6 +37,7 @@ void testAudioChunkHeaderSerialization() {
   assert(deserialized.sampleRate == 48000.0);
   assert(deserialized.numSamples == 256);
   assert(deserialized.dawSampleTime == 96000.0);
+  assert(deserialized.captureEpoch == 7);
 
   std::cout << "[PASS] testAudioChunkHeaderSerialization" << std::endl;
 }
@@ -62,6 +64,7 @@ void testTranscriptionResultHeaderSerialization() {
   resultHeader.textLength = 42;
   resultHeader.startTime = 1.0;
   resultHeader.endTime = 2.5;
+  resultHeader.captureEpoch = 3;
 
   std::vector<char> buf(sizeof(resultHeader));
   std::memcpy(buf.data(), &resultHeader, sizeof(resultHeader));
@@ -72,8 +75,24 @@ void testTranscriptionResultHeaderSerialization() {
   assert(deserialized.textLength == 42);
   assert(deserialized.startTime == 1.0);
   assert(deserialized.endTime == 2.5);
+  assert(deserialized.captureEpoch == 3);
 
   std::cout << "[PASS] testTranscriptionResultHeaderSerialization" << std::endl;
+}
+
+void testTransportStopHeaderSerialization() {
+  punch2pen::protocol::TransportStopHeader stopHeader;
+  stopHeader.captureEpoch = 11;
+
+  std::vector<char> buf(sizeof(stopHeader));
+  std::memcpy(buf.data(), &stopHeader, sizeof(stopHeader));
+
+  punch2pen::protocol::TransportStopHeader deserialized;
+  std::memcpy(&deserialized, buf.data(), sizeof(deserialized));
+
+  assert(deserialized.captureEpoch == 11);
+
+  std::cout << "[PASS] testTransportStopHeaderSerialization" << std::endl;
 }
 
 void testMessageTypeCoverage() {
@@ -140,6 +159,7 @@ int main() {
   testAudioChunkHeaderSerialization();
   testCorrectionHeaderSerialization();
   testTranscriptionResultHeaderSerialization();
+  testTransportStopHeaderSerialization();
   testMessageTypeCoverage();
   testFullMessageRoundTrip();
   std::cout << "All Protocol serialization tests passed!" << std::endl;

@@ -17,8 +17,8 @@ public:
 
   bool isConnected() const;
   void sendAudioChunk(const float *samples, int numSamples, double sampleRate,
-                      double dawSampleTime);
-  void sendTransportStop();
+                      double dawSampleTime, uint32_t captureEpoch = 0);
+  void sendTransportStop(uint32_t captureEpoch = 0);
   void flagTransportStop(uint32_t epoch = 0);
   void sendCorrection(const std::string &original, const std::string &corrected);
   void setTranscriptionMode(TranscriptionMode mode);
@@ -28,8 +28,8 @@ public:
   struct Listener {
     virtual ~Listener() = default;
     virtual void onTranscriptionReceived(const std::string &text,
-                                         double startTime,
-                                         double endTime) = 0;
+                                         double startTime, double endTime,
+                                         uint32_t captureEpoch) = 0;
     virtual void onStatusChanged(bool isConnected) = 0;
   };
 
@@ -48,6 +48,7 @@ private:
   void launchEngine();
   void handleMessage();
   void applyPendingCaptureReset();
+  bool popStopEpoch(uint32_t &epoch);
   void processOutgoingAudio(bool flushPartial = false,
                             uint32_t stopEpoch = 0);
 
@@ -60,14 +61,13 @@ private:
   std::atomic<TranscriptionMode> transcriptionMode{TranscriptionMode::Offline};
   std::atomic<double> hostSampleRate{0.0};
   std::atomic<bool> pendingCaptureReset{false};
-  std::atomic<uint32_t> pendingStopEpoch{0};
+  juce::AbstractFifo stopFifo{64};
+  std::vector<uint32_t> stopEpochs;
 
   int serverPort;
   bool autoLaunchEngine;
   juce::CriticalSection listenerLock;
   std::vector<Listener *> listeners;
-
-  std::atomic<bool> pendingStop{false};
 };
 
 } // namespace punch2pen

@@ -7,6 +7,7 @@
 #include "TranscriptionCoordinator.h"
 
 #include <csignal>
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
@@ -31,10 +32,11 @@ public:
       : server(serverRef) {}
 
   void onTranscriptUpdated(const std::string &text, bool isProvisional,
-                           double startTime, double endTime) override {
+                           double startTime, double endTime,
+                           uint32_t captureEpoch) override {
     (void)isProvisional;
     std::cout << "Transcription: " << text << std::endl;
-    server.sendResult(text, startTime, endTime);
+    server.sendResult(text, startTime, endTime, captureEpoch);
   }
 
 private:

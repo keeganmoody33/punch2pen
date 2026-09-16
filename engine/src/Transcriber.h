@@ -3,6 +3,7 @@
 #include "TranscriberInterface.h"
 #include "whisper.h"
 
+#include <cstdint>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -15,7 +16,7 @@ public:
   ~Transcriber() override;
 
   void pushAudioBlock(const float *samples, int sampleCount,
-                      double dawSampleTime) override;
+                      double dawSampleTime, uint32_t captureEpoch) override;
   void addListener(Listener *newListener) override;
   void removeListener(Listener *listenerToRemove) override;
   void setVocabularyBias(const std::vector<std::string> &words) override;
@@ -40,6 +41,7 @@ private:
   double resampleCarry = 0.0;
   double bufferStartDawSample = 0.0;
   int bufferHostSamples = 0;
+  uint32_t bufferCaptureEpoch = 0;
 
   std::mutex listenerMutex;
   std::vector<Listener *> listeners;

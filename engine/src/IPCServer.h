@@ -3,6 +3,7 @@
 #include "IPCServerInterface.h"
 
 #include <atomic>
+#include <cstdint>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -26,12 +27,14 @@ public:
   std::vector<float> popAudio() override;
   double lastAudioDawSampleTime() override;
   double lastAudioSampleRate() override;
+  uint32_t lastAudioCaptureEpoch() override;
   bool transportStateChangedToStop() override;
 
   bool hasPendingCorrection() override;
   CorrectionPair popCorrection() override;
 
-  void sendResult(const std::string &text, double startTime, double endTime);
+  void sendResult(const std::string &text, double startTime, double endTime,
+                  uint32_t captureEpoch);
 
 private:
   void acceptLoop();
@@ -50,10 +53,12 @@ private:
     std::vector<float> samples;
     double dawSampleTime = 0.0;
     double sampleRate = 0.0;
+    uint32_t captureEpoch = 0;
   };
   std::vector<QueuedEvent> eventQueue;
   double lastDawSampleTime_ = 0.0;
   double lastSampleRate_ = 0.0;
+  uint32_t lastCaptureEpoch_ = 0;
 
   std::mutex correctionQueueLock;
   std::vector<CorrectionPair> correctionQueue;

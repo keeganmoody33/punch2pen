@@ -208,7 +208,12 @@ void testTransportStop() {
     }
 
     headerOk = (header.type == Punch2Pen::protocol::MessageType::TransportStop &&
-                header.length == 0);
+                header.length ==
+                    (uint32_t)sizeof(Punch2Pen::protocol::TransportStopHeader));
+    Punch2Pen::protocol::TransportStopHeader stopHeader;
+    if (headerOk &&
+        readExact(*client, &stopHeader, sizeof(stopHeader)))
+      headerOk = (stopHeader.captureEpoch == 0);
     gotStop = true;
     delete client;
   });
@@ -452,8 +457,9 @@ void testTranscriptionResultForwardsTimes() {
     std::atomic<bool> got{false};
     std::atomic<bool> ok{false};
     void onTranscriptionReceived(const std::string &text, double startTime,
-                                 double endTime) override {
-      ok = (text == "hello" && startTime == 48000.0 && endTime == 52800.0);
+                                 double endTime, uint32_t captureEpoch) override {
+      ok = (text == "hello" && startTime == 48000.0 && endTime == 52800.0 &&
+            captureEpoch == 9);
       got = true;
     }
     void onStatusChanged(bool) override {}
@@ -474,6 +480,7 @@ void testTranscriptionResultForwardsTimes() {
     resultHeader.textLength = (uint32_t)text.size();
     resultHeader.startTime = 48000.0;
     resultHeader.endTime = 52800.0;
+    resultHeader.captureEpoch = 9;
     header.length =
         (uint32_t)(sizeof(resultHeader) + resultHeader.textLength);
 
@@ -771,6 +778,109 @@ void testStopDoesNotEmitNewerTake() {
   std::cout << "[PASS] testStopDoesNotEmitNewerTake" << std::endl;
 }
 
+void testQueuedStopsDrainEachEpoch() {
+  juce::StreamingSocket server;
+  bool bound = server.createListener(TEST_PORT + 11, "127.0.0.1");
+  assert(bound);
+
+  std::atomic<int> audioChunks{0};
+  std::atomic<int> stops{0};
+  std::atomic<bool> orderOk{true};
+  const int leftover = 128;
+  const double originA = 24000.0;
+  const double originB = 96000.0;
+
+  std::thread serverThread([&]() {
+    juce::StreamingSocket *client = server.waitForNextConnection();
+    if (client == nullptr)
+      return;
+
+    uint32_t lastStopEpoch = 0;
+    while (stops.load() < 2) {
+      Punch2Pen::protocol::Header header;
+      if (!readExact(*client, &header, sizeof(header)))
+        break;
+      if (header.type == Punch2Pen::protocol::MessageType::AudioChunk) {
+        Punch2Pen::protocol::AudioChunkHeader chunkHeader;
+        if (!readExact(*client, &chunkHeader, sizeof(chunkHeader)))
+          break;
+        std::vector<float> payload(chunkHeader.numSamples);
+        if (!readExact(*client, payload.data(),
+                       (int)chunkHeader.numSamples * (int)sizeof(float)))
+          break;
+        if (stops.load() == 0) {
+          if (chunkHeader.captureEpoch != 0 ||
+              chunkHeader.dawSampleTime != originA ||
+              chunkHeader.numSamples != (uint32_t)leftover)
+            orderOk = false;
+        } else {
+          if (chunkHeader.captureEpoch != 1 ||
+              chunkHeader.dawSampleTime != originB ||
+              chunkHeader.numSamples != (uint32_t)leftover)
+            orderOk = false;
+        }
+        audioChunks.fetch_add(1);
+      } else if (header.type == Punch2Pen::protocol::MessageType::TransportStop) {
+        Punch2Pen::protocol::TransportStopHeader stopHeader;
+        if (!readExact(*client, &stopHeader, sizeof(stopHeader)))
+          break;
+        if (stops.load() == 0 && stopHeader.captureEpoch != 0)
+          orderOk = false;
+        if (stops.load() == 1 && stopHeader.captureEpoch != 1)
+          orderOk = false;
+        if (audioChunks.load() != (int)(stops.load() + 1))
+          orderOk = false;
+        lastStopEpoch = stopHeader.captureEpoch;
+        (void)lastStopEpoch;
+        stops.fetch_add(1);
+      } else if (header.length > 0) {
+        std::vector<char> skip((size_t)header.length);
+        if (!readExact(*client, skip.data(), (int)header.length))
+          break;
+      }
+    }
+    delete client;
+  });
+
+  juce::Thread::sleep(100);
+  auto ipcClient = std::make_unique<Punch2Pen::IPCClient>(
+      TEST_PORT + 11, /*autoLaunchEngine=*/false);
+  ipcClient->setHostSampleRate(48000.0);
+
+  for (int i = 0; i < 50; ++i) {
+    if (ipcClient->isConnected())
+      break;
+    juce::Thread::sleep(100);
+  }
+  assert(ipcClient->isConnected());
+
+  Punch2Pen::AudioRingBuffer ring(8192);
+  std::vector<float> samplesA(leftover, 0.25f);
+  std::vector<float> samplesB(leftover, 0.75f);
+  assert(ring.write(samplesA.data(), leftover, originA, 0));
+  assert(ring.write(samplesB.data(), leftover, originB, 1));
+  ipcClient->setAudioSource(&ring);
+  ipcClient->flagTransportStop(0);
+  ipcClient->flagTransportStop(1);
+
+  for (int i = 0; i < 50; ++i) {
+    if (stops.load() >= 2)
+      break;
+    juce::Thread::sleep(100);
+  }
+
+  ipcClient.reset();
+  serverThread.join();
+  server.close();
+
+  assert(audioChunks.load() == 2);
+  assert(stops.load() == 2);
+  assert(orderOk.load());
+  assert(ring.getNumReady() == 0);
+
+  std::cout << "[PASS] testQueuedStopsDrainEachEpoch" << std::endl;
+}
+
 int main() {
   // RAII initializer for JUCE Thread internals. JUCE only ships the _GUI
   // variant; per its own header docs, it's the recommended initializer for
@@ -787,6 +897,7 @@ int main() {
   testTransportStopFlushesPartialChunk();
   testStopFlushLeavesNewerEpochInRing();
   testStopDoesNotEmitNewerTake();
+  testQueuedStopsDrainEachEpoch();
   testTransportStop();
   testCorrection();
   testDisconnectDetection();

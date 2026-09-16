@@ -10,7 +10,7 @@
 namespace punch2pen {
 
 IPCClient::IPCClient(int port, bool autoLaunchEngineFlag)
-    : Thread("Punch2Pen_IPC"), serverPort(port),
+    : Thread("Punch2Pen_IPC"), stopEpochs(64, 0), serverPort(port),
       autoLaunchEngine(autoLaunchEngineFlag) {
   startThread();
 }
@@ -52,7 +52,8 @@ void IPCClient::run() {
               juce::ScopedLock lock(listenerLock);
               for (auto *l : listeners)
                 l->onTranscriptionReceived(text, resultHeader.startTime,
-                                           resultHeader.endTime);
+                                           resultHeader.endTime,
+                                           resultHeader.captureEpoch);
             }
           }
         } else {
@@ -69,14 +70,16 @@ void IPCClient::run() {
       }
     }
 
-    // Handle stop before any regular drain so a full chunk of take B cannot
-    // overtake take A's TransportStop.
-    if (pendingStop.exchange(false)) {
-      processOutgoingAudio(true, pendingStopEpoch.load());
-      sendTransportStop();
-    } else {
-      processOutgoingAudio(false);
+    // Drain every queued punch-out: matching epoch then one TransportStop.
+    uint32_t stopEpoch = 0;
+    bool drainedStop = false;
+    while (popStopEpoch(stopEpoch)) {
+      processOutgoingAudio(true, stopEpoch);
+      sendTransportStop(stopEpoch);
+      drainedStop = true;
     }
+    if (!drainedStop)
+      processOutgoingAudio(false);
   }
 }
 
@@ -116,7 +119,7 @@ void IPCClient::processOutgoingAudio(bool flushPartial, uint32_t stopEpoch) {
                                    &epoch);
     if (n <= 0)
       return;
-    sendAudioChunk(tempBuffer.data(), n, sampleRate, chunkDawSample);
+    sendAudioChunk(tempBuffer.data(), n, sampleRate, chunkDawSample, epoch);
     if (!flushPartial)
       return;
   }
@@ -185,9 +188,29 @@ void IPCClient::setHostSampleRate(double sampleRate) {
 }
 
 void IPCClient::flagTransportStop(uint32_t epoch) {
-  pendingStopEpoch.store(epoch);
-  pendingStop.store(true);
+  int start1 = 0, size1 = 0, start2 = 0, size2 = 0;
+  stopFifo.prepareToWrite(1, start1, size1, start2, size2);
+  if (size1 > 0)
+    stopEpochs[static_cast<size_t>(start1)] = epoch;
+  else if (size2 > 0)
+    stopEpochs[static_cast<size_t>(start2)] = epoch;
+  else
+    return;
+  stopFifo.finishedWrite(1);
   notify();
+}
+
+bool IPCClient::popStopEpoch(uint32_t &epoch) {
+  int start1 = 0, size1 = 0, start2 = 0, size2 = 0;
+  stopFifo.prepareToRead(1, start1, size1, start2, size2);
+  if (size1 > 0)
+    epoch = stopEpochs[static_cast<size_t>(start1)];
+  else if (size2 > 0)
+    epoch = stopEpochs[static_cast<size_t>(start2)];
+  else
+    return false;
+  stopFifo.finishedRead(1);
+  return true;
 }
 
 void IPCClient::requestCaptureReset() {
@@ -196,7 +219,8 @@ void IPCClient::requestCaptureReset() {
 }
 
 void IPCClient::sendAudioChunk(const float *samples, int numSamples,
-                               double sampleRate, double dawSampleTime) {
+                               double sampleRate, double dawSampleTime,
+                               uint32_t captureEpoch) {
   if (!connected)
     return;
 
@@ -207,6 +231,7 @@ void IPCClient::sendAudioChunk(const float *samples, int numSamples,
   chunkHeader.sampleRate = sampleRate;
   chunkHeader.numSamples = (uint32_t)numSamples;
   chunkHeader.dawSampleTime = dawSampleTime;
+  chunkHeader.captureEpoch = captureEpoch;
 
   size_t payloadSize =
       sizeof(protocol::AudioChunkHeader) + ((size_t)numSamples * sizeof(float));
@@ -227,15 +252,21 @@ void IPCClient::sendAudioChunk(const float *samples, int numSamples,
   }
 }
 
-void IPCClient::sendTransportStop() {
+void IPCClient::sendTransportStop(uint32_t captureEpoch) {
   if (!connected)
     return;
 
   protocol::Header header;
   header.type = protocol::MessageType::TransportStop;
-  header.length = 0;
+  protocol::TransportStopHeader stopHeader;
+  stopHeader.captureEpoch = captureEpoch;
+  header.length = (uint32_t)sizeof(stopHeader);
 
   if (socket.write(&header, sizeof(header)) != sizeof(header)) {
+    connected = false;
+    return;
+  }
+  if (socket.write(&stopHeader, sizeof(stopHeader)) != sizeof(stopHeader)) {
     connected = false;
   }
 }
