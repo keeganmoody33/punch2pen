@@ -7,9 +7,27 @@ import math
 # Protocol Constants
 MESSAGE_TYPE_AUDIO = 1
 MESSAGE_TYPE_RESULT = 2
+MESSAGE_TYPE_HANDSHAKE = 3
+MESSAGE_TYPE_HANDSHAKE_RESPONSE = 4
+PROTOCOL_VERSION = 1
 
 HOST = '127.0.0.1'
 PORT = 7483
+
+def complete_handshake(sock):
+    sock.sendall(struct.pack('<II', MESSAGE_TYPE_HANDSHAKE, 4))
+    sock.sendall(struct.pack('<I', PROTOCOL_VERSION))
+    header = sock.recv(8)
+    if len(header) != 8:
+        raise RuntimeError('handshake: no response header')
+    msg_type, length = struct.unpack('<II', header)
+    payload = sock.recv(length)
+    if msg_type != MESSAGE_TYPE_HANDSHAKE_RESPONSE or len(payload) < 8:
+        raise RuntimeError(f'handshake: unexpected type {msg_type}')
+    version, accepted = struct.unpack_from('<II', payload)
+    if accepted != 1 or version != PROTOCOL_VERSION:
+        raise RuntimeError(
+            f'handshake rejected (version={version} accepted={accepted})')
 
 def create_audio_chunk(duration_sec=1.0, sample_rate=16000.0):
     """Generates a simple sine wave audio chunk."""
@@ -27,23 +45,18 @@ def create_audio_chunk(duration_sec=1.0, sample_rate=16000.0):
         
     return samples, sample_rate
 
-def send_audio(sock, samples, sample_rate):
+def send_audio(sock, samples, sample_rate, daw_sample_time=0.0, capture_epoch=0):
     num_samples = len(samples)
-    payload_size = 12 + (num_samples * 4) # 8 bytes double + 4 bytes uint32 + samples
-    
-    # Send Main Header
-    # MessageType (uint32), Length (uint32)
+    # AudioChunkHeader: sampleRate d, numSamples I, dawSampleTime d, captureEpoch I
+    payload_size = 24 + (num_samples * 4)
+
     sock.sendall(struct.pack('<II', MESSAGE_TYPE_AUDIO, payload_size))
-    
-    # Send AudioChunkHeader
-    # sampleRate (double), numSamples (uint32)
-    sock.sendall(struct.pack('<dI', sample_rate, num_samples))
-    
-    # Send Samples (float32 array)
-    # We use 'f' for float which is 4 bytes
+    sock.sendall(struct.pack('<dIdI', sample_rate, num_samples, daw_sample_time,
+                             capture_epoch))
+
     packed_samples = struct.pack('<%df' % num_samples, *samples)
     sock.sendall(packed_samples)
-    
+
     print(f"Sent {num_samples} samples ({num_samples/sample_rate:.2f}s)")
 
 def main():
@@ -51,7 +64,8 @@ def main():
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((HOST, PORT))
         print(f"Connected to Engine at {HOST}:{PORT}")
-        
+        complete_handshake(sock)
+
         # 1. Send 3 seconds of audio to trigger simple VAD/Transcription thresholds
         # The engine logic waits for >2-3 seconds typically in the simple loop we wrote
         # Transcriber.cpp: if (audioBuffer.size() < WHISPER_SAMPLE_RATE * 3)
@@ -71,16 +85,15 @@ def main():
             msg_type, length = struct.unpack('<II', header_data)
             
             if msg_type == MESSAGE_TYPE_RESULT:
-                # Read Result Header
-                # textLength(u32), start(d), end(d) = 4 + 8 + 8 = 20 bytes
-                result_header = sock.recv(20)
-                text_len, start, end = struct.unpack('<Idd', result_header)
+                # textLength(u32), start(d), end(d), captureEpoch(u32)
+                result_header = sock.recv(24)
+                text_len, start, end, capture_epoch = struct.unpack('<IddI', result_header)
                 
                 # Read Text
                 text_bytes = sock.recv(text_len)
                 text = text_bytes.decode('utf-8')
                 
-                print(f"✅ Received Transcription: '{text}'")
+                print(f"✅ Received Transcription: '{text}' ({start}-{end} epoch {capture_epoch})")
                 break
             else:
                 print(f"Received unknown message type: {msg_type}")

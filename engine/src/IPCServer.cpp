@@ -9,14 +9,14 @@ IPCServer::IPCServer(int port) : port(port) {}
 
 IPCServer::~IPCServer() { stop(); }
 
-void IPCServer::start() {
+bool IPCServer::start() {
   if (running)
-    return;
+    return true;
 
   serverSocket = socket(AF_INET, SOCK_STREAM, 0);
   if (serverSocket < 0) {
     std::cerr << "Failed to create socket" << std::endl;
-    return;
+    return false;
   }
 
   sockaddr_in addr{};
@@ -28,15 +28,23 @@ void IPCServer::start() {
   setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
   if (bind(serverSocket, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-    std::cerr << "Failed to bind socket on port " << port << std::endl;
-    return;
+    std::cerr << "Failed to bind socket on 127.0.0.1:" << port << std::endl;
+    close(serverSocket);
+    serverSocket = -1;
+    return false;
   }
 
-  listen(serverSocket, 5);
+  if (listen(serverSocket, 5) < 0) {
+    std::cerr << "Failed to listen on 127.0.0.1:" << port << std::endl;
+    close(serverSocket);
+    serverSocket = -1;
+    return false;
+  }
 
   running = true;
   acceptThread = std::thread(&IPCServer::acceptLoop, this);
   std::cout << "IPC Server started on 127.0.0.1:" << port << std::endl;
+  return true;
 }
 
 void IPCServer::stop() {
@@ -118,11 +126,28 @@ void IPCServer::acceptLoop() {
   }
 }
 
+bool IPCServer::sendHandshakeResponse(int clientSocket, uint32_t version,
+                                      uint32_t accepted) {
+  protocol::Header header{};
+  header.type = protocol::MessageType::HandshakeResponse;
+  protocol::HandshakeResponse response{};
+  response.version = version;
+  response.accepted = accepted;
+  header.length = (uint32_t)sizeof(response);
+
+  if (send(clientSocket, &header, sizeof(header), 0) != (ssize_t)sizeof(header))
+    return false;
+  return send(clientSocket, &response, sizeof(response), 0) ==
+         (ssize_t)sizeof(response);
+}
+
 void IPCServer::clientHandler(int clientSocket) {
   {
     std::lock_guard<std::mutex> lock(clientLock);
     activeClientSocket = clientSocket;
   }
+
+  bool handshook = false;
 
   while (running) {
     protocol::Header header;
@@ -131,6 +156,34 @@ void IPCServer::clientHandler(int clientSocket) {
 
     if (bytesRead != sizeof(header))
       break;
+
+    if (header.type == protocol::MessageType::Handshake) {
+      protocol::Handshake handshake{};
+      if (header.length != sizeof(handshake))
+        break;
+      if (recv(clientSocket, &handshake, sizeof(handshake), MSG_WAITALL) !=
+          (ssize_t)sizeof(handshake))
+        break;
+      const uint32_t accepted =
+          handshake.version == protocol::kProtocolVersion ? 1u : 0u;
+      if (!sendHandshakeResponse(clientSocket, protocol::kProtocolVersion,
+                                 accepted))
+        break;
+      if (accepted == 0)
+        break;
+      handshook = true;
+      continue;
+    }
+
+    if (!handshook) {
+      std::cerr << "Dropping pre-handshake message type "
+                << static_cast<uint32_t>(header.type) << std::endl;
+      if (header.length > 0) {
+        std::vector<char> trash(header.length);
+        recv(clientSocket, trash.data(), header.length, MSG_WAITALL);
+      }
+      continue;
+    }
 
     if (header.type == protocol::MessageType::AudioChunk) {
       protocol::AudioChunkHeader chunkHeader;

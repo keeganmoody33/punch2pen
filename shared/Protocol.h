@@ -15,6 +15,8 @@ enum class MessageType : uint32_t {
   TransportStop = 6
 };
 
+inline constexpr uint32_t kProtocolVersion = 1;
+
 #pragma pack(push, 1)
 
 struct Header {
@@ -22,9 +24,13 @@ struct Header {
   uint32_t length;
 };
 
-// Preliminary structures, will expand as needed
 struct Handshake {
   uint32_t version;
+};
+
+struct HandshakeResponse {
+  uint32_t version;
+  uint32_t accepted; // 1 = ok, 0 = reject
 };
 
 struct AudioChunkHeader {

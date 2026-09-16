@@ -20,6 +20,42 @@ static bool readExact(juce::StreamingSocket &sock, void *dest, int len) {
   return sock.read(dest, len, true) == len;
 }
 
+static bool replyToHandshake(juce::StreamingSocket &client) {
+  Punch2Pen::protocol::Header header;
+  if (!readExact(client, &header, sizeof(header)))
+    return false;
+  if (header.type != Punch2Pen::protocol::MessageType::Handshake ||
+      header.length != (uint32_t)sizeof(Punch2Pen::protocol::Handshake))
+    return false;
+
+  Punch2Pen::protocol::Handshake handshake;
+  if (!readExact(client, &handshake, sizeof(handshake)))
+    return false;
+
+  Punch2Pen::protocol::Header reply;
+  reply.type = Punch2Pen::protocol::MessageType::HandshakeResponse;
+  Punch2Pen::protocol::HandshakeResponse response;
+  response.version = Punch2Pen::protocol::kProtocolVersion;
+  response.accepted =
+      handshake.version == Punch2Pen::protocol::kProtocolVersion ? 1u : 0u;
+  reply.length = (uint32_t)sizeof(response);
+
+  return client.write(&reply, sizeof(reply)) == sizeof(reply) &&
+         client.write(&response, sizeof(response)) == sizeof(response) &&
+         response.accepted != 0;
+}
+
+static juce::StreamingSocket *acceptAndHandshake(juce::StreamingSocket &server) {
+  juce::StreamingSocket *client = server.waitForNextConnection();
+  if (client == nullptr)
+    return nullptr;
+  if (!replyToHandshake(*client)) {
+    delete client;
+    return nullptr;
+  }
+  return client;
+}
+
 void testConnectionAndAudioChunk() {
   // Spin up a server on a background thread
   juce::StreamingSocket server;
@@ -34,7 +70,7 @@ void testConnectionAndAudioChunk() {
   const double sampleRate = 44100.0;
 
   std::thread serverThread([&]() {
-    juce::StreamingSocket *client = server.waitForNextConnection();
+    juce::StreamingSocket *client = acceptAndHandshake(server);
     if (client == nullptr)
       return;
 
@@ -129,7 +165,7 @@ void testOutgoingChunksUseHostSampleRate() {
   const int chunkSize = 4096;
 
   std::thread serverThread([&]() {
-    juce::StreamingSocket *client = server.waitForNextConnection();
+    juce::StreamingSocket *client = acceptAndHandshake(server);
     if (client == nullptr)
       return;
 
@@ -197,7 +233,7 @@ void testTransportStop() {
   std::atomic<bool> headerOk{false};
 
   std::thread serverThread([&]() {
-    juce::StreamingSocket *client = server.waitForNextConnection();
+    juce::StreamingSocket *client = acceptAndHandshake(server);
     if (client == nullptr)
       return;
 
@@ -258,7 +294,7 @@ void testCorrection() {
   std::atomic<bool> allOk{false};
 
   std::thread serverThread([&]() {
-    juce::StreamingSocket *client = server.waitForNextConnection();
+    juce::StreamingSocket *client = acceptAndHandshake(server);
     if (client == nullptr)
       return;
 
@@ -340,7 +376,7 @@ void testDisconnectDetection() {
   assert(bound);
 
   std::thread serverThread([&]() {
-    juce::StreamingSocket *client = server.waitForNextConnection();
+    juce::StreamingSocket *client = acceptAndHandshake(server);
     if (client == nullptr)
       return;
     // Accept connection then immediately close
@@ -390,7 +426,7 @@ void testOutgoingChunksStampDawSampleTime() {
   const int chunkSize = 4096;
 
   std::thread serverThread([&]() {
-    juce::StreamingSocket *client = server.waitForNextConnection();
+    juce::StreamingSocket *client = acceptAndHandshake(server);
     if (client == nullptr)
       return;
 
@@ -466,7 +502,7 @@ void testTranscriptionResultForwardsTimes() {
   };
 
   std::thread serverThread([&]() {
-    juce::StreamingSocket *client = server.waitForNextConnection();
+    juce::StreamingSocket *client = acceptAndHandshake(server);
     if (client == nullptr)
       return;
 
@@ -561,7 +597,7 @@ void testTransportStopFlushesPartialChunk() {
   const double origin = 24000.0;
 
   std::thread serverThread([&]() {
-    juce::StreamingSocket *client = server.waitForNextConnection();
+    juce::StreamingSocket *client = acceptAndHandshake(server);
     if (client == nullptr)
       return;
 
@@ -644,7 +680,7 @@ void testStopFlushLeavesNewerEpochInRing() {
   const double originA = 24000.0;
 
   std::thread serverThread([&]() {
-    juce::StreamingSocket *client = server.waitForNextConnection();
+    juce::StreamingSocket *client = acceptAndHandshake(server);
     if (client == nullptr)
       return;
 
@@ -728,7 +764,7 @@ void testStopDoesNotEmitNewerTake() {
   std::atomic<bool> gotStop{false};
 
   std::thread serverThread([&]() {
-    juce::StreamingSocket *client = server.waitForNextConnection();
+    juce::StreamingSocket *client = acceptAndHandshake(server);
     if (client == nullptr)
       return;
 
@@ -791,7 +827,7 @@ void testQueuedStopsDrainEachEpoch() {
   const double originB = 96000.0;
 
   std::thread serverThread([&]() {
-    juce::StreamingSocket *client = server.waitForNextConnection();
+    juce::StreamingSocket *client = acceptAndHandshake(server);
     if (client == nullptr)
       return;
 
@@ -881,6 +917,113 @@ void testQueuedStopsDrainEachEpoch() {
   std::cout << "[PASS] testQueuedStopsDrainEachEpoch" << std::endl;
 }
 
+void testHandshakeIsFirstMessage() {
+  juce::StreamingSocket server;
+  bool bound = server.createListener(TEST_PORT + 12, "127.0.0.1");
+  assert(bound);
+
+  std::atomic<bool> gotHandshake{false};
+  std::atomic<bool> handshakeOk{false};
+
+  std::thread serverThread([&]() {
+    juce::StreamingSocket *client = server.waitForNextConnection();
+    if (client == nullptr)
+      return;
+
+    Punch2Pen::protocol::Header header;
+    if (!readExact(*client, &header, sizeof(header))) {
+      delete client;
+      return;
+    }
+
+    gotHandshake = (header.type == Punch2Pen::protocol::MessageType::Handshake &&
+                    header.length ==
+                        (uint32_t)sizeof(Punch2Pen::protocol::Handshake));
+    Punch2Pen::protocol::Handshake handshake;
+    if (gotHandshake && readExact(*client, &handshake, sizeof(handshake)))
+      handshakeOk = (handshake.version == Punch2Pen::protocol::kProtocolVersion);
+
+    Punch2Pen::protocol::Header reply;
+    reply.type = Punch2Pen::protocol::MessageType::HandshakeResponse;
+    Punch2Pen::protocol::HandshakeResponse response;
+    response.version = Punch2Pen::protocol::kProtocolVersion;
+    response.accepted = 1;
+    reply.length = (uint32_t)sizeof(response);
+    client->write(&reply, sizeof(reply));
+    client->write(&response, sizeof(response));
+    delete client;
+  });
+
+  juce::Thread::sleep(100);
+  auto ipcClient = std::make_unique<Punch2Pen::IPCClient>(
+      TEST_PORT + 12, /*autoLaunchEngine=*/false);
+
+  for (int i = 0; i < 50; ++i) {
+    if (ipcClient->isConnected())
+      break;
+    juce::Thread::sleep(100);
+  }
+
+  ipcClient.reset();
+  serverThread.join();
+  server.close();
+
+  assert(gotHandshake.load());
+  assert(handshakeOk.load());
+
+  std::cout << "[PASS] testHandshakeIsFirstMessage" << std::endl;
+}
+
+void testRejectedHandshakeDoesNotConnect() {
+  juce::StreamingSocket server;
+  bool bound = server.createListener(TEST_PORT + 13, "127.0.0.1");
+  assert(bound);
+
+  std::thread serverThread([&]() {
+    juce::StreamingSocket *client = server.waitForNextConnection();
+    if (client == nullptr)
+      return;
+
+    Punch2Pen::protocol::Header header;
+    if (!readExact(*client, &header, sizeof(header))) {
+      delete client;
+      return;
+    }
+    Punch2Pen::protocol::Handshake handshake;
+    readExact(*client, &handshake, sizeof(handshake));
+
+    Punch2Pen::protocol::Header reply;
+    reply.type = Punch2Pen::protocol::MessageType::HandshakeResponse;
+    Punch2Pen::protocol::HandshakeResponse response;
+    response.version = Punch2Pen::protocol::kProtocolVersion;
+    response.accepted = 0;
+    reply.length = (uint32_t)sizeof(response);
+    client->write(&reply, sizeof(reply));
+    client->write(&response, sizeof(response));
+    juce::Thread::sleep(50);
+    client->close();
+    delete client;
+  });
+
+  juce::Thread::sleep(100);
+  auto ipcClient = std::make_unique<Punch2Pen::IPCClient>(
+      TEST_PORT + 13, /*autoLaunchEngine=*/false);
+
+  for (int i = 0; i < 20; ++i) {
+    if (ipcClient->isConnected())
+      break;
+    juce::Thread::sleep(100);
+  }
+
+  assert(!ipcClient->isConnected());
+
+  ipcClient.reset();
+  serverThread.join();
+  server.close();
+
+  std::cout << "[PASS] testRejectedHandshakeDoesNotConnect" << std::endl;
+}
+
 int main() {
   // RAII initializer for JUCE Thread internals. JUCE only ships the _GUI
   // variant; per its own header docs, it's the recommended initializer for
@@ -898,6 +1041,8 @@ int main() {
   testStopFlushLeavesNewerEpochInRing();
   testStopDoesNotEmitNewerTake();
   testQueuedStopsDrainEachEpoch();
+  testHandshakeIsFirstMessage();
+  testRejectedHandshakeDoesNotConnect();
   testTransportStop();
   testCorrection();
   testDisconnectDetection();
