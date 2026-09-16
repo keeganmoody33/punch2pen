@@ -12,6 +12,7 @@ public:
   virtual bool hasPendingAudio() = 0;
   virtual std::vector<float> popAudio() = 0;
   virtual double lastAudioDawSampleTime() = 0;
+  virtual double lastAudioSampleRate() = 0;
   virtual bool transportStateChangedToStop() = 0;
 
   struct CorrectionPair {

@@ -23,6 +23,7 @@ public:
   void setVocabularyBias(const std::vector<std::string> &words) override;
   void pushAudioBlock(const float *samples, int sampleCount,
                       double dawSampleTime) override;
+  void setInputSampleRate(double sampleRate) override;
   void finalizeStream() override;
 
 private:
@@ -37,7 +38,7 @@ private:
 
   std::vector<int16_t> pcmAccumulator;
   std::mutex audioMutex;
-  static constexpr int inputSampleRate = 48000;
+  int inputSampleRate = 48000;
   static constexpr int targetSampleRate = 16000;
   const size_t targetChunkSize = 1600;
 };

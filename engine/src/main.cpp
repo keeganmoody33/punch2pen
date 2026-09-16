@@ -68,7 +68,6 @@ int main(int argc, char *argv[]) {
   profileManager.loadProfile("default");
 
   punch2pen::IPCServer server(7483);
-  server.start();
 
   punch2pen::TranscriberInterface *activeTranscriber = nullptr;
   std::unique_ptr<punch2pen::TranscriberInterface> cloudTranscriber;
@@ -97,7 +96,11 @@ int main(int argc, char *argv[]) {
     std::cout << "Mode: [LOCAL] whisper.cpp" << std::endl;
     const std::string modelPath = dataDir + "/models/ggml-base.bin";
     localTranscriber = std::make_unique<punch2pen::Transcriber>(modelPath);
-    localTranscriber->setInputSampleRate(48000.0);
+    if (!localTranscriber->isReady()) {
+      std::cerr << "Failed to load whisper model at " << modelPath
+                << std::endl;
+      return 1;
+    }
     activeTranscriber = localTranscriber.get();
   }
 
@@ -111,6 +114,7 @@ int main(int argc, char *argv[]) {
   EngineTranscriberListener transcriberListener(server);
   activeTranscriber->addListener(&transcriberListener);
 
+  server.start();
   std::cout << "Engine ready." << std::endl;
 
   punch2pen::TranscriptionCoordinator coordinator(server, *activeTranscriber, db,

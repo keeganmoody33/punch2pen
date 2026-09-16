@@ -25,6 +25,7 @@ public:
   bool hasPendingAudio() override;
   std::vector<float> popAudio() override;
   double lastAudioDawSampleTime() override;
+  double lastAudioSampleRate() override;
   bool transportStateChangedToStop() override;
 
   bool hasPendingCorrection() override;
@@ -47,9 +48,11 @@ private:
   struct AudioPacket {
     std::vector<float> samples;
     double dawSampleTime = 0.0;
+    double sampleRate = 0.0;
   };
   std::vector<AudioPacket> audioQueue;
   double lastDawSampleTime_ = 0.0;
+  double lastSampleRate_ = 0.0;
 
   std::mutex correctionQueueLock;
   std::vector<CorrectionPair> correctionQueue;

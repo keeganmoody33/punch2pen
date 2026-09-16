@@ -21,10 +21,13 @@ public:
     auto block = audioQueue.front();
     audioQueue.erase(audioQueue.begin());
     lastDawSampleTime_ = nextDawSampleTime;
+    lastSampleRate_ = nextSampleRate;
     return block;
   }
 
   double lastAudioDawSampleTime() override { return lastDawSampleTime_; }
+
+  double lastAudioSampleRate() override { return lastSampleRate_; }
 
   bool transportStateChangedToStop() override {
     bool status = simulatedStopTriggered;
@@ -47,6 +50,8 @@ public:
   std::vector<CorrectionPair> correctionQueue;
   double nextDawSampleTime = 0.0;
   double lastDawSampleTime_ = 0.0;
+  double nextSampleRate = 0.0;
+  double lastSampleRate_ = 0.0;
 };
 
 class MockTranscriber : public Punch2Pen::TranscriberInterface {
@@ -70,6 +75,10 @@ public:
     lastVocabularyReceived = words;
   }
 
+  void setInputSampleRate(double sampleRate) override {
+    lastInputSampleRate = sampleRate;
+  }
+
   void finalizeStream() override { finalizeStreamCalled = true; }
 
   Listener *listener = nullptr;
@@ -78,6 +87,7 @@ public:
   bool finalizeStreamCalled = false;
   int lastSampleCountReceived = 0;
   double lastDawSampleTime = 0.0;
+  double lastInputSampleRate = 0.0;
   std::vector<std::string> lastVocabularyReceived;
 };
 
@@ -101,6 +111,7 @@ void testCoordinatorRouting() {
   mockServer.audioQueue.push_back(fakeDAWAudio);
   mockServer.simulatedStopTriggered = true;
   mockServer.nextDawSampleTime = 48000.0;
+  mockServer.nextSampleRate = 44100.0;
 
   std::thread worker([&]() { coordinator.run(); });
 
@@ -116,6 +127,8 @@ void testCoordinatorRouting() {
          "Error: Coordinator missed the DAW transport stop trigger event!");
   assert(mockTranscriber.lastDawSampleTime == 48000.0 &&
          "Error: DAW sample time not forwarded correctly!");
+  assert(mockTranscriber.lastInputSampleRate == 44100.0 &&
+         "Error: Host sample rate not forwarded to TranscriberInterface!");
 
   std::cout << "[PASS] testCoordinatorRouting" << std::endl;
 

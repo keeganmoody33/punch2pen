@@ -33,6 +33,7 @@ public:
   void removeListener(Listener *listener);
 
   void setAudioSource(class AudioRingBuffer *buffer) { ringBuffer = buffer; }
+  void setHostSampleRate(double sampleRate);
 
 private:
   void attemptConnection();
@@ -47,6 +48,7 @@ private:
   class AudioRingBuffer *ringBuffer = nullptr;
   std::vector<float> tempBuffer;
   std::atomic<TranscriptionMode> transcriptionMode{TranscriptionMode::Offline};
+  std::atomic<double> hostSampleRate{0.0};
 
   int serverPort;
   bool autoLaunchEngine;

@@ -19,10 +19,10 @@ void IPCServer::start() {
     return;
   }
 
-  sockaddr_in addr;
+  sockaddr_in addr{};
   addr.sin_family = AF_INET;
-  addr.sin_addr.s_addr = INADDR_ANY;
-  addr.sin_port = htons(port);
+  addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  addr.sin_port = htons(static_cast<uint16_t>(port));
 
   int opt = 1;
   setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
@@ -36,7 +36,7 @@ void IPCServer::start() {
 
   running = true;
   acceptThread = std::thread(&IPCServer::acceptLoop, this);
-  std::cout << "IPC Server started on port " << port << std::endl;
+  std::cout << "IPC Server started on 127.0.0.1:" << port << std::endl;
 }
 
 void IPCServer::stop() {
@@ -63,11 +63,16 @@ std::vector<float> IPCServer::popAudio() {
   auto packet = std::move(audioQueue.front());
   audioQueue.erase(audioQueue.begin());
   lastDawSampleTime_ = packet.dawSampleTime;
+  lastSampleRate_ = packet.sampleRate;
   return std::move(packet.samples);
 }
 
 double IPCServer::lastAudioDawSampleTime() {
   return lastDawSampleTime_;
+}
+
+double IPCServer::lastAudioSampleRate() {
+  return lastSampleRate_;
 }
 
 bool IPCServer::hasPendingCorrection() {
@@ -132,7 +137,8 @@ void IPCServer::clientHandler(int clientSocket) {
         if (recv(clientSocket, samples.data(), payloadSize, MSG_WAITALL) ==
             (ssize_t)payloadSize) {
           std::lock_guard<std::mutex> lock(audioQueueLock);
-          audioQueue.push_back({std::move(samples), chunkHeader.dawSampleTime});
+          audioQueue.push_back({std::move(samples), chunkHeader.dawSampleTime,
+                                chunkHeader.sampleRate});
         }
       }
     } else if (header.type == protocol::MessageType::Correction) {

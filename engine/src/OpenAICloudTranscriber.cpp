@@ -1,6 +1,7 @@
 #include "OpenAICloudTranscriber.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <iostream>
 
@@ -93,6 +94,12 @@ void OpenAICloudTranscriber::setVocabularyBias(
   webSocket->send(sessionUpdate.dump());
 }
 
+void OpenAICloudTranscriber::setInputSampleRate(double sampleRate) {
+  if (sampleRate > 0.0) {
+    inputSampleRate = static_cast<int>(std::lround(sampleRate));
+  }
+}
+
 void OpenAICloudTranscriber::pushAudioBlock(const float *samples, int sampleCount,
                                             double dawSampleTime) {
   (void)dawSampleTime;
@@ -102,7 +109,8 @@ void OpenAICloudTranscriber::pushAudioBlock(const float *samples, int sampleCoun
 
   std::lock_guard<std::mutex> lock(audioMutex);
 
-  const int decimationFactor = inputSampleRate / targetSampleRate;
+  const int decimationFactor =
+      std::max(1, inputSampleRate / targetSampleRate);
   for (int i = 0; i < sampleCount; i += decimationFactor) {
     const float sample = std::max(-1.0f, std::min(1.0f, samples[i]));
     pcmAccumulator.push_back(static_cast<int16_t>(sample * 32767.0f));

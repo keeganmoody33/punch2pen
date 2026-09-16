@@ -17,6 +17,7 @@ Punch2PenAudioProcessor::Punch2PenAudioProcessor()
 
   // Initialize IPC
   ipcClient = std::make_unique<punch2pen::IPCClient>();
+  ipcClient->setAudioSource(audioRingBuffer.get());
 }
 
 Punch2PenAudioProcessor::~Punch2PenAudioProcessor() {}
@@ -71,8 +72,10 @@ Punch2PenAudioProcessor::getProgramName(int /*programIndex*/) {
 void Punch2PenAudioProcessor::changeProgramName(
     int /*programIndex*/, const juce::String & /*newName*/) {}
 
-void Punch2PenAudioProcessor::prepareToPlay(double /*sampleRate*/,
+void Punch2PenAudioProcessor::prepareToPlay(double sampleRate,
                                             int /*samplesPerBlock*/) {
+  if (ipcClient)
+    ipcClient->setHostSampleRate(sampleRate);
   if (const char *modeEnv = std::getenv("PUNCH2PEN_TRANSCRIBE_MODE")) {
     const std::string mode(modeEnv);
     if (mode == "online") {

@@ -21,6 +21,7 @@ public:
   virtual void addListener(Listener *listener) = 0;
   virtual void removeListener(Listener *listener) = 0;
   virtual void setVocabularyBias(const std::vector<std::string> &words) = 0;
+  virtual void setInputSampleRate(double sampleRate) = 0;
   virtual void finalizeStream() = 0;
 };
 

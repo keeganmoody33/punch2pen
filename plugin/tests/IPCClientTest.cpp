@@ -1,4 +1,5 @@
 #include "../Source/IPCClient.h"
+#include "../Source/RingBuffer.h"
 #include "../../shared/Protocol.h"
 
 #include <cassert>
@@ -121,6 +122,75 @@ void testConnectionAndAudioChunk() {
   assert(payloadOk);
 
   std::cout << "[PASS] testConnectionAndAudioChunk" << std::endl;
+}
+
+void testOutgoingChunksUseHostSampleRate() {
+  juce::StreamingSocket server;
+  bool bound = server.createListener(TEST_PORT + 4, "127.0.0.1");
+  assert(bound);
+
+  std::atomic<bool> gotAudioChunk{false};
+  std::atomic<bool> rateOk{false};
+  const double hostRate = 44100.0;
+  const int chunkSize = 4096;
+
+  std::thread serverThread([&]() {
+    juce::StreamingSocket *client = server.waitForNextConnection();
+    if (client == nullptr)
+      return;
+
+    Punch2Pen::protocol::Header header;
+    if (!readExact(*client, &header, sizeof(header))) {
+      delete client;
+      return;
+    }
+
+    Punch2Pen::protocol::AudioChunkHeader chunkHeader;
+    if (!readExact(*client, &chunkHeader, sizeof(chunkHeader))) {
+      delete client;
+      return;
+    }
+
+    rateOk = (chunkHeader.sampleRate == hostRate &&
+              chunkHeader.numSamples == (uint32_t)chunkSize);
+
+    std::vector<float> payload(chunkSize);
+    readExact(*client, payload.data(), chunkSize * (int)sizeof(float));
+    gotAudioChunk = true;
+    delete client;
+  });
+
+  juce::Thread::sleep(100);
+  auto ipcClient = std::make_unique<Punch2Pen::IPCClient>(
+      TEST_PORT + 4, /*autoLaunchEngine=*/false);
+  ipcClient->setHostSampleRate(hostRate);
+
+  Punch2Pen::AudioRingBuffer ring(chunkSize * 2);
+  std::vector<float> samples(chunkSize, 0.25f);
+  ring.write(samples.data(), chunkSize);
+  ipcClient->setAudioSource(&ring);
+
+  for (int i = 0; i < 50; ++i) {
+    if (ipcClient->isConnected())
+      break;
+    juce::Thread::sleep(100);
+  }
+  assert(ipcClient->isConnected());
+
+  for (int i = 0; i < 50; ++i) {
+    if (gotAudioChunk)
+      break;
+    juce::Thread::sleep(100);
+  }
+
+  ipcClient.reset();
+  serverThread.join();
+  server.close();
+
+  assert(gotAudioChunk);
+  assert(rateOk);
+
+  std::cout << "[PASS] testOutgoingChunksUseHostSampleRate" << std::endl;
 }
 
 void testTransportStop() {
@@ -317,6 +387,7 @@ int main() {
   juce::ScopedJuceInitialiser_GUI juceInit;
 
   testConnectionAndAudioChunk();
+  testOutgoingChunksUseHostSampleRate();
   testTransportStop();
   testCorrection();
   testDisconnectDetection();
