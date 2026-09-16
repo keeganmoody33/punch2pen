@@ -44,6 +44,7 @@ private:
 };
 
 int main(int argc, char *argv[]) {
+  std::signal(SIGPIPE, SIG_IGN);
   std::cout << "punch2pen Engine v1.0.0" << std::endl;
 
   bool useCloudMode = false;

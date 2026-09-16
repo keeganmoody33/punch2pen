@@ -1,9 +1,65 @@
 #include "IPCServer.h"
 #include "../../shared/Protocol.h"
+#include <cerrno>
 #include <cstring>
 #include <iostream>
 
 namespace punch2pen {
+
+namespace {
+
+int sendFlags() {
+#if defined(MSG_NOSIGNAL)
+  return MSG_NOSIGNAL;
+#else
+  return 0;
+#endif
+}
+
+void suppressClientSigPipe(int clientSocket) {
+#if defined(SO_NOSIGPIPE)
+  int disableSigPipe = 1;
+  setsockopt(clientSocket, SOL_SOCKET, SO_NOSIGPIPE, &disableSigPipe,
+             sizeof(disableSigPipe));
+#else
+  (void)clientSocket;
+#endif
+}
+
+bool recvExact(int clientSocket, void *buf, size_t nbytes) {
+  auto *p = static_cast<char *>(buf);
+  size_t got = 0;
+  while (got < nbytes) {
+    const ssize_t n = recv(clientSocket, p + got, nbytes - got, 0);
+    if (n == 0)
+      return false;
+    if (n < 0) {
+      if (errno == EINTR)
+        continue;
+      return false;
+    }
+    got += static_cast<size_t>(n);
+  }
+  return true;
+}
+
+bool sendExact(int clientSocket, const void *buf, size_t nbytes) {
+  auto *p = static_cast<const char *>(buf);
+  size_t sent = 0;
+  while (sent < nbytes) {
+    const ssize_t n =
+        send(clientSocket, p + sent, nbytes - sent, sendFlags());
+    if (n <= 0) {
+      if (n < 0 && errno == EINTR)
+        continue;
+      return false;
+    }
+    sent += static_cast<size_t>(n);
+  }
+  return true;
+}
+
+} // namespace
 
 IPCServer::IPCServer(int port) : port(port) {}
 
@@ -120,6 +176,7 @@ void IPCServer::acceptLoop() {
         accept(serverSocket, (struct sockaddr *)&clientAddr, &clientLen);
 
     if (clientSocket >= 0) {
+      suppressClientSigPipe(clientSocket);
       std::cout << "Client connected!" << std::endl;
       std::thread(&IPCServer::clientHandler, this, clientSocket).detach();
     }
@@ -135,10 +192,8 @@ bool IPCServer::sendHandshakeResponse(int clientSocket, uint32_t version,
   response.accepted = accepted;
   header.length = (uint32_t)sizeof(response);
 
-  if (send(clientSocket, &header, sizeof(header), 0) != (ssize_t)sizeof(header))
-    return false;
-  return send(clientSocket, &response, sizeof(response), 0) ==
-         (ssize_t)sizeof(response);
+  return sendExact(clientSocket, &header, sizeof(header)) &&
+         sendExact(clientSocket, &response, sizeof(response));
 }
 
 void IPCServer::clientHandler(int clientSocket) {
@@ -151,18 +206,14 @@ void IPCServer::clientHandler(int clientSocket) {
 
   while (running) {
     protocol::Header header;
-    ssize_t bytesRead =
-        recv(clientSocket, &header, sizeof(header), MSG_WAITALL);
-
-    if (bytesRead != sizeof(header))
+    if (!recvExact(clientSocket, &header, sizeof(header)))
       break;
 
     if (header.type == protocol::MessageType::Handshake) {
       protocol::Handshake handshake{};
       if (header.length != sizeof(handshake))
         break;
-      if (recv(clientSocket, &handshake, sizeof(handshake), MSG_WAITALL) !=
-          (ssize_t)sizeof(handshake))
+      if (!recvExact(clientSocket, &handshake, sizeof(handshake)))
         break;
       const uint32_t accepted =
           handshake.version == protocol::kProtocolVersion ? 1u : 0u;
@@ -176,13 +227,9 @@ void IPCServer::clientHandler(int clientSocket) {
     }
 
     if (!handshook) {
-      std::cerr << "Dropping pre-handshake message type "
+      std::cerr << "Closing pre-handshake connection, type "
                 << static_cast<uint32_t>(header.type) << std::endl;
-      if (header.length > 0) {
-        std::vector<char> trash(header.length);
-        recv(clientSocket, trash.data(), header.length, MSG_WAITALL);
-      }
-      continue;
+      break;
     }
 
     if (header.type == protocol::MessageType::AudioChunk) {

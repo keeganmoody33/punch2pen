@@ -9,17 +9,26 @@ PROTOCOL_VERSION = 1
 HOST = '127.0.0.1'
 PORT = 7483
 
+def recv_exact(sock, nbytes):
+    buf = bytearray()
+    while len(buf) < nbytes:
+        chunk = sock.recv(nbytes - len(buf))
+        if not chunk:
+            raise RuntimeError(
+                f'handshake: connection closed after {len(buf)}/{nbytes} bytes')
+        buf.extend(chunk)
+    return bytes(buf)
+
 def complete_handshake(sock):
     sock.sendall(struct.pack('<II', MESSAGE_TYPE_HANDSHAKE, 4))
     sock.sendall(struct.pack('<I', PROTOCOL_VERSION))
-    header = sock.recv(8)
-    if len(header) != 8:
-        raise RuntimeError('handshake: no response header')
+    header = recv_exact(sock, 8)
     msg_type, length = struct.unpack('<II', header)
-    payload = sock.recv(length)
-    if msg_type != MESSAGE_TYPE_HANDSHAKE_RESPONSE or len(payload) < 8:
-        raise RuntimeError(f'handshake: unexpected type {msg_type}')
-    version, accepted = struct.unpack_from('<II', payload)
+    if msg_type != MESSAGE_TYPE_HANDSHAKE_RESPONSE or length != 8:
+        raise RuntimeError(
+            f'handshake: unexpected type {msg_type} length {length}')
+    payload = recv_exact(sock, length)
+    version, accepted = struct.unpack('<II', payload)
     if accepted != 1 or version != PROTOCOL_VERSION:
         raise RuntimeError(
             f'handshake rejected (version={version} accepted={accepted})')

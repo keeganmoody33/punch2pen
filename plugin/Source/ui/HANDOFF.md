@@ -74,8 +74,7 @@ window.hideCorrection()
 `updatePlayhead` iterates `.lyric-word`, classifies each as
 `past`/`active`/`upcoming` per the spec's alpha system (1.0 / 0.6 / 0.4),
 and updates `#transcript-inner.style.transform` via a `requestAnimationFrame`
-spring loop tuned to the same `0.15` ease factor used by
-`juce::VBlankAttachment` in `TranscriptView.cpp`.
+spring loop in `plugin/Source/ui/public/index.html` (`scroll += (target - scroll) * 0.15`).
 
 ## JS → C++ API (registered as native functions on `window.punch2pen`)
 
@@ -115,19 +114,19 @@ transport flags and IPC connection status (see
 
 ---
 
-## Color tokens (from existing JUCE constants)
+## Color tokens (from `plugin/Source/ui/public/index.html`)
 
 | Token              | Hex      | Source                                              |
 |--------------------|----------|-----------------------------------------------------|
-| `--bg-primary`     | #1C1917  | `TranscriptView.h` line 65                          |
-| `--text-primary`   | #FAFAF9  | `TranscriptView.h` line 66                          |
-| `--accent-primary` | #FCD34D  | `TranscriptView.h` line 67                          |
-| `--window-bg`      | #1E1E1E  | `PluginEditor.cpp` paint() line 61                  |
-| `--header-bg`      | #2D2D2D  | `CorrectionEditor.cpp` line 17                      |
-| `--input-bg`       | #3A3A3A  | `CorrectionEditor.cpp` line 19                      |
-| `--border-color`   | #505050  | `CorrectionEditor.cpp` line 18 (popup outline)      |
-| `--submit-green`   | #4A9F4A  | `CorrectionEditor.cpp` line 22                      |
-| `--cancel-red`     | #9F4A4A  | `CorrectionEditor.cpp` line 26                      |
+| `--bg-primary`     | #1C1917  | `index.html` `:root`                                |
+| `--text-primary`   | #FAFAF9  | `index.html` `:root`                                |
+| `--accent-primary` | #FCD34D  | `index.html` `:root`                                |
+| `--window-bg`      | #1E1E1E  | `index.html` `:root`; `PluginEditor.cpp` paint()    |
+| `--header-bg`      | #2D2D2D  | `index.html` `:root`                                |
+| `--input-bg`       | #3A3A3A  | `index.html` `:root`                                |
+| `--border-color`   | #505050  | `index.html` `:root`                                |
+| `--submit-green`   | #4A9F4A  | `index.html` `:root`                                |
+| `--cancel-red`     | #9F4A4A  | `index.html` `:root`                                |
 
 ---
 

@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <mutex>
 
 #if JUCE_MAC || JUCE_IOS
 #include <fcntl.h>
@@ -13,6 +14,34 @@ extern char **environ;
 #endif
 
 namespace punch2pen {
+
+namespace {
+std::once_flag g_engineLaunchOnce;
+
+bool writeExact(juce::StreamingSocket &socket, const void *data, int len) {
+  const auto *p = static_cast<const char *>(data);
+  int sent = 0;
+  while (sent < len) {
+    const int n = socket.write(p + sent, len - sent);
+    if (n <= 0)
+      return false;
+    sent += n;
+  }
+  return true;
+}
+
+bool readExact(juce::StreamingSocket &socket, void *data, int len) {
+  auto *p = static_cast<char *>(data);
+  int got = 0;
+  while (got < len) {
+    const int n = socket.read(p + got, len - got, true);
+    if (n <= 0)
+      return false;
+    got += n;
+  }
+  return true;
+}
+} // namespace
 
 IPCClient::IPCClient(int port, bool autoLaunchEngineFlag)
     : Thread("Punch2Pen_IPC"), stopEpochs(64, 0), serverPort(port),
@@ -174,23 +203,23 @@ bool IPCClient::completeHandshake() {
   handshake.version = protocol::kProtocolVersion;
   header.length = (uint32_t)sizeof(handshake);
 
-  if (socket.write(&header, sizeof(header)) != sizeof(header))
+  if (!writeExact(socket, &header, sizeof(header)))
     return false;
-  if (socket.write(&handshake, sizeof(handshake)) != sizeof(handshake))
+  if (!writeExact(socket, &handshake, sizeof(handshake)))
     return false;
 
   if (!socket.waitUntilReady(true, 1000))
     return false;
 
   protocol::Header reply{};
-  if (socket.read(&reply, sizeof(reply), true) != sizeof(reply))
+  if (!readExact(socket, &reply, sizeof(reply)))
     return false;
   if (reply.type != protocol::MessageType::HandshakeResponse ||
       reply.length != (uint32_t)sizeof(protocol::HandshakeResponse))
     return false;
 
   protocol::HandshakeResponse response{};
-  if (socket.read(&response, sizeof(response), true) != sizeof(response))
+  if (!readExact(socket, &response, sizeof(response)))
     return false;
 
   return response.accepted != 0 &&
@@ -220,42 +249,42 @@ juce::File IPCClient::resolveEngineBinary() const {
 }
 
 void IPCClient::launchEngine() {
-  if (engineLaunchAttempted)
-    return;
-  engineLaunchAttempted = true;
-
-  const juce::File engineApp = resolveEngineBinary();
-  if (!engineApp.existsAsFile())
-    return;
+  std::call_once(g_engineLaunchOnce, [this]() {
+    const juce::File engineApp = resolveEngineBinary();
+    if (!engineApp.existsAsFile())
+      return;
 
 #if JUCE_MAC
-  const juce::File dataDir =
-      juce::File::getSpecialLocation(juce::File::userHomeDirectory)
-          .getChildFile(".punch2pen");
-  dataDir.createDirectory();
-  const juce::File logFile = dataDir.getChildFile("engine.log");
-  const juce::String enginePath = engineApp.getFullPathName();
-  const juce::String logPath = logFile.getFullPathName();
+    const juce::File dataDir =
+        juce::File::getSpecialLocation(juce::File::userHomeDirectory)
+            .getChildFile(".punch2pen");
+    dataDir.createDirectory();
+    const juce::File logFile = dataDir.getChildFile("engine.log");
+    const juce::String enginePath = engineApp.getFullPathName();
+    const juce::String logPath = logFile.getFullPathName();
 
-  posix_spawn_file_actions_t actions;
-  posix_spawnattr_t attr;
-  posix_spawn_file_actions_init(&actions);
-  posix_spawnattr_init(&attr);
-  posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETPGROUP);
-  posix_spawnattr_setpgroup(&attr, 0);
-  posix_spawn_file_actions_addopen(&actions, STDOUT_FILENO,
-                                   logPath.toRawUTF8(),
-                                   O_WRONLY | O_CREAT | O_APPEND, 0644);
-  posix_spawn_file_actions_adddup2(&actions, STDOUT_FILENO, STDERR_FILENO);
+    posix_spawn_file_actions_t actions;
+    posix_spawnattr_t attr;
+    posix_spawn_file_actions_init(&actions);
+    posix_spawnattr_init(&attr);
+    posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETPGROUP);
+    posix_spawnattr_setpgroup(&attr, 0);
+    posix_spawn_file_actions_addopen(&actions, STDOUT_FILENO,
+                                     logPath.toRawUTF8(),
+                                     O_WRONLY | O_CREAT | O_APPEND, 0644);
+    posix_spawn_file_actions_adddup2(&actions, STDOUT_FILENO, STDERR_FILENO);
 
-  const char *argv[] = {enginePath.toRawUTF8(), nullptr};
-  pid_t pid = 0;
-  posix_spawn(&pid, enginePath.toRawUTF8(), &actions, &attr,
-              const_cast<char **>(argv), environ);
+    const char *argv[] = {enginePath.toRawUTF8(), nullptr};
+    pid_t pid = 0;
+    const int rc = posix_spawn(&pid, enginePath.toRawUTF8(), &actions, &attr,
+                               const_cast<char **>(argv), environ);
 
-  posix_spawnattr_destroy(&attr);
-  posix_spawn_file_actions_destroy(&actions);
+    posix_spawnattr_destroy(&attr);
+    posix_spawn_file_actions_destroy(&actions);
+    if (rc != 0)
+      return;
 #endif
+  });
 }
 
 bool IPCClient::isConnected() const { return connected; }

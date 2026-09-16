@@ -20,7 +20,7 @@ juce_add_plugin(punch2pen_plugin
     EDITOR_WANTS_KEYBOARD_FOCUS TRUE
     AU_MAIN_TYPE "kAudioUnitType_Effect"
     AU_SANDBOX_SAFE FALSE
-    VST3_CATEGORIES "Fx Tools"
+    VST3_CATEGORIES "Fx|Tools"
     COPY_PLUGIN_AFTER_BUILD TRUE
     NEEDS_WEB_BROWSER TRUE
 )

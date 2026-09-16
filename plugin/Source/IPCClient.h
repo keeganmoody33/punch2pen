@@ -68,7 +68,6 @@ private:
 
   int serverPort;
   bool autoLaunchEngine;
-  bool engineLaunchAttempted = false;
   juce::CriticalSection listenerLock;
   std::vector<Listener *> listeners;
 };
