@@ -24,10 +24,8 @@ plugin/
 ```
 
 The legacy native components (`TranscriptView`, `CorrectionEditor`,
-`PositionDisplay`) are still listed in `target_sources` so unit tests
-continue to link. They are no longer instantiated by the editor and can
-be deleted in a follow-up PR once you confirm the WebView build is good
-on every CI target.
+`PositionDisplay`) have been dropped from `target_sources` and deleted.
+The shipping face is `index.html` in `juce::WebBrowserComponent`.
 
 ---
 
@@ -160,20 +158,12 @@ transport flags and IPC connection status (see
    backend on Windows; macOS uses WKWebView automatically. CEF is *not*
    pulled in — keeps the binary small.
 
-3. **`getSampleRate()` on the processor.** The editor's `timerCallback`
-   computes `currentSamplePosition` from `transport.ppq · bpm · sr`.
-   `Punch2PenAudioProcessor` currently has no public `getSampleRate()` —
-   add one (or use `AudioProcessor::getSampleRate()` directly, which is
-   the same thing) before this compiles cleanly. One-liner.
+3. **`getSampleRate()` on the processor.** Done — `Punch2PenAudioProcessor::getSampleRate()`.
 
-4. **Streaming sample placement.** The bridge mirrors the existing
-   heuristic (`streamCursorSample += 4800.0` per word) from
-   `TranscriptView::onTranscriptionReceived`. If you change that on the
-   engine side to send real timestamps, propagate them through the
-   `appendWord` call and remove the heuristic here.
+4. **Streaming sample placement.** Done on main (#17) — the bridge uses
+   engine `startTime`/`endTime` rather than the old +4800 heuristic.
 
-5. **Retire the legacy components.** Once the WebView build is green on
-   every CI target, drop `TranscriptView.*`, `CorrectionEditor.*`, and
-   `PositionDisplay.*` from `target_sources` and delete them. The unit
-   tests in `tests/` that touch the old editor will need to be updated
-   or scoped to processor-only behaviour.
+5. **Retire the legacy components.** Done — `TranscriptView.*`,
+   `CorrectionEditor.*`, and `PositionDisplay.*` are no longer compiled
+   and the files have been deleted. Processor tests link WebView sources
+   only.

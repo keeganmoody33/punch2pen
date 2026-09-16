@@ -36,3 +36,7 @@ jobs:
           ./build/plugin/ringBufferTest_artefacts/Release/ringBufferTest
           ./build/plugin/ipcClientTest_artefacts/Release/ipcClientTest
           ./build/plugin/pluginProcessorStateTest_artefacts/Release/pluginProcessorStateTest
+      - name: Build AU, VST3, and engine
+        run: cmake --build build --config Release --target punch2penEngine punch2pen_plugin_AU punch2pen_plugin_VST3 -j4
+      - name: Package unsigned macOS installer
+        run: ./installer/macos/build_pkg.sh --skip-build --build-dir build

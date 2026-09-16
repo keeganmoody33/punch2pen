@@ -11,8 +11,8 @@ This document outlines the core domain concepts of the `punch2pen` project.
 
 ## System Components
 
-- **IPCClient** — JUCE Thread in the plugin managing the TCP connection to the engine. Drains the AudioRingBuffer, sends AudioChunk/TransportStop/Correction messages, and dispatches incoming TranscriptionResult events to listeners (`plugin/Source/IPCClient.h`).
-- **IPCServer** — TCP server in the engine accepting plugin connections on port 7483. Queues incoming audio, transport-stop events, and corrections for the coordinator to consume (`engine/src/IPCServer.h`).
+- **IPCClient** — JUCE Thread in the plugin managing the TCP connection to the engine. Completes Handshake/HandshakeResponse, drains the AudioRingBuffer, sends AudioChunk/TransportStop/Correction messages, and dispatches incoming TranscriptionResult events to listeners (`plugin/Source/IPCClient.h`).
+- **IPCServer** — TCP server in the engine accepting plugin connections on 127.0.0.1:7483. Requires handshake before other messages. Queues incoming audio, transport-stop events, and corrections for the coordinator to consume (`engine/src/IPCServer.h`).
 - **IPCServerInterface** — Abstract interface decoupling TranscriptionCoordinator from the concrete IPCServer, enabling test doubles (`engine/src/IPCServerInterface.h`).
 - **Protocol** — Shared binary wire format header (`shared/Protocol.h`) defining MessageTypes: `AudioChunk`, `TranscriptionResult`, `Handshake`, `HandshakeResponse`, `Correction`, `TransportStop`.
 - **AudioRingBuffer** — SPSC lock-free ring buffer backed by `juce::AbstractFifo` for transferring float audio samples from the real-time audio thread to the IPC thread (`plugin/Source/RingBuffer.h`).
@@ -21,9 +21,7 @@ This document outlines the core domain concepts of the `punch2pen` project.
 - **TranscriberInterface** — Polymorphic base class for transcription backends, defining `pushAudioBlock`, `finalizeStream`, `setVocabularyBias`, and listener management (`engine/src/TranscriberInterface.h`).
 - **TranscriptionCoordinator** — Engine main loop: polls IPCServer for audio, forwards to the active transcriber, handles transport-stop finalization, processes corrections through DatabaseManager, and refreshes vocabulary bias (`engine/src/TranscriptionCoordinator.h`).
 - **DatabaseManager** — CSV-based persistence of corrections at `~/.punch2pen/corrections.csv`. Extracts vocabulary words from corrected text for initial_prompt bias (`engine/src/DatabaseManager.h`).
-- **TranscriptView** — Plugin UI component with VBlank-synced scrolling, word-level alpha highlighting (karaoke-style), and mouseDown click detection for correction triggering (`plugin/Source/TranscriptView.h`).
-- **CorrectionEditor** — Popup UI component shown on word click. Displays the original word, accepts a corrected replacement, and submits the correction via IPCClient (`plugin/Source/CorrectionEditor.h`).
-- **PositionDisplay** — Plugin UI component showing the current DAW transport position as bar/beat (`plugin/Source/PositionDisplay.h`).
+- **WebViewEditor** — Plugin UI: Studio Receipt HTML in `juce::WebBrowserComponent`, driven by a JS bridge (`plugin/Source/WebViewEditor.h`).
 - **ProfileManager** — JSON-backed user profile persistence with per-user vocabulary and corrections, loaded during engine startup and saved during shutdown (`engine/src/ProfileManager.h`).
 
 ## Technical Abbreviations

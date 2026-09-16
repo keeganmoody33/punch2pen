@@ -4,10 +4,24 @@ cmake_minimum_required(VERSION 3.22)
 
 juce_add_plugin(punch2pen_plugin
     COMPANY_NAME "Doctaaa"
+    COMPANY_WEBSITE "https://punch2pen.com"
+    PLUGIN_NAME "punch2pen"
     PLUGIN_MANUFACTURER_CODE "Dcta"
     PLUGIN_CODE "P2pn"
     FORMATS VST3 AU
     PRODUCT_NAME "punch2pen"
+    BUNDLE_ID "com.doctaaa.punch2pen"
+    VERSION "1.0.0"
+    DESCRIPTION "Real-time vocal transcription inside a DAW"
+    IS_SYNTH FALSE
+    NEEDS_MIDI_INPUT FALSE
+    NEEDS_MIDI_OUTPUT FALSE
+    IS_MIDI_EFFECT FALSE
+    EDITOR_WANTS_KEYBOARD_FOCUS TRUE
+    AU_MAIN_TYPE "kAudioUnitType_Effect"
+    AU_SANDBOX_SAFE FALSE
+    VST3_CATEGORIES "Fx Tools"
+    COPY_PLUGIN_AFTER_BUILD TRUE
     NEEDS_WEB_BROWSER TRUE
 )
 
@@ -29,17 +43,8 @@ target_sources(punch2pen_plugin
         Source/PluginEditor.h
         Source/WebViewEditor.cpp
         Source/WebViewEditor.h
-        # Legacy native components — kept for reference, no longer added
-        # to the editor tree. Remove these source entries (and their files)
-        # once the WebView build is confirmed everywhere.
-        Source/TranscriptView.cpp
-        Source/TranscriptView.h
-        Source/CorrectionEditor.cpp
-        Source/CorrectionEditor.h
         Source/IPCClient.cpp
         Source/IPCClient.h
-        Source/PositionDisplay.cpp
-        Source/PositionDisplay.h
         Source/RingBuffer.h
 )
 
@@ -105,9 +110,6 @@ target_sources(pluginProcessorStateTest PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
     Source/WebViewEditor.cpp
-    Source/TranscriptView.cpp
-    Source/CorrectionEditor.cpp
-    Source/PositionDisplay.cpp
     Source/IPCClient.cpp
 )
 target_link_libraries(pluginProcessorStateTest PRIVATE

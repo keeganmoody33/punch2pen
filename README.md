@@ -15,12 +15,11 @@ flowchart LR
     subgraph Plugin["JUCE Plugin (VST3 / AU)"]
         RB["AudioRingBuffer<br/>(SPSC lock-free)"]
         IPC_C["IPCClient<br/>(juce::Thread)"]
-        TV["TranscriptView<br/>(VBlank scroll)"]
-        CE["CorrectionEditor"]
+        WV["WebViewEditor<br/>(Studio Receipt)"]
     end
 
     subgraph Engine["Engine Daemon (C++)"]
-        IPC_S["IPCServer<br/>(TCP :7483)"]
+        IPC_S["IPCServer<br/>(TCP 127.0.0.1:7483)"]
         TC["TranscriptionCoordinator"]
         T["Transcriber<br/>(whisper.cpp)"]
         OAI["OpenAICloudTranscriber<br/>(WebSocket)"]
@@ -29,34 +28,35 @@ flowchart LR
 
     PB -- "isRecording audio" --> RB
     RB --> IPC_C
-    IPC_C -- "AudioChunk / TransportStop / Correction" --> IPC_S
+    IPC_C -- "Handshake / AudioChunk / TransportStop / Correction" --> IPC_S
     IPC_S --> TC
     TC --> T
     TC --> OAI
     TC --> DB
-    IPC_S -- "TranscriptionResult" --> IPC_C
-    IPC_C --> TV
-    TV -- "word click" --> CE
-    CE -- "sendCorrection()" --> IPC_C
+    IPC_S -- "HandshakeResponse / TranscriptionResult" --> IPC_C
+    IPC_C --> WV
+    WV -- "word click / sendCorrection()" --> IPC_C
     DB -- "vocabulary bias" --> T
     DB -- "vocabulary bias" --> OAI
 ```
 
-**Plugin side:** `processBlock()` captures audio only when the DAW transport reports `isRecording == true`. Samples are written into a lock-free `AudioRingBuffer` (SPSC, in `plugin/Source/RingBuffer.h`). An `IPCClient` thread drains the ring buffer and streams `AudioChunk` messages to the engine.
+**Plugin side:** `processBlock()` captures audio only when the DAW transport reports `isRecording == true`. Samples are written into a lock-free `AudioRingBuffer` (SPSC, in `plugin/Source/RingBuffer.h`). An `IPCClient` thread completes a protocol handshake, drains the ring buffer, and streams `AudioChunk` messages to the engine. The editor is a WebView shell (`plugin/Source/ui/public/index.html`).
 
-**Engine side:** `TranscriptionCoordinator` polls the `IPCServer` for audio, transport-stop events, and correction messages in a 1 ms loop. Audio is forwarded to whichever `TranscriberInterface` backend is active. Results flow back through the IPC connection and appear in the plugin's `TranscriptView`.
+**Engine side:** `TranscriptionCoordinator` polls the `IPCServer` for audio, transport-stop events, and correction messages in a 1 ms loop. Audio is forwarded to whichever `TranscriberInterface` backend is active. Results flow back through the IPC connection and appear in the plugin WebView. Local whisper refuses to start if the model file is missing. The engine exits if it cannot bind `127.0.0.1:7483`.
 
 ## Key Capabilities
 
 | Feature | Implementation |
 |---|---|
-| **VBlank-synced scrolling transcript** | `TranscriptView` uses `juce::VBlankAttachment` with spring-eased interpolation (`currentScrollY += delta * 0.15f`) |
+| **Studio Receipt WebView** | One HTML blob in `juce::WebBrowserComponent` (`plugin/Source/ui/public/index.html`); default editor size 400×600, resizable |
 | **Polymorphic transcription backend** | Local whisper.cpp (`Transcriber`) or cloud OpenAI Realtime WebSocket API (`OpenAICloudTranscriber`), switchable via CLI `--cloud --api-key=` |
 | **Correction feedback loop** | User corrections stored in CSV at `~/.punch2pen/corrections.csv`; vocabulary extracted to bias future transcriptions via `initial_prompt` |
 | **Record-state gating** | Audio only captured when DAW transport reports `isRecording == true` |
-| **Karaoke-style word highlighting** | `updatePlaybackPosition()` sets per-word alpha states (1.0 active, 0.6 upcoming, 0.4 past) |
-| **Click-to-correct UI** | `TranscriptView` word hit detection triggers `CorrectionEditor` popup; corrections are submitted via IPC to the engine |
+| **Karaoke-style word highlighting** | WebView uses engine `startTime`/`endTime` against the DAW playhead |
+| **Click-to-correct UI** | Word click opens the Direction C correction overlay; corrections are submitted via IPC to the engine |
 | **Plugin state persistence** | `transcriptionMode` and `bpm` saved via ValueTree XML serialization in `getStateInformation` / `setStateInformation` |
+| **Fail-loud local engine** | Missing `~/.punch2pen/models/ggml-base.bin` or a failed `127.0.0.1:7483` bind exits the engine with status 1 |
+| **macOS installer** | Unsigned pkg via `installer/macos/build_pkg.sh` (AU + VST3 + engine). Bundle ID `com.doctaaa.punch2pen`. Codes remain **Dcta / P2pn / aufx**. |
 
 ## Prerequisites
 
@@ -99,7 +99,23 @@ cmake --build build -j4
 ./build/bin/punch2penEngine --cloud --api-key=YOUR_KEY
 ```
 
-The `--api-key=` flag can be omitted if the `OPENAI_API_KEY` environment variable is set (see `engine/src/main.cpp` lines 60-64).
+The `--api-key=` flag can be omitted if the `OPENAI_API_KEY` environment variable is set. Do not bake a vendor key into the installer.
+
+Plugin auto-launch looks for `PUNCH2PEN_ENGINE`, then `~/punch2pen/bin/punch2penEngine`, then `/Applications/Punch2Pen/punch2penEngine`. It does not spawn the engine more than once per plugin process.
+
+## macOS installer
+
+```bash
+./installer/macos/build_pkg.sh
+```
+
+Writes an unsigned `dist/Punch2Pen_Installer.pkg`. Requires CMake plugin builds (`-DPUNCH2PEN_BUILD_PLUGIN=ON`). AU validation after install:
+
+```bash
+auval -strict -v aufx P2pn Dcta
+```
+
+The plugin must instantiate with the engine down. Auto-launch is a background helper, not part of AU initialize.
 
 ## Repository Structure
 
@@ -107,8 +123,8 @@ The `--api-key=` flag can be omitted if the `OPENAI_API_KEY` environment variabl
 |---|---|
 | `engine/` | Background transcription daemon (whisper.cpp, OpenAI Realtime, IPC server, coordinator loop) |
 | `engine/tests/` | Unit tests for coordinator, database manager, profile manager, protocol serialization, OpenAI JSON |
-| `plugin/` | JUCE DAW plugin — audio capture, IPC client, transcript UI, correction editor |
-| `plugin/Source/` | C++ plugin sources (`PluginProcessor`, `PluginEditor`, `TranscriptView`, `CorrectionEditor`, `IPCClient`, `RingBuffer`) |
+| `plugin/` | JUCE DAW plugin — audio capture, IPC client, Studio Receipt WebView |
+| `plugin/Source/` | C++ plugin sources (`PluginProcessor`, `PluginEditor`, `WebViewEditor`, `IPCClient`, `RingBuffer`) |
 | `plugin/tests/` | Unit tests for RingBuffer, IPCClient, and PluginProcessor state persistence |
 | `shared/` | Protocol definitions shared between plugin and engine (`Protocol.h`) |
 | `scripts/` | Model download, IPC verification, and DAW integration readiness helpers |
