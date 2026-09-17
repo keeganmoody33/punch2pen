@@ -115,12 +115,40 @@ fi
 
 cp -R "${AU_BUNDLE}" "$STAGE_AU/"
 cp -R "${VST3_BUNDLE}" "$STAGE_VST3/"
+
+MAKE_APP="${PROJECT_ROOT}/installer/macos/make_engine_app.sh"
+BUNDLE_LIBS="${PROJECT_ROOT}/installer/macos/bundle_engine_libs.sh"
+CHECK_RPATH="${PROJECT_ROOT}/scripts/check_engine_rpath.sh"
+chmod +x "$MAKE_APP" "$BUNDLE_LIBS" "$CHECK_RPATH"
+
+ENGINE_DIR="$(cd "$(dirname "$ENGINE_BIN")" && pwd)"
+bash "$MAKE_APP" "${ENGINE_BIN}" "${STAGE_ENGINE}/punch2penEngine.app"
 cp "${ENGINE_BIN}" "$STAGE_ENGINE/punch2penEngine"
 chmod 755 "$STAGE_ENGINE/punch2penEngine"
+shopt -s nullglob
+for lib in "${ENGINE_DIR}"/*.dylib; do
+  cp "$lib" "$STAGE_ENGINE/"
+done
+shopt -u nullglob
+bash "$BUNDLE_LIBS" "$STAGE_ENGINE/punch2penEngine" "$ENGINE_DIR" "${BUILD_DIR}/lib"
+
+# Logic loads the AU/VST3 bundle, not /Applications. Nested helper so
+# Launch Services can start an unsandboxed engine from the already-allowed plugin.
+bash "$MAKE_APP" "${ENGINE_BIN}" \
+    "${STAGE_AU}/punch2pen.component/Contents/Helpers/punch2penEngine.app"
+bash "$MAKE_APP" "${ENGINE_BIN}" \
+    "${STAGE_VST3}/punch2pen.vst3/Contents/Helpers/punch2penEngine.app"
+
+bash "$CHECK_RPATH" \
+    "$STAGE_ENGINE/punch2penEngine" \
+    "$STAGE_ENGINE/punch2penEngine.app" \
+    "${STAGE_AU}/punch2pen.component/Contents/Helpers/punch2penEngine.app" \
+    "${STAGE_VST3}/punch2pen.vst3/Contents/Helpers/punch2penEngine.app"
 
 echo "Staged AU: ${AU_BUNDLE}"
 echo "Staged VST3: ${VST3_BUNDLE}"
-echo "Staged engine: ${ENGINE_BIN}"
+echo "Staged engine app: ${STAGE_ENGINE}/punch2penEngine.app"
+echo "Staged engine CLI: ${STAGE_ENGINE}/punch2penEngine"
 
 # 5. Build Component Packages
 echo -e "\n[5] Building Component Packages..."

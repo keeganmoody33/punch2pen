@@ -46,7 +46,7 @@ Mac plugin-in-DAW (manual, after engine-only verify is torn down — same port):
 ./scripts/test_daw_integration.sh --download-model --install-plugin --setup-engine-link --skip-engine
 ```
 
-Then start **this skill's** engine **or** the installed helper at `~/punch2pen/bin/punch2penEngine` — not both. Insert **punch2pen** on an audio track. Plugin auto-launch (`IPCClient::launchEngine`) looks at `~/punch2pen/bin/punch2penEngine`, then `~/punch2pen/build/bin/punch2penEngine`, then `/Applications/Punch2Pen/punch2penEngine` via `nohup` + `system()`.
+Then start **this skill's** engine **or** the packaged helper at `/Applications/Punch2Pen/punch2penEngine.app` — not both. Insert **punch2pen** on an audio track. Plugin auto-launch (`IPCClient::launchEngine`) looks at `PUNCH2PEN_ENGINE`, then `Contents/Helpers/punch2penEngine.app` inside the AU/VST3 bundle, then `/Applications/Punch2Pen/punch2penEngine.app` via `/usr/bin/open -g`. A bare `/Applications/Punch2Pen/punch2penEngine` is the posix_spawn fallback. Leftover `~/punch2pen/bin/punch2penEngine` is ignored.
 
 Teardown: `.cursor/skills/verify-punch2pen/scripts/control-punch2pen cleanup` (kills **the pid this run started** only).
 

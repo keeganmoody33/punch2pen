@@ -2,6 +2,7 @@
 
 #include "../../shared/Protocol.h"
 #include <JuceHeader.h>
+#include <atomic>
 #include <cstdint>
 
 namespace punch2pen {
@@ -48,6 +49,7 @@ private:
   bool completeHandshake();
   void launchEngine();
   juce::File resolveEngineBinary() const;
+  juce::File resolveEngineApp() const;
   void handleMessage();
   void applyPendingCaptureReset();
   bool popStopEpoch(uint32_t &epoch);
@@ -68,6 +70,7 @@ private:
 
   int serverPort;
   bool autoLaunchEngine;
+  std::atomic<uint32_t> lastLaunchAttemptMs{0};
   juce::CriticalSection listenerLock;
   std::vector<Listener *> listeners;
 };

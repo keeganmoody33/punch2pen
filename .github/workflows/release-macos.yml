@@ -64,6 +64,11 @@ jobs:
       - name: Build AU, VST3, and engine
         run: cmake --build build --config Release --target punch2penEngine punch2pen_plugin_AU punch2pen_plugin_VST3 -j4
 
+      - name: Check engine rpath is relocatable
+        run: |
+          chmod +x scripts/check_engine_rpath.sh
+          ./scripts/check_engine_rpath.sh build/bin/punch2penEngine
+
       - name: auval
         run: |
           echo "Skipping auval on GitHub-hosted macos runners."
@@ -98,6 +103,8 @@ jobs:
           - Manufacturer / plugin / type: **Dcta / P2pn / aufx**
           - Not signed or notarized. Gatekeeper will warn.
           - Place the Whisper model at `~/.punch2pen/models/ggml-base.bin` (not included).
+          - Engine helper is `punch2penEngine.app` (also nested in the AU/VST3 bundle). The plugin launches it with Launch Services so Logic can reach `127.0.0.1:7483`.
+          - whisper/ggml/ixwebsocket are statically linked when possible; remaining dylibs ship next to the engine with `@executable_path` / `@loader_path`. Leftover `~/punch2pen/bin/punch2penEngine` is not auto-launched.
           - `auval` is skipped in GitHub Actions. On a Mac after install: `auval -strict -v aufx P2pn Dcta`
 
           No Windows build, prices, or vendor keys.

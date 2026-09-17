@@ -14,6 +14,24 @@ target_include_directories(punch2penEngine
     PRIVATE ../shared
 )
 
+# whisper.cpp defaults BUILD_SHARED_LIBS ON (non-MINGW). That produced
+# @rpath/libwhisper.1.dylib + ggml/ixwebsocket dylibs with LC_RPATH set to
+# the CI/build machine (build/lib). The 1.0.0 pkg shipped only the engine
+# binary, so dyld aborted before main() and nothing bound 127.0.0.1:7483.
+# Static-link the inference/websocket stack; remaining dylibs are bundled
+# next to the binary with @executable_path / @loader_path (see POST_BUILD).
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Static whisper/ggml/ixwebsocket" FORCE)
+set(GGML_BACKEND_DL OFF CACHE BOOL "" FORCE)
+set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+if(APPLE)
+    set(GGML_METAL_EMBED_LIBRARY ON CACHE BOOL "" FORCE)
+    set(USE_OPEN_SSL OFF CACHE BOOL "" FORCE)
+    set(USE_MBED_TLS OFF CACHE BOOL "" FORCE)
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH OFF)
+    set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
+    set(CMAKE_MACOSX_RPATH ON)
+endif()
 
 # Fetch whisper.cpp
 include(FetchContent)
@@ -55,6 +73,26 @@ set_target_properties(punch2penEngine PROPERTIES
     CXX_STANDARD 20
     CXX_STANDARD_REQUIRED ON
 )
+
+if(APPLE)
+    set_target_properties(punch2penEngine PROPERTIES
+        BUILD_WITH_INSTALL_RPATH TRUE
+        BUILD_RPATH "@executable_path;@loader_path"
+        INSTALL_RPATH "@executable_path;@loader_path"
+        INSTALL_RPATH_USE_LINK_PATH FALSE
+        MACOSX_RPATH TRUE
+    )
+    add_custom_command(TARGET punch2penEngine POST_BUILD
+        COMMAND /bin/bash
+                "${CMAKE_SOURCE_DIR}/installer/macos/bundle_engine_libs.sh"
+                "$<TARGET_FILE:punch2penEngine>"
+                "${CMAKE_BINARY_DIR}/lib"
+        COMMAND /bin/bash
+                "${CMAKE_SOURCE_DIR}/scripts/check_engine_rpath.sh"
+                "$<TARGET_FILE:punch2penEngine>"
+        COMMENT "Rewrite punch2penEngine rpath; bundle remaining dylibs"
+    )
+endif()
 
 add_executable(transcriptionCoordinatorTest
     tests/TranscriptionCoordinatorTest.cpp

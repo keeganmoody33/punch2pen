@@ -5,14 +5,19 @@
 #include "Transcriber.h"
 #include "TranscriberInterface.h"
 #include "TranscriptionCoordinator.h"
+#include "UserHome.h"
 
 #include <csignal>
 #include <cstdint>
 #include <cstdlib>
+#include <fcntl.h>
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#include <string>
 #include <unordered_set>
+#include <unistd.h>
+#include <vector>
 
 volatile std::sig_atomic_t g_shutdownRequested = 0;
 static punch2pen::TranscriptionCoordinator *g_coordinator = nullptr;
@@ -43,9 +48,22 @@ private:
   punch2pen::IPCServer &server;
 };
 
+static void maybeRedirectLogs(const std::string &dataDir) {
+  if (isatty(STDOUT_FILENO))
+    return;
+  const std::string logPath = dataDir + "/engine.log";
+  const int fd =
+      ::open(logPath.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
+  if (fd < 0)
+    return;
+  dup2(fd, STDOUT_FILENO);
+  dup2(fd, STDERR_FILENO);
+  if (fd != STDOUT_FILENO && fd != STDERR_FILENO)
+    close(fd);
+}
+
 int main(int argc, char *argv[]) {
   std::signal(SIGPIPE, SIG_IGN);
-  std::cout << "punch2pen Engine v1.0.0" << std::endl;
 
   bool useCloudMode = false;
   std::string apiKey;
@@ -58,10 +76,27 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  const char *home = std::getenv("HOME");
-  const std::string dataDir =
-      std::string(home != nullptr ? home : ".") + "/.punch2pen";
+  const std::string dataDir = punch2pen::punch2penDataDir();
   std::filesystem::create_directories(dataDir);
+  maybeRedirectLogs(dataDir);
+
+  std::cout << "punch2pen Engine v1.0.0" << std::endl;
+  std::cout << "Data dir: " << dataDir << std::endl;
+
+  if (useCloudMode) {
+    if (apiKey.empty()) {
+      const char *envKey = std::getenv("OPENAI_API_KEY");
+      if (envKey != nullptr) {
+        apiKey = envKey;
+      }
+    }
+    if (apiKey.empty()) {
+      std::cerr << "Cloud mode requested but no API key supplied via "
+                   "--api-key= or OPENAI_API_KEY"
+                << std::endl;
+      return 1;
+    }
+  }
 
   punch2pen::DatabaseManager db;
   db.initialize(dataDir + "/corrections.csv");
@@ -71,26 +106,18 @@ int main(int argc, char *argv[]) {
   profileManager.loadProfile("default");
 
   punch2pen::IPCServer server(7483);
+  // Bind before loading whisper so the plugin can handshake while the model
+  // is still opening. Logic otherwise sits on WAIT for the entire load.
+  if (!server.start()) {
+    std::cerr << "Engine cannot listen on 127.0.0.1:7483" << std::endl;
+    return 1;
+  }
 
   punch2pen::TranscriberInterface *activeTranscriber = nullptr;
   std::unique_ptr<punch2pen::TranscriberInterface> cloudTranscriber;
   std::unique_ptr<punch2pen::Transcriber> localTranscriber;
 
   if (useCloudMode) {
-    if (apiKey.empty()) {
-      const char *envKey = std::getenv("OPENAI_API_KEY");
-      if (envKey != nullptr) {
-        apiKey = envKey;
-      }
-    }
-
-    if (apiKey.empty()) {
-      std::cerr << "Cloud mode requested but no API key supplied via "
-                   "--api-key= or OPENAI_API_KEY"
-                << std::endl;
-      return 1;
-    }
-
     std::cout << "Mode: [ONLINE] OpenAI Realtime" << std::endl;
     cloudTranscriber =
         std::make_unique<punch2pen::OpenAICloudTranscriber>(apiKey);
@@ -117,10 +144,6 @@ int main(int argc, char *argv[]) {
   EngineTranscriberListener transcriberListener(server);
   activeTranscriber->addListener(&transcriberListener);
 
-  if (!server.start()) {
-    std::cerr << "Engine cannot listen on 127.0.0.1:7483" << std::endl;
-    return 1;
-  }
   std::cout << "Engine ready." << std::endl;
 
   punch2pen::TranscriptionCoordinator coordinator(server, *activeTranscriber, db,

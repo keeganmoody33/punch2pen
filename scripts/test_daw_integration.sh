@@ -43,7 +43,7 @@ Options:
   --skip-tests           Do not run unit/integration helper tests
   --skip-engine          Do not launch the engine readiness check
   --install-plugin       Copy built VST3/AU bundles into ~/Library/Audio/Plug-Ins
-  --setup-engine-link    Copy the built engine into plugin auto-launch paths
+  --setup-engine-link    Copy the built engine into /Applications/Punch2Pen
   --open-daw NAME        Open a detected DAW after checks (logic|reaper|ableton)
   --cloud                Start engine in OpenAI cloud mode for the engine check
   --api-key KEY          API key to pass with --cloud (or use OPENAI_API_KEY)
@@ -400,32 +400,52 @@ else
 fi
 
 SYSTEM_ENGINE_DIR="/Applications/Punch2Pen"
-USER_ENGINE_DIR="$HOME/punch2pen/bin"
+LEFTOVER_USER_ENGINE="$HOME/punch2pen/bin/punch2penEngine"
+MAKE_ENGINE_APP="$ROOT_DIR/installer/macos/make_engine_app.sh"
+BUNDLE_ENGINE_LIBS="$ROOT_DIR/installer/macos/bundle_engine_libs.sh"
 if [[ "$SETUP_ENGINE_LINK" -eq 1 ]]; then
   if [[ -x "$ENGINE_BIN" ]]; then
+    ENGINE_DIR="$(cd "$(dirname "$ENGINE_BIN")" && pwd)"
     ENGINE_INSTALL_COUNT=0
     if mkdir -p "$SYSTEM_ENGINE_DIR" 2>/dev/null && cp "$ENGINE_BIN" "$SYSTEM_ENGINE_DIR/punch2penEngine" 2>/dev/null; then
+      shopt -s nullglob
+      for lib in "${ENGINE_DIR}"/*.dylib; do
+        cp "$lib" "$SYSTEM_ENGINE_DIR/" 2>/dev/null || true
+      done
+      shopt -u nullglob
+      if [[ -x "$BUNDLE_ENGINE_LIBS" ]]; then
+        "$BUNDLE_ENGINE_LIBS" "$SYSTEM_ENGINE_DIR/punch2penEngine" "$ENGINE_DIR" 2>/dev/null || true
+      fi
       record pass "Install engine helper" "$SYSTEM_ENGINE_DIR/punch2penEngine"
       ENGINE_INSTALL_COUNT=$((ENGINE_INSTALL_COUNT + 1))
+      if [[ -x "$MAKE_ENGINE_APP" ]] && "$MAKE_ENGINE_APP" "$ENGINE_BIN" "$SYSTEM_ENGINE_DIR/punch2penEngine.app" 2>/dev/null; then
+        record pass "Install engine app" "$SYSTEM_ENGINE_DIR/punch2penEngine.app"
+      fi
     else
-      record warn "Install engine helper" "could not write $SYSTEM_ENGINE_DIR; install manually if plugin auto-launch prefers the system path"
+      record warn "Install engine helper" "could not write $SYSTEM_ENGINE_DIR; nested AU/VST3 helper is the Logic launch path"
     fi
 
-    if mkdir -p "$USER_ENGINE_DIR" && cp "$ENGINE_BIN" "$USER_ENGINE_DIR/punch2penEngine"; then
-      record pass "Install engine helper" "$USER_ENGINE_DIR/punch2penEngine"
+    if [[ -e "$LEFTOVER_USER_ENGINE" ]]; then
+      record warn "Leftover ~/punch2pen/bin" "$LEFTOVER_USER_ENGINE exists; plugin no longer auto-launches it (broken CI rpath). Remove it."
+    fi
+
+    NESTED_HELPER=""
+    if [[ -n "${AU_BUNDLE:-}" ]]; then
+      NESTED_HELPER="${AU_BUNDLE}/Contents/Helpers/punch2penEngine.app"
+    fi
+    if [[ -d "$NESTED_HELPER" ]]; then
+      record pass "Nested engine helper" "$NESTED_HELPER"
       ENGINE_INSTALL_COUNT=$((ENGINE_INSTALL_COUNT + 1))
-    else
-      record warn "Install engine helper" "could not write $USER_ENGINE_DIR"
     fi
 
     if [[ "$ENGINE_INSTALL_COUNT" -eq 0 ]]; then
-      record fail "Install engine helper" "no plugin auto-launch path was updated"
+      record fail "Install engine helper" "no packaged auto-launch path was updated"
     fi
   else
     record fail "Install engine helper" "engine binary unavailable"
   fi
 else
-  record warn "Engine helper install" "skipped; use --setup-engine-link to update plugin auto-launch paths"
+  record warn "Engine helper install" "skipped; use --setup-engine-link to update /Applications/Punch2Pen"
 fi
 
 if command_exists auval && [[ -d "$USER_AU_DIR/punch2pen.component" ]]; then
