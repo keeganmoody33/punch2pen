@@ -71,6 +71,9 @@ private:
   int serverPort;
   bool autoLaunchEngine;
   std::atomic<uint32_t> lastLaunchAttemptMs{0};
+#if JUCE_MAC
+  std::atomic<uint32_t> nextLaunchCandidate{0};
+#endif
   juce::CriticalSection listenerLock;
   std::vector<Listener *> listeners;
 };

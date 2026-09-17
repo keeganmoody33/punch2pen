@@ -156,14 +156,27 @@ rewrite_rpaths() {
     [[ -z "$rp" ]] && continue
     install_name_tool -delete_rpath "$rp" "$macho" 2>/dev/null || true
   done < <(list_rpaths "$macho")
-  install_name_tool -add_rpath "@executable_path" "$macho" 2>/dev/null || true
-  install_name_tool -add_rpath "@loader_path" "$macho" 2>/dev/null || true
+  if ! install_name_tool -add_rpath "@executable_path" "$macho" 2>/dev/null; then
+    if ! list_rpaths "$macho" | grep -qx "@executable_path"; then
+      echo "error: could not add @executable_path to ${macho}" >&2
+      exit 1
+    fi
+  fi
+  if ! install_name_tool -add_rpath "@loader_path" "$macho" 2>/dev/null; then
+    if ! list_rpaths "$macho" | grep -qx "@loader_path"; then
+      echo "error: could not add @loader_path to ${macho}" >&2
+      exit 1
+    fi
+  fi
 }
 
 shopt -s nullglob
 for lib in "${DEST}"/*.dylib; do
   name="$(basename "$lib")"
-  install_name_tool -id "@rpath/${name}" "$lib" 2>/dev/null || true
+  if ! install_name_tool -id "@rpath/${name}" "$lib"; then
+    echo "error: could not set install name on ${lib}" >&2
+    exit 1
+  fi
   rewrite_rpaths "$lib"
 done
 shopt -u nullglob
