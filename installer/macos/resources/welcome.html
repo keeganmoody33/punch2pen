@@ -10,7 +10,8 @@
   <ul>
     <li>AU: <code>/Library/Audio/Plug-Ins/Components/punch2pen.component</code></li>
     <li>VST3: <code>/Library/Audio/Plug-Ins/VST3/punch2pen.vst3</code></li>
-    <li>Engine: <code>/Applications/Punch2Pen/punch2penEngine</code></li>
+    <li>Engine app: <code>/Applications/Punch2Pen/punch2penEngine.app</code> (also nested in the AU/VST3 bundle)</li>
+    <li>Engine CLI: <code>/Applications/Punch2Pen/punch2penEngine</code> (whisper/ggml dylibs sit next to it when not statically linked)</li>
   </ul>
   <p>Local transcription needs a Whisper model at <code>~/.punch2pen/models/ggml-base.bin</code>. This installer does not download a model and does not contain any vendor API keys.</p>
   <p>The plugin is not sandbox-safe. It talks to the engine over <code>127.0.0.1:7483</code>. GarageBand may refuse it; Logic, REAPER, and Ableton are the intended hosts.</p>

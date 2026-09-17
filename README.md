@@ -101,7 +101,9 @@ cmake --build build -j4
 
 The `--api-key=` flag can be omitted if the `OPENAI_API_KEY` environment variable is set. Do not bake a vendor key into the installer.
 
-Plugin auto-launch looks for `PUNCH2PEN_ENGINE`, then `~/punch2pen/bin/punch2penEngine`, then `/Applications/Punch2Pen/punch2penEngine`. It does not spawn the engine more than once per plugin process.
+Plugin auto-launch looks for `PUNCH2PEN_ENGINE`, then a nested `Contents/Helpers/punch2penEngine.app` inside the AU/VST3 bundle, then `/Applications/Punch2Pen/punch2penEngine.app`. It starts that app with Launch Services (`open -g`) so Logic's AU sandbox does not inherit onto the engine. A bare `punch2penEngine` at `/Applications/Punch2Pen/punch2penEngine` is the posix_spawn fallback. Leftover `~/punch2pen/bin/punch2penEngine` from old builds is ignored (those binaries still have a CI/build-machine rpath and die in dyld). Launch is retried every few seconds until TCP `127.0.0.1:7483` handshakes.
+
+The engine is built with whisper/ggml/ixwebsocket statically linked when possible. Any remaining dylibs ship next to the binary. `LC_RPATH` is `@executable_path` / `@loader_path`, not the GitHub Actions runner or a `/tmp` build dir.
 
 ## macOS installer
 

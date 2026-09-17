@@ -50,6 +50,7 @@ target_sources(punch2pen_plugin
 
 target_include_directories(punch2pen_plugin PRIVATE
     "${CMAKE_CURRENT_BINARY_DIR}/punch2pen_plugin_artefacts/JuceLibraryCode"
+    "${CMAKE_SOURCE_DIR}/shared"
 )
 
 target_compile_definitions(punch2pen_plugin PUBLIC
@@ -132,3 +133,20 @@ target_compile_definitions(pluginProcessorStateTest PRIVATE
     JucePlugin_IsMidiEffect=0
     JucePlugin_IsSynth=0
 )
+
+if(APPLE)
+    add_dependencies(punch2pen_plugin_AU punch2penEngine)
+    add_dependencies(punch2pen_plugin_VST3 punch2penEngine)
+    foreach(_p2p_fmt AU VST3)
+        add_custom_command(TARGET punch2pen_plugin_${_p2p_fmt} POST_BUILD
+            COMMAND /bin/bash
+                    "${CMAKE_SOURCE_DIR}/installer/macos/make_engine_app.sh"
+                    "$<TARGET_FILE:punch2penEngine>"
+                    "$<TARGET_BUNDLE_DIR:punch2pen_plugin_${_p2p_fmt}>/Contents/Helpers/punch2penEngine.app"
+            COMMAND /bin/bash
+                    "${CMAKE_SOURCE_DIR}/scripts/check_engine_rpath.sh"
+                    "$<TARGET_BUNDLE_DIR:punch2pen_plugin_${_p2p_fmt}>/Contents/Helpers/punch2penEngine.app"
+            COMMENT "Embed punch2penEngine.app helper in punch2pen_plugin_${_p2p_fmt}"
+        )
+    endforeach()
+endif()

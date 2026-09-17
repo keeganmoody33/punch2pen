@@ -1,7 +1,10 @@
 #include "Protocol.h"
+#include "UserHome.h"
 #include <cassert>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <string>
 #include <vector>
 
 void testHeaderSerialization() {
@@ -182,6 +185,22 @@ void testFullMessageRoundTrip() {
   std::cout << "[PASS] testFullMessageRoundTrip" << std::endl;
 }
 
+void testRealUserHome() {
+  const char *previous = std::getenv("PUNCH2PEN_HOME");
+  const std::string previousCopy = previous != nullptr ? previous : "";
+  ::setenv("PUNCH2PEN_HOME", "/tmp/p2p-home-test", 1);
+  assert(punch2pen::realUserHome() == "/tmp/p2p-home-test");
+  assert(punch2pen::punch2penDataDir() == "/tmp/p2p-home-test/.punch2pen");
+  if (!previousCopy.empty())
+    ::setenv("PUNCH2PEN_HOME", previousCopy.c_str(), 1);
+  else
+    ::unsetenv("PUNCH2PEN_HOME");
+
+  const std::string home = punch2pen::realUserHome();
+  assert(!home.empty());
+  std::cout << "[PASS] testRealUserHome (" << home << ")" << std::endl;
+}
+
 int main() {
   testHeaderSerialization();
   testAudioChunkHeaderSerialization();
@@ -191,6 +210,7 @@ int main() {
   testMessageTypeCoverage();
   testHandshakeSerialization();
   testFullMessageRoundTrip();
+  testRealUserHome();
   std::cout << "All Protocol serialization tests passed!" << std::endl;
   return 0;
 }

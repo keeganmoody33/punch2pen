@@ -38,6 +38,10 @@ jobs:
           ./build/plugin/pluginProcessorStateTest_artefacts/Release/pluginProcessorStateTest
       - name: Build AU, VST3, and engine
         run: cmake --build build --config Release --target punch2penEngine punch2pen_plugin_AU punch2pen_plugin_VST3 -j4
+      - name: Check engine rpath is relocatable
+        run: |
+          chmod +x scripts/check_engine_rpath.sh
+          ./scripts/check_engine_rpath.sh build/bin/punch2penEngine
       - name: Package unsigned macOS installer
         run: ./installer/macos/build_pkg.sh --skip-build --build-dir build
       - name: auval

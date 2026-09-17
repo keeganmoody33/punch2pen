@@ -1,12 +1,15 @@
 #include "IPCClient.h"
 #include "RingBuffer.h"
+#include "UserHome.h"
 
 #include <algorithm>
 #include <cstdlib>
-#include <mutex>
+#include <string>
+#include <vector>
 
 #if JUCE_MAC || JUCE_IOS
 #include <fcntl.h>
+#include <pwd.h>
 #include <spawn.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -16,7 +19,7 @@ extern char **environ;
 namespace punch2pen {
 
 namespace {
-std::once_flag g_engineLaunchOnce;
+constexpr uint32_t kLaunchCooldownMs = 4000;
 
 bool writeExact(juce::StreamingSocket &socket, const void *data, int len) {
   const auto *p = static_cast<const char *>(data);
@@ -208,7 +211,7 @@ bool IPCClient::completeHandshake() {
   if (!writeExact(socket, &handshake, sizeof(handshake)))
     return false;
 
-  if (!socket.waitUntilReady(true, 1000))
+  if (!socket.waitUntilReady(true, 2000))
     return false;
 
   protocol::Header reply{};
@@ -226,65 +229,208 @@ bool IPCClient::completeHandshake() {
          response.version == protocol::kProtocolVersion;
 }
 
+namespace {
+
+void pluginIpcLog(const juce::String &line) {
+  const juce::File dataDir =
+      juce::File(juce::String(punch2pen::punch2penDataDir()));
+  dataDir.createDirectory();
+  dataDir.getChildFile("plugin-ipc.log")
+      .appendText(juce::Time::getCurrentTime().toString(true, true) + " " +
+                  line + "\n");
+}
+
+juce::File pluginContentsDir() {
+  return juce::File::getSpecialLocation(juce::File::currentExecutableFile)
+      .getParentDirectory()
+      .getParentDirectory();
+}
+
+void considerApp(std::vector<juce::File> &apps, const juce::File &app) {
+  if (!(app.isDirectory() && app.hasFileExtension("app")))
+    return;
+  for (const auto &existing : apps) {
+    if (existing == app)
+      return;
+  }
+  apps.push_back(app);
+}
+
+void considerBinary(std::vector<juce::File> &bins, const juce::File &bin) {
+  if (!bin.existsAsFile())
+    return;
+  for (const auto &existing : bins) {
+    if (existing == bin)
+      return;
+  }
+  bins.push_back(bin);
+}
+
+#if JUCE_MAC
+bool openEngineApp(const juce::File &app) {
+  const std::string path = app.getFullPathName().toStdString();
+  const char *argv[] = {"/usr/bin/open", "-g", path.c_str(), nullptr};
+  pid_t pid = 0;
+  const int rc = posix_spawn(&pid, "/usr/bin/open", nullptr, nullptr,
+                             const_cast<char **>(argv), environ);
+  pluginIpcLog("open -g " + app.getFullPathName() + " rc=" + juce::String(rc));
+  return rc == 0;
+}
+
+bool spawnBareEngine(const juce::File &engineBin) {
+  const std::string home = punch2pen::realUserHome();
+  const juce::File dataDir =
+      juce::File(juce::String(home)).getChildFile(".punch2pen");
+  dataDir.createDirectory();
+  const juce::File logFile = dataDir.getChildFile("engine.log");
+
+  const std::string enginePath = engineBin.getFullPathName().toStdString();
+  const std::string logPath = logFile.getFullPathName().toStdString();
+  std::vector<std::string> envStore = {
+      "HOME=" + home,
+      "PUNCH2PEN_HOME=" + home,
+      "PATH=/usr/bin:/bin:/usr/sbin:/sbin",
+      "TMPDIR=/tmp",
+  };
+  if (const passwd *pw = getpwuid(getuid())) {
+    if (pw->pw_name != nullptr && pw->pw_name[0] != '\0')
+      envStore.push_back(std::string("USER=") + pw->pw_name);
+  }
+  std::vector<char *> envp;
+  envp.reserve(envStore.size() + 1);
+  for (auto &entry : envStore)
+    envp.push_back(entry.data());
+  envp.push_back(nullptr);
+
+  posix_spawn_file_actions_t actions;
+  posix_spawnattr_t attr;
+  posix_spawn_file_actions_init(&actions);
+  posix_spawnattr_init(&attr);
+  posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETPGROUP);
+  posix_spawnattr_setpgroup(&attr, 0);
+  const int openRc = posix_spawn_file_actions_addopen(
+      &actions, STDOUT_FILENO, logPath.c_str(), O_WRONLY | O_CREAT | O_APPEND,
+      0644);
+  if (openRc == 0)
+    posix_spawn_file_actions_adddup2(&actions, STDOUT_FILENO, STDERR_FILENO);
+
+  const char *argv[] = {enginePath.c_str(), nullptr};
+  pid_t pid = 0;
+  const int rc =
+      posix_spawn(&pid, enginePath.c_str(), openRc == 0 ? &actions : nullptr,
+                  &attr, const_cast<char **>(argv), envp.data());
+
+  posix_spawnattr_destroy(&attr);
+  posix_spawn_file_actions_destroy(&actions);
+  pluginIpcLog("posix_spawn " + engineBin.getFullPathName() +
+               " rc=" + juce::String(rc));
+  return rc == 0;
+}
+#endif
+
+} // namespace
+
+juce::File IPCClient::resolveEngineApp() const {
+  if (const char *overridePath = std::getenv("PUNCH2PEN_ENGINE")) {
+    juce::File fromEnv(overridePath);
+    if (fromEnv.isDirectory() && fromEnv.hasFileExtension("app"))
+      return fromEnv;
+  }
+
+  const juce::File nested =
+      pluginContentsDir().getChildFile("Helpers/punch2penEngine.app");
+  if (nested.isDirectory())
+    return nested;
+
+  const juce::File systemApp("/Applications/Punch2Pen/punch2penEngine.app");
+  if (systemApp.isDirectory())
+    return systemApp;
+
+  return {};
+}
+
 juce::File IPCClient::resolveEngineBinary() const {
   if (const char *overridePath = std::getenv("PUNCH2PEN_ENGINE")) {
     juce::File fromEnv(overridePath);
     if (fromEnv.existsAsFile())
       return fromEnv;
+    if (fromEnv.isDirectory() && fromEnv.hasFileExtension("app")) {
+      const juce::File inner =
+          fromEnv.getChildFile("Contents/MacOS/punch2penEngine");
+      if (inner.existsAsFile())
+        return inner;
+    }
   }
 
-  const juce::File home =
-      juce::File::getSpecialLocation(juce::File::userHomeDirectory);
-  // Prefer the user-writable helper so a local test install is not shadowed
-  // by an older system-wide engine from the pkg.
-  juce::File engineApp = home.getChildFile("punch2pen/bin/punch2penEngine");
-  if (engineApp.existsAsFile())
-    return engineApp;
+  const juce::File nested =
+      pluginContentsDir().getChildFile("Helpers/punch2penEngine.app");
+  if (nested.isDirectory()) {
+    const juce::File inner =
+        nested.getChildFile("Contents/MacOS/punch2penEngine");
+    if (inner.existsAsFile())
+      return inner;
+  }
 
-  engineApp = juce::File("/Applications/Punch2Pen/punch2penEngine");
-  if (engineApp.existsAsFile())
-    return engineApp;
+  const juce::File systemApp("/Applications/Punch2Pen/punch2penEngine.app");
+  if (systemApp.isDirectory()) {
+    const juce::File inner =
+        systemApp.getChildFile("Contents/MacOS/punch2penEngine");
+    if (inner.existsAsFile())
+      return inner;
+  }
+
+  const juce::File systemBin("/Applications/Punch2Pen/punch2penEngine");
+  if (systemBin.existsAsFile())
+    return systemBin;
 
   return {};
 }
 
 void IPCClient::launchEngine() {
-  std::call_once(g_engineLaunchOnce, [this]() {
-    const juce::File engineApp = resolveEngineBinary();
-    if (!engineApp.existsAsFile())
-      return;
+  const uint32_t now = juce::Time::getMillisecondCounter();
+  const uint32_t prev = lastLaunchAttemptMs.load();
+  if (prev != 0 && (now - prev) < kLaunchCooldownMs)
+    return;
+  lastLaunchAttemptMs.store(now);
 
 #if JUCE_MAC
-    const juce::File dataDir =
-        juce::File::getSpecialLocation(juce::File::userHomeDirectory)
-            .getChildFile(".punch2pen");
-    dataDir.createDirectory();
-    const juce::File logFile = dataDir.getChildFile("engine.log");
-    const juce::String enginePath = engineApp.getFullPathName();
-    const juce::String logPath = logFile.getFullPathName();
+  std::vector<juce::File> apps;
+  std::vector<juce::File> bins;
 
-    posix_spawn_file_actions_t actions;
-    posix_spawnattr_t attr;
-    posix_spawn_file_actions_init(&actions);
-    posix_spawnattr_init(&attr);
-    posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETPGROUP);
-    posix_spawnattr_setpgroup(&attr, 0);
-    posix_spawn_file_actions_addopen(&actions, STDOUT_FILENO,
-                                     logPath.toRawUTF8(),
-                                     O_WRONLY | O_CREAT | O_APPEND, 0644);
-    posix_spawn_file_actions_adddup2(&actions, STDOUT_FILENO, STDERR_FILENO);
+  if (const char *overridePath = std::getenv("PUNCH2PEN_ENGINE")) {
+    const juce::File fromEnv(overridePath);
+    considerApp(apps, fromEnv);
+    considerBinary(bins, fromEnv);
+    if (fromEnv.isDirectory() && fromEnv.hasFileExtension("app"))
+      considerBinary(bins,
+                     fromEnv.getChildFile("Contents/MacOS/punch2penEngine"));
+  }
 
-    const char *argv[] = {enginePath.toRawUTF8(), nullptr};
-    pid_t pid = 0;
-    const int rc = posix_spawn(&pid, enginePath.toRawUTF8(), &actions, &attr,
-                               const_cast<char **>(argv), environ);
+  considerApp(apps,
+              pluginContentsDir().getChildFile("Helpers/punch2penEngine.app"));
+  considerApp(apps, juce::File("/Applications/Punch2Pen/punch2penEngine.app"));
+  considerBinary(bins, juce::File("/Applications/Punch2Pen/punch2penEngine"));
 
-    posix_spawnattr_destroy(&attr);
-    posix_spawn_file_actions_destroy(&actions);
-    if (rc != 0)
+  const juce::File leftoverHome =
+      juce::File(juce::String(realUserHome()))
+          .getChildFile("punch2pen/bin/punch2penEngine");
+  if (leftoverHome.existsAsFile())
+    pluginIpcLog("ignoring leftover " + leftoverHome.getFullPathName() +
+                 "; packaged engine is preferred");
+
+  pluginIpcLog("launchEngine apps=" + juce::String((int)apps.size()) +
+               " bins=" + juce::String((int)bins.size()));
+
+  for (const auto &app : apps) {
+    if (openEngineApp(app))
       return;
+  }
+  for (const auto &bin : bins) {
+    if (spawnBareEngine(bin))
+      return;
+  }
+  pluginIpcLog("launchEngine: no engine helper launched");
 #endif
-  });
 }
 
 bool IPCClient::isConnected() const { return connected; }
