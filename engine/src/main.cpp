@@ -15,6 +15,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <sys/stat.h>
 #include <unordered_set>
 #include <unistd.h>
 #include <vector>
@@ -48,8 +49,19 @@ private:
   punch2pen::IPCServer &server;
 };
 
+static bool fdIsDevNull(int fd) {
+  struct stat fdStat {};
+  struct stat nullStat {};
+  if (fstat(fd, &fdStat) != 0 || stat("/dev/null", &nullStat) != 0)
+    return false;
+  return S_ISCHR(fdStat.st_mode) && fdStat.st_rdev == nullStat.st_rdev;
+}
+
 static void maybeRedirectLogs(const std::string &dataDir) {
-  if (isatty(STDOUT_FILENO))
+  // Launch Services and discarded posix_spawn output attach /dev/null.
+  // Shell redirection, verify-skill capture, and CI logs must keep the
+  // caller's streams so readiness greps still see "Engine ready."
+  if (!fdIsDevNull(STDOUT_FILENO))
     return;
   const std::string logPath = dataDir + "/engine.log";
   const int fd =
@@ -108,6 +120,7 @@ int main(int argc, char *argv[]) {
   punch2pen::IPCServer server(7483);
   // Bind before loading whisper so the plugin can handshake while the model
   // is still opening. Logic otherwise sits on WAIT for the entire load.
+  // Audio queued during that window is consumed after Transcriber is ready.
   if (!server.start()) {
     std::cerr << "Engine cannot listen on 127.0.0.1:7483" << std::endl;
     return 1;
