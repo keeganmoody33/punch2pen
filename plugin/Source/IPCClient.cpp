@@ -5,13 +5,19 @@
 #include <algorithm>
 #include <cstdlib>
 #include <string>
+#include <utility>
 #include <vector>
+
+#if JUCE_MAC || JUCE_LINUX || JUCE_BSD
+#include <dlfcn.h>
+#endif
 
 #if JUCE_MAC || JUCE_IOS
 #include <fcntl.h>
 #include <pwd.h>
 #include <spawn.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 #include <unistd.h>
 extern char **environ;
 #endif
@@ -240,10 +246,35 @@ void pluginIpcLog(const juce::String &line) {
                   line + "\n");
 }
 
+juce::File thisPluginImageFile() {
+#if JUCE_MAC || JUCE_LINUX || JUCE_BSD
+  // Address in this plugin image — not the DAW host executable.
+  Dl_info info{};
+  if (dladdr(reinterpret_cast<const void *>(&pluginIpcLog), &info) != 0 &&
+      info.dli_fname != nullptr && info.dli_fname[0] != '\0') {
+    const juce::File image(info.dli_fname);
+    if (image.existsAsFile() || image.isDirectory())
+      return image;
+  }
+#endif
+  return juce::File::getSpecialLocation(juce::File::currentApplicationFile);
+}
+
 juce::File pluginContentsDir() {
-  return juce::File::getSpecialLocation(juce::File::currentExecutableFile)
-      .getParentDirectory()
-      .getParentDirectory();
+  juce::File cursor = thisPluginImageFile();
+  for (int i = 0; i < 12 && cursor != cursor.getParentDirectory(); ++i) {
+    if (cursor.hasFileExtension("component") ||
+        cursor.hasFileExtension("vst3"))
+      return cursor.getChildFile("Contents");
+    if (cursor.getFileName() == "Contents" &&
+        cursor.getChildFile("MacOS").isDirectory())
+      return cursor;
+    cursor = cursor.getParentDirectory();
+  }
+  const juce::File image = thisPluginImageFile();
+  if (image.getParentDirectory().getFileName() == "MacOS")
+    return image.getParentDirectory().getParentDirectory();
+  return image.getParentDirectory();
 }
 
 void considerApp(std::vector<juce::File> &apps, const juce::File &app) {
@@ -273,8 +304,19 @@ bool openEngineApp(const juce::File &app) {
   pid_t pid = 0;
   const int rc = posix_spawn(&pid, "/usr/bin/open", nullptr, nullptr,
                              const_cast<char **>(argv), environ);
-  pluginIpcLog("open -g " + app.getFullPathName() + " rc=" + juce::String(rc));
-  return rc == 0;
+  if (rc != 0) {
+    pluginIpcLog("open -g " + app.getFullPathName() +
+                 " spawn_rc=" + juce::String(rc));
+    return false;
+  }
+  int status = 0;
+  const pid_t waited = waitpid(pid, &status, 0);
+  const bool ok =
+      waited == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+  pluginIpcLog("open -g " + app.getFullPathName() +
+               " wait=" + juce::String((int)waited) +
+               " status=" + juce::String(status) + (ok ? " ok" : " fail"));
+  return ok;
 }
 
 bool spawnBareEngine(const juce::File &engineBin) {
@@ -418,15 +460,34 @@ void IPCClient::launchEngine() {
     pluginIpcLog("ignoring leftover " + leftoverHome.getFullPathName() +
                  "; packaged engine is preferred");
 
-  pluginIpcLog("launchEngine apps=" + juce::String((int)apps.size()) +
-               " bins=" + juce::String((int)bins.size()));
+  std::vector<std::pair<juce::File, bool>> candidates;
+  candidates.reserve(apps.size() + bins.size());
+  for (const auto &app : apps)
+    candidates.emplace_back(app, true);
+  for (const auto &bin : bins)
+    candidates.emplace_back(bin, false);
 
-  for (const auto &app : apps) {
-    if (openEngineApp(app))
-      return;
+  pluginIpcLog("launchEngine apps=" + juce::String((int)apps.size()) +
+               " bins=" + juce::String((int)bins.size()) + " nested=" +
+               pluginContentsDir()
+                   .getChildFile("Helpers/punch2penEngine.app")
+                   .getFullPathName());
+
+  if (candidates.empty()) {
+    pluginIpcLog("launchEngine: no engine helper launched");
+    return;
   }
-  for (const auto &bin : bins) {
-    if (spawnBareEngine(bin))
+
+  // Rotate so a Gatekeeper-rejected nested app does not starve /Applications
+  // forever. Immediate fallbacks still run when `open` itself exits non-zero.
+  const size_t start =
+      static_cast<size_t>(nextLaunchCandidate.fetch_add(1)) %
+      candidates.size();
+  for (size_t n = 0; n < candidates.size(); ++n) {
+    const auto &candidate = candidates[(start + n) % candidates.size()];
+    const bool ok = candidate.second ? openEngineApp(candidate.first)
+                                     : spawnBareEngine(candidate.first);
+    if (ok)
       return;
   }
   pluginIpcLog("launchEngine: no engine helper launched");

@@ -27,18 +27,11 @@ resolve_bin() {
 
 fail=0
 
-check_one() {
-  local input="$1"
-  local bin dir load rpath dep name
-  bin="$(resolve_bin "$input")"
-  if [[ ! -f "$bin" ]]; then
-    echo "FAIL: engine binary not found: $input -> $bin" >&2
-    fail=1
-    return
-  fi
-  dir="$(cd "$(dirname "$bin")" && pwd)"
-
-  echo "Checking ${bin}"
+check_macho() {
+  local macho="$1"
+  local dir="$2"
+  local rpath dep name
+  echo "Checking ${macho}"
 
   while IFS= read -r rpath; do
     [[ -z "$rpath" ]] && continue
@@ -57,7 +50,7 @@ check_one() {
         fail=1
         ;;
     esac
-  done < <(otool -l "$bin" | awk '
+  done < <(otool -l "$macho" | awk '
     $1 == "cmd" && $2 == "LC_RPATH" { pending = 1 }
     pending && $1 == "path" { print $2; pending = 0 }
   ')
@@ -72,12 +65,31 @@ check_one() {
       @rpath/*|@loader_path/*|@executable_path/*)
         name="${dep##*/}"
         if [[ ! -f "${dir}/${name}" ]]; then
-          echo "FAIL: ${dep} is not next to $(basename "$bin") (${dir}/${name} missing)" >&2
+          echo "FAIL: ${dep} is not next to $(basename "$macho") (${dir}/${name} missing)" >&2
           fail=1
         fi
         ;;
     esac
-  done < <(otool -L "$bin" | awk 'NR > 1 { print $1 }')
+  done < <(otool -L "$macho" | awk 'NR > 1 { print $1 }')
+}
+
+check_one() {
+  local input="$1"
+  local bin dir
+  bin="$(resolve_bin "$input")"
+  if [[ ! -f "$bin" ]]; then
+    echo "FAIL: engine binary not found: $input -> $bin" >&2
+    fail=1
+    return
+  fi
+  dir="$(cd "$(dirname "$bin")" && pwd)"
+  check_macho "$bin" "$dir"
+  local lib
+  shopt -s nullglob
+  for lib in "${dir}"/*.dylib; do
+    check_macho "$lib" "$dir"
+  done
+  shopt -u nullglob
 }
 
 for arg in "$@"; do
