@@ -122,25 +122,41 @@ fi
 MODEL_SIZE="$(wc -c < "$MODEL_DST" | tr -d ' ')"
 [[ "$MODEL_SIZE" -gt 1000000 ]] || die "model at $MODEL_DST is too small ($MODEL_SIZE bytes)"
 
-LOG="$ISOLATED/engine.log"
+LOG="$ISOLATED/engine.stdout"
+DATA_LOG="$ISOLATED/.punch2pen/engine.log"
 "$ENGINE" >"$LOG" 2>&1 &
 ENGINE_PID=$!
-log "engine_smoke: pid $ENGINE_PID log $LOG"
+log "engine_smoke: pid $ENGINE_PID stdout=$LOG data-log=$DATA_LOG"
+
+# Non-TTY CI: punch2penEngine dup2's stdout into ~/.punch2pen/engine.log.
+log_has() {
+  local needle="$1"
+  grep -q "$needle" "$LOG" 2>/dev/null && return 0
+  grep -q "$needle" "$DATA_LOG" 2>/dev/null && return 0
+  return 1
+}
+
+dump_engine_logs() {
+  log "----- $LOG -----" >&2
+  tail -n 80 "$LOG" >&2 || true
+  log "----- $DATA_LOG -----" >&2
+  tail -n 80 "$DATA_LOG" >&2 || true
+}
 
 ready=0
-for _ in $(seq 1 90); do
+for _ in $(seq 1 180); do
   if ! kill -0 "$ENGINE_PID" >/dev/null 2>&1; then
-    tail -n 40 "$LOG" >&2 || true
+    dump_engine_logs
     die "engine exited before ready"
   fi
-  if grep -q 'Engine ready.' "$LOG" 2>/dev/null && grep -q '127.0.0.1:7483' "$LOG" 2>/dev/null && port_busy; then
+  if log_has 'Engine ready.' && log_has '127.0.0.1:7483' && port_busy; then
     ready=1
     break
   fi
   sleep 1
 done
 [[ "$ready" -eq 1 ]] || {
-  tail -n 40 "$LOG" >&2 || true
+  dump_engine_logs
   die "timed out waiting for Engine ready. on 127.0.0.1:${PORT}"
 }
 log "engine_smoke: Engine ready."
@@ -149,14 +165,14 @@ python3 "$ROOT/scripts/verify_engine.py" smoke --port "$PORT"
 
 found=0
 for _ in $(seq 1 20); do
-  if grep -q "Received Correction:" "$LOG" && grep -q "Applied correction." "$LOG"; then
+  if log_has "Received Correction:" && log_has "Applied correction."; then
     found=1
     break
   fi
   sleep 0.25
 done
 [[ "$found" -eq 1 ]] || {
-  tail -n 50 "$LOG" >&2 || true
+  dump_engine_logs
   die "engine log missing Received/Applied correction"
 }
 
