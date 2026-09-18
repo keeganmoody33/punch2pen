@@ -189,20 +189,30 @@ def cmd_vocals(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--port", type=int, default=proto.PORT)
+    common.add_argument("--timeout", type=float, default=5.0)
+
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--port", type=int, default=proto.PORT)
-    parser.add_argument("--timeout", type=float, default=5.0)
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    selftest = sub.add_parser("selftest", help="Check packed header sizes")
+    selftest = sub.add_parser(
+        "selftest", parents=[common], help="Check packed header sizes"
+    )
     selftest.set_defaults(func=cmd_selftest)
 
-    smoke = sub.add_parser("smoke", help="Handshake + correction send")
+    smoke = sub.add_parser(
+        "smoke", parents=[common], help="Handshake + correction send"
+    )
     smoke.add_argument("--original", default="punch 2 pen")
     smoke.add_argument("--corrected", default="Punch2Pen")
     smoke.set_defaults(func=cmd_smoke)
 
-    vocals = sub.add_parser("vocals", help="Golden-file STT against a dry vocal WAV")
+    vocals = sub.add_parser(
+        "vocals",
+        parents=[common],
+        help="Golden-file STT against a dry vocal WAV",
+    )
     vocals.add_argument("--wav", type=Path, default=DEFAULT_WAV)
     vocals.add_argument("--expected", type=Path, default=DEFAULT_EXPECTED)
     vocals.add_argument(
