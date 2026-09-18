@@ -134,6 +134,37 @@ target_compile_definitions(pluginProcessorStateTest PRIVATE
     JucePlugin_IsSynth=0
 )
 
+# Headless capture-gating (mock playhead, no Logic)
+juce_add_console_app(pluginProcessorCaptureTest PRODUCT_NAME "pluginProcessorCaptureTest")
+juce_generate_juce_header(pluginProcessorCaptureTest)
+target_sources(pluginProcessorCaptureTest PRIVATE
+    tests/PluginProcessorCaptureTest.cpp
+    Source/PluginProcessor.cpp
+    Source/PluginEditor.cpp
+    Source/WebViewEditor.cpp
+    Source/IPCClient.cpp
+)
+target_link_libraries(pluginProcessorCaptureTest PRIVATE
+    punch2pen_resources
+    juce::juce_audio_utils
+    juce::juce_gui_extra
+    juce::juce_recommended_config_flags
+)
+target_include_directories(pluginProcessorCaptureTest PRIVATE
+    Source
+    ${CMAKE_SOURCE_DIR}/shared
+)
+target_compile_definitions(pluginProcessorCaptureTest PRIVATE
+    JUCE_WEB_BROWSER=1
+    JUCE_USE_CURL=0
+    JUCE_VST3_CAN_REPLACE_VST2=0
+    JucePlugin_Name="punch2pen"
+    JucePlugin_WantsMidiInput=0
+    JucePlugin_ProducesMidiOutput=0
+    JucePlugin_IsMidiEffect=0
+    JucePlugin_IsSynth=0
+)
+
 if(APPLE)
     add_dependencies(punch2pen_plugin_AU punch2penEngine)
     add_dependencies(punch2pen_plugin_VST3 punch2penEngine)

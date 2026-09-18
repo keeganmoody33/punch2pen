@@ -55,3 +55,17 @@ staging/
 # Abandoned Vite UI (production UI is plugin/Source/ui/public/)
 node_modules/
 plugin/ui/
+
+# Vocal golden-file audio (docs stay tracked; force-add only original recordings you own)
+fixtures/vocals/*.wav
+fixtures/vocals/*.aiff
+fixtures/vocals/*.aif
+fixtures/vocals/*.flac
+fixtures/vocals/*.mp3
+fixtures/vocals/*.m4a
+fixtures/vocals/*.ogg
+fixtures/vocals/expected-words.txt
+
+# Python
+__pycache__/
+*.py[cod]

@@ -32,7 +32,7 @@ Preconditions:
 
 ## Gotchas
 
-- `scripts/verify_correction.py` speaks the right protocol but **exits 0 on connection refused**. Use `control-punch2pen drive correction`.
+- `scripts/verify_correction.py` speaks the right protocol and **exits 1** on connection refused. Prefer `scripts/engine_smoke.sh` or `control-punch2pen drive correction`.
 - Driving the user's `~/.punch2pen/corrections.csv` contaminates studio vocab. Doctor must show the isolated HOME.
 - Empty or identical replacement is not sent by `WebViewEditor::nativeSubmitCorrection`. The helper sends a distinct pair on purpose.
 - Profile JSON is written on **engine shutdown**, not on each correction. CSV is the live side effect.

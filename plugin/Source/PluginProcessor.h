@@ -61,6 +61,11 @@ public:
 
   punch2pen::IPCClient *getIPCClient() const { return ipcClient.get(); }
 
+  // Test hook for headless capture-gating (no DAW). Not a product API.
+  punch2pen::AudioRingBuffer *audioRingBufferForTest() const {
+    return audioRingBuffer.get();
+  }
+
 private:
   std::unique_ptr<punch2pen::AudioRingBuffer> audioRingBuffer;
   std::unique_ptr<punch2pen::IPCClient> ipcClient;

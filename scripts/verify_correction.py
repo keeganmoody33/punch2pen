@@ -1,80 +1,20 @@
-import socket
-import struct
+#!/usr/bin/env python3
+"""Send one Correction over the Punch2Pen IPC socket.
+
+Exits 1 on connection/protocol failure. Does not prove Studio Receipt Apply.
+"""
+
+from __future__ import annotations
+
 import sys
+from pathlib import Path
 
-MESSAGE_TYPE_HANDSHAKE = 3
-MESSAGE_TYPE_HANDSHAKE_RESPONSE = 4
-MESSAGE_TYPE_CORRECTION = 5
-PROTOCOL_VERSION = 1
-HOST = '127.0.0.1'
-PORT = 7483
-
-def recv_exact(sock, nbytes):
-    buf = bytearray()
-    while len(buf) < nbytes:
-        chunk = sock.recv(nbytes - len(buf))
-        if not chunk:
-            raise RuntimeError(
-                f'handshake: connection closed after {len(buf)}/{nbytes} bytes')
-        buf.extend(chunk)
-    return bytes(buf)
-
-def complete_handshake(sock):
-    sock.sendall(struct.pack('<II', MESSAGE_TYPE_HANDSHAKE, 4))
-    sock.sendall(struct.pack('<I', PROTOCOL_VERSION))
-    header = recv_exact(sock, 8)
-    msg_type, length = struct.unpack('<II', header)
-    if msg_type != MESSAGE_TYPE_HANDSHAKE_RESPONSE or length != 8:
-        raise RuntimeError(
-            f'handshake: unexpected type {msg_type} length {length}')
-    payload = recv_exact(sock, length)
-    version, accepted = struct.unpack('<II', payload)
-    if accepted != 1 or version != PROTOCOL_VERSION:
-        raise RuntimeError(
-            f'handshake rejected (version={version} accepted={accepted})')
-
-def send_correction(sock, original, corrected):
-    orig_bytes = original.encode('utf-8')
-    corr_bytes = corrected.encode('utf-8')
-    orig_len = len(orig_bytes)
-    corr_len = len(corr_bytes)
-    
-    # Payload logic:
-    # 1. Main Header: Type(4) + Length(4)
-    # Length = CorrectionHeader(8) + orig_str + corr_str
-    
-    payload_size = 8 + orig_len + corr_len
-    
-    # Send Main Header
-    sock.sendall(struct.pack('<II', MESSAGE_TYPE_CORRECTION, payload_size))
-    
-    # Send Correction Header
-    sock.sendall(struct.pack('<II', orig_len, corr_len))
-    
-    # Send Strings
-    sock.sendall(orig_bytes)
-    sock.sendall(corr_bytes)
-    
-    print(f"Sent Correction: '{original}' -> '{corrected}'")
-
-def main():
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((HOST, PORT))
-        print(f"Connected to Engine at {HOST}:{PORT}")
-        complete_handshake(sock)
-
-        # Send a test correction
-        send_correction(sock, "punch 2 pen", "Punch2Pen")
-        
-        print("✅ Correction sent successfully. Check engine logs for 'Applied correction'.")
-        
-    except ConnectionRefusedError:
-        print("❌ Could not connect to Engine. Is it running?")
-    except Exception as e:
-        print(f"❌ Error: {e}")
-    finally:
-        sock.close()
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from verify_engine import main as verify_main
 
 if __name__ == "__main__":
-    main()
+    original = sys.argv[1] if len(sys.argv) > 1 else "punch 2 pen"
+    corrected = sys.argv[2] if len(sys.argv) > 2 else "Punch2Pen"
+    raise SystemExit(
+        verify_main(["smoke", "--original", original, "--corrected", corrected])
+    )

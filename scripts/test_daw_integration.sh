@@ -312,6 +312,7 @@ if [[ "$RUN_TESTS" -eq 1 ]]; then
     '*/ringBufferTest_artefacts/*/ringBufferTest'
     '*/ipcClientTest_artefacts/*/ipcClientTest'
     '*/pluginProcessorStateTest_artefacts/*/pluginProcessorStateTest'
+    '*/pluginProcessorCaptureTest_artefacts/*/pluginProcessorCaptureTest'
   )
   for pattern in "${PLUGIN_TEST_PATTERNS[@]}"; do
     test_bin="$(find_first "$pattern")"
@@ -370,6 +371,9 @@ if [[ "$RUN_ENGINE" -eq 1 ]]; then
 
     if [[ "$RUN_TESTS" -eq 1 && -f "$ROOT_DIR/scripts/verify_correction.py" ]] && command_exists python3; then
       run_cmd "Correction IPC helper" python3 "$ROOT_DIR/scripts/verify_correction.py" || true
+    fi
+    if [[ "$RUN_TESTS" -eq 1 && -f "$ROOT_DIR/scripts/verify_engine.py" ]] && command_exists python3; then
+      run_cmd "Vocal golden-file (skip if no WAV)" python3 "$ROOT_DIR/scripts/verify_engine.py" vocals || true
     fi
   fi
 else
@@ -476,7 +480,8 @@ cat <<CHECKLIST
    - Did the plugin connect to 127.0.0.1:7483?
    - Is Logic actually in record, not just playback?
    - Is the model present at $MODEL_FILE?
-5. If transcript appears but timing is wrong, test a simple 4/4 session first, then your compound-meter session.
+5. If transcript appears but word highlighting is late, test a simple 4/4 session first, then your compound-meter session.
+6. Isolated engine smoke (no Logic): ./scripts/engine_smoke.sh
 CHECKLIST
 
 if [[ -n "$OPEN_DAW" ]]; then
