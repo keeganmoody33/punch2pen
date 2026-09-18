@@ -249,25 +249,8 @@ cmd_doctor() {
 
 send_correction() {
   local original="$1" corrected="$2"
-  python3 - "$PORT" "$original" "$corrected" <<'PY'
-import socket, struct, sys
-port, original, corrected = int(sys.argv[1]), sys.argv[2], sys.argv[3]
-orig_b, corr_b = original.encode("utf-8"), corrected.encode("utf-8")
-payload = 8 + len(orig_b) + len(corr_b)
-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.settimeout(5)
-try:
-    sock.connect(("127.0.0.1", port))
-    sock.sendall(struct.pack("<II", 5, payload))
-    sock.sendall(struct.pack("<II", len(orig_b), len(corr_b)))
-    sock.sendall(orig_b + corr_b)
-    print(f"Sent Correction: '{original}' -> '{corrected}'")
-except ConnectionRefusedError:
-    print("connection refused on 127.0.0.1:%s" % port, file=sys.stderr)
-    sys.exit(1)
-finally:
-    sock.close()
-PY
+  python3 "$REPO/scripts/verify_engine.py" smoke --port "$PORT" \
+    --original "$original" --corrected "$corrected"
 }
 
 cmd_drive_correction() {

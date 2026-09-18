@@ -30,12 +30,13 @@ jobs:
       - name: Configure with plugin
         run: cmake -S . -B build -DPUNCH2PEN_BUILD_PLUGIN=ON -DCMAKE_BUILD_TYPE=Release
       - name: Build plugin test targets
-        run: cmake --build build --config Release --target ringBufferTest ipcClientTest pluginProcessorStateTest -j4
+        run: cmake --build build --config Release --target ringBufferTest ipcClientTest pluginProcessorStateTest pluginProcessorCaptureTest -j4
       - name: Run plugin tests
         run: |
           ./build/plugin/ringBufferTest_artefacts/Release/ringBufferTest
           ./build/plugin/ipcClientTest_artefacts/Release/ipcClientTest
           ./build/plugin/pluginProcessorStateTest_artefacts/Release/pluginProcessorStateTest
+          ./build/plugin/pluginProcessorCaptureTest_artefacts/Release/pluginProcessorCaptureTest
       - name: Build AU, VST3, and engine
         run: cmake --build build --config Release --target punch2penEngine punch2pen_plugin_AU punch2pen_plugin_VST3 -j4
       - name: Check engine rpath is relocatable
@@ -48,3 +49,24 @@ jobs:
         run: |
           echo "Skipping auval on GitHub-hosted macos runners (no signed AU host session)."
           echo "After install on a Mac: auval -strict -v aufx P2pn Dcta"
+
+  engine-smoke:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache whisper base model
+        uses: actions/cache@v4
+        with:
+          path: /tmp/punch2pen-model-cache/ggml-base.bin
+          key: whisper-ggml-base-v1.7.4
+      - name: Configure engine only
+        run: cmake -S . -B build -DPUNCH2PEN_BUILD_PLUGIN=OFF -DCMAKE_BUILD_TYPE=Release
+      - name: Build punch2penEngine
+        run: cmake --build build --config Release --target punch2penEngine -j4
+      - name: Engine smoke (no Logic)
+        env:
+          PUNCH2PEN_MODEL_CACHE: /tmp/punch2pen-model-cache
+        run: |
+          chmod +x scripts/engine_smoke.sh scripts/download_model.sh
+          ./scripts/engine_smoke.sh --skip-build
+        # vocals SKIP (exit 0) until fixtures/vocals/dry-vocal.wav is force-added.

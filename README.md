@@ -1,6 +1,6 @@
 # Punch to Pen (punch2pen) — Real-time speech-to-text for Digital Audio Workstations
 
-punch2pen transcribes vocals inside a DAW in real time, displaying a scrolling karaoke-style transcript that stays in sync with the playback cursor. Users can click any word in the transcript to correct mis-transcriptions, and those corrections feed back into the model to improve future accuracy.
+punch2pen transcribes vocals inside a DAW in real time. During playback the UI is a **Living Transcript**: it highlights the word under the playhead and treats the active line as a title. Users can click any word to correct a mis-hear; those corrections feed back into the model.
 
 ## Architecture
 
@@ -52,7 +52,7 @@ flowchart LR
 | **Polymorphic transcription backend** | Local whisper.cpp (`Transcriber`) or cloud OpenAI Realtime WebSocket API (`OpenAICloudTranscriber`), switchable via CLI `--cloud --api-key=` |
 | **Correction feedback loop** | User corrections stored in CSV at `~/.punch2pen/corrections.csv`; vocabulary extracted to bias future transcriptions via `initial_prompt` |
 | **Record-state gating** | Audio only captured when DAW transport reports `isRecording == true` |
-| **Karaoke-style word highlighting** | WebView uses engine `startTime`/`endTime` against the DAW playhead |
+| **Living Transcript** | WebView highlights the word under the playhead using engine `startTime`/`endTime` |
 | **Click-to-correct UI** | Word click opens the Direction C correction overlay; corrections are submitted via IPC to the engine |
 | **Plugin state persistence** | `transcriptionMode` and `bpm` saved via ValueTree XML serialization in `getStateInformation` / `setStateInformation` |
 | **Fail-loud local engine** | Missing `~/.punch2pen/models/ggml-base.bin` or a failed `127.0.0.1:7483` bind exits the engine with status 1 |
@@ -146,7 +146,8 @@ Wait for the **macOS Release** workflow. Download `Punch2Pen-1.0.0-macOS-unsigne
 | `plugin/Source/` | C++ plugin sources (`PluginProcessor`, `PluginEditor`, `WebViewEditor`, `IPCClient`, `RingBuffer`) |
 | `plugin/tests/` | Unit tests for RingBuffer, IPCClient, and PluginProcessor state persistence |
 | `shared/` | Protocol definitions shared between plugin and engine (`Protocol.h`) |
-| `scripts/` | Model download, IPC verification, and DAW integration readiness helpers |
+| `scripts/` | Model download, engine smoke, vocal golden-file, DAW readiness helpers |
+| `fixtures/vocals/` | Drop-in dry WAV + expected words (audio gitignored; see README there) |
 | `installer/` | macOS distribution packaging (`installer/macos/build_pkg.sh`) |
 
 ## DAW Integration Readiness
@@ -165,11 +166,26 @@ For a local install into the current macOS user account, run:
 
 The script checks macOS prerequisites, CMake/compiler availability, DAW detection, model files, build artifacts, engine startup on `127.0.0.1:7483`, IPC correction submission, plugin bundles, code signing status, and the exact manual DAW checklist to follow next.
 
+## Testing
+
+Green unit CI is not a Logic punch. Layers:
+
+| Layer | Command | Needs |
+|---|---|---|
+| Engine unit tests | `databaseManagerTest` … `transcriptTimingTest` (CI `engine-tests`) | CMake |
+| Plugin unit tests | `ringBufferTest`, `ipcClientTest`, `pluginProcessorStateTest`, `pluginProcessorCaptureTest` (CI `plugin-tests`) | macOS + JUCE |
+| Engine smoke (no Logic) | `./scripts/engine_smoke.sh` (CI `engine-smoke`) | whisper `ggml-base.bin`; isolated `PUNCH2PEN_HOME` |
+| Vocal golden file | `python3 scripts/verify_engine.py vocals` | Your dry WAV in `fixtures/vocals/` — **SKIP** if missing |
+| AU identity | `auval -strict -v aufx P2pn Dcta` | Mac after AU install. **Not** GitHub-hosted runners |
+| Logic punch | Insert **punch2pen**, arm, record, watch the Living Transcript | M-series MacBook Pro only |
+
+Do not check in commercial songs. See `fixtures/vocals/README.md`. `scripts/verify_correction.py` now exits 1 on a dead engine. `scripts/verify_transcription.py` is a sine-wave **protocol** probe, not STT quality.
+
 ## Roadmap
 
 The following items are **planned but not yet implemented**:
 
-- End-to-end automated host validation inside a real DAW session. The readiness script prepares the machine and opens the DAW, but recording/monitoring in Logic Pro or another host still requires manual confirmation.
+- End-to-end automated host validation inside a real DAW session. The readiness script prepares the machine and opens the DAW, but recording/monitoring in Logic Pro or another host still requires manual confirmation. Engine smoke and a skip-if-no-vocals golden file live in `scripts/engine_smoke.sh`.
 
 **Recently completed:**
 

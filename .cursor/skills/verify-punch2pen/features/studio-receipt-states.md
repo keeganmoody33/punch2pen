@@ -7,7 +7,7 @@ Studio Receipt is the plugin face: a 400×600 (resizable) WebView with five `bod
 - `state-disconnected` shows `#connection-banner` “Waiting for engine connection…” and badge `WAIT`.
 - `state-idle` is connected, transport stopped, empty pane “— no signal —”, badge `IDLE`.
 - `state-recording` is connected + DAW record, badge `REC`, provisional words, `#stream-cursor`.
-- `state-playback` is connected + playing, karaoke classes `past` / `active` / `upcoming`, badge `PLAY`.
+- `state-playback` is connected + playing, Living Transcript classes `past` / `active` / `upcoming`, badge `PLAY`.
 - `state-correction` shows `#correction-overlay` over the saved state; Cancel or Apply hides it.
 - `state-contract` asserts the bindable IDs and state names in `plugin/Source/ui/public/index.html`.
 
@@ -17,7 +17,7 @@ Studio Receipt is the plugin face: a 400×600 (resizable) WebView with five `bod
 - Disconnect or stop the engine to see WAIT / banner.
 - Connect the engine, leave transport stopped: IDLE.
 - Arm the track and record: REC.
-- Play back a take with words: PLAY karaoke.
+- Play back a take with words: PLAY Living Transcript.
 - Click a word: correction overlay.
 - Open `plugin/Source/ui/public/index.html` in a browser for the **static preview** only (no C++ bridge).
 
@@ -38,6 +38,6 @@ Preconditions:
 
 - README architecture still draws native `TranscriptView` / `CorrectionEditor`. The live editor is WebView. Do not drive the legacy C++ widgets.
 - `setState('correction')` keeps the previous badge (`—` in the JS map). Assert the overlay, not `REC`.
-- Recording suppresses karaoke `.active` styling on purpose. Do not fail REC because words are not inverted.
+- Recording suppresses Living Transcript `.active` styling on purpose. Do not fail REC because words are not inverted.
 - Default size is 400×600; the editor is resizable. Size is not a failure.
 - Do not restyle Direction C tokens or replace the wordmark as part of verify.

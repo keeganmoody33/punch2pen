@@ -16,11 +16,11 @@ This skill is for the next agent. Drive only what the repo can actually run.
 | Studio Receipt editor inside a DAW (`plugin/Source/ui/public/index.html` in WKWebView) | Primary UI. Wordmark `[ PUNCH2PEN ]`. States `disconnected` / `idle` / `recording` / `playback` / `correction`. | **No DAW driver.** JUCE `AudioPluginHost` is fetched when `PUNCH2PEN_BUILD_PLUGIN=ON` but has no session script. |
 | `punch2penEngine` CLI | `./build/bin/punch2penEngine` (optional `--cloud` / `--api-key=`). Ready line: `Engine ready.` | **Yes** — launch, log, port. |
 | Correction (click a word → Apply) | WebView `submitCorrection` → `IPCClient::sendCorrection` → engine `Applied correction.` → `~/.punch2pen/corrections.csv` | **Yes on the wire** (same Correction message the plugin sends). Click-in-DAW is manual. |
-| Karaoke transcript while recording | `processBlock` captures only when `isRecording`; results come back as `TranscriptionResult`. | **Human DAW only.** `scripts/verify_transcription.py` is **stale** (AudioChunk header missing `dawSampleTime` + `captureEpoch` after #17). |
+| Living Transcript while recording | `processBlock` captures only when `isRecording`; results come back as `TranscriptionResult`. | **Human DAW only.** `scripts/verify_transcription.py` is a sine-wave protocol probe, not STT. Use `scripts/verify_engine.py vocals` with `fixtures/vocals/dry-vocal.wav`. |
 | AU identity | `auval -v aufx P2pn Dcta`. CMake `PLUGIN_MANUFACTURER_CODE "Dcta"`, `PLUGIN_CODE "P2pn"`, `FORMATS VST3 AU`. | Read-only checks. **Never rename Dcta / P2pn / aufx.** |
 | Windows VST3 | Mentioned in docs, not this skill | Skip. |
 
-Existing harnesses (use these; do not add a fake DAW): `scripts/test_daw_integration.sh`, `scripts/verify_correction.py` (no failing exit code — do not trust it), `scripts/download_model.sh`, engine/plugin unit tests, `auval` on macOS.
+Existing harnesses (use these; do not add a fake DAW): `scripts/engine_smoke.sh`, `scripts/verify_engine.py`, `scripts/test_daw_integration.sh`, `scripts/verify_correction.py` (now exits 1 on a dead engine), `scripts/download_model.sh`, engine/plugin unit tests, `auval` on macOS.
 
 ## Launch
 
@@ -88,7 +88,7 @@ Stable handles (do not use click coordinates):
 .cursor/skills/verify-punch2pen/scripts/control-punch2pen drive daw-transcript
 ```
 
-`drive daw-transcript` **prints SKIP** with the unmet DAW precondition. That is success of the helper, not proof of karaoke.
+`drive daw-transcript` **prints SKIP** with the unmet DAW precondition. That is success of the helper, not proof of the Living Transcript.
 
 ## Evidence
 

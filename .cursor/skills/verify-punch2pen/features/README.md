@@ -19,7 +19,7 @@ This directory is the maintained source for verifying user-facing punch2pen beha
 - Start every recipe from the baseline unless its preconditions say otherwise.
 - Treat every command as literal.
 - Engine/IPC actions go through `control-punch2pen launch|doctor|drive|cleanup`.
-- DAW recording, karaoke click, and host transport are **manual on Mac**. There is no expect/Playwright/AudioPluginHost session in this tree.
+- DAW recording, Living Transcript click, and host transport are **manual on Mac**. There is no expect/Playwright/AudioPluginHost session in this tree.
 - Restore fixture corrections after a mutation. Do not remove proof artifacts during cleanup.
 
 ## Proof and skip reporting
