@@ -9,6 +9,7 @@ PORT=7483
 RUN_BUILD=1
 RUN_VOCALS=1
 REQUIRE_VOCALS=0
+REAP_SELFTEST_ONLY=0
 ENGINE_PID=""
 ISOLATED=""
 
@@ -23,6 +24,7 @@ Options:
   --skip-build       Use an existing \$PUNCH2PEN_BUILD_DIR/bin/punch2penEngine
   --skip-vocals      Do not run scripts/verify_engine.py vocals
   --require-vocals   Fail if fixtures/vocals/dry-vocal.wav is missing
+  --reap-selftest    Kill a SIGTERM-ignoring dummy and exit (no engine)
   --build-dir PATH   CMake build directory (default: $BUILD_DIR)
   -h, --help
 USAGE
@@ -30,6 +32,48 @@ USAGE
 
 log() { printf '%s\n' "$*"; }
 die() { printf 'engine_smoke: %s\n' "$*" >&2; exit 1; }
+
+# Descendants first, then root. Used so leftover whisper children are SIGKILL'd
+# instead of becoming orphans the script would wait on.
+pids_of_tree() {
+  local pid="$1"
+  local child
+  for child in $(pgrep -P "$pid" 2>/dev/null || true); do
+    pids_of_tree "$child"
+  done
+  printf '%s\n' "$pid"
+}
+
+# SIGTERM, brief poll, SIGKILL. Never `wait` — punch2penEngine's SIGTERM
+# handler calls stop() from the signal path and can sit in whisper forever.
+kill_engine_tree() {
+  local root="${1:-}"
+  local pids
+  [[ -n "$root" ]] || return 0
+
+  pids="$(pids_of_tree "$root" | tr '\n' ' ')"
+  if [[ -n "${pids// /}" ]]; then
+    # shellcheck disable=SC2086
+    kill -TERM $pids >/dev/null 2>&1 || true
+  fi
+
+  local i=0
+  while [[ $i -lt 5 ]]; do
+    if ! kill -0 "$root" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 0.1
+    i=$((i + 1))
+  done
+
+  pids="$(pids_of_tree "$root" | tr '\n' ' ')"
+  if [[ -n "${pids// /}" ]]; then
+    # shellcheck disable=SC2086
+    kill -KILL $pids >/dev/null 2>&1 || true
+  fi
+  # Reap a SIGKILL'd job only. Do not wait after SIGTERM — that is the CI hang.
+  wait "$root" >/dev/null 2>&1 || true
+}
 
 port_busy() {
   python3 - "$PORT" <<'PY'
@@ -44,18 +88,46 @@ PY
 }
 
 cleanup() {
-  if [[ -n "${ENGINE_PID:-}" ]] && kill -0 "$ENGINE_PID" >/dev/null 2>&1; then
-    kill "$ENGINE_PID" >/dev/null 2>&1 || true
-    wait "$ENGINE_PID" >/dev/null 2>&1 || true
-  fi
+  local pid="${ENGINE_PID:-}"
+  ENGINE_PID=""
+  kill_engine_tree "$pid"
 }
 trap cleanup EXIT
+
+# Prove PASS-path teardown cannot hang on a SIGTERM-ignoring dummy + child.
+reap_selftest() {
+  local dummy="" childfile="" child="" start elapsed
+  childfile="$(mktemp /tmp/punch2pen-reap.XXXXXX)"
+  bash -c 'trap "" TERM INT; sleep 60 & echo $! >"$0"; wait' "$childfile" &
+  dummy=$!
+  local n=0
+  while [[ $n -lt 50 && ! -s "$childfile" ]]; do
+    sleep 0.02
+    n=$((n + 1))
+  done
+  child="$(cat "$childfile" 2>/dev/null || true)"
+  start="$(python3 -c 'import time; print(time.monotonic())')"
+  kill_engine_tree "$dummy"
+  elapsed="$(python3 -c "import time; print('{:.3f}'.format(time.monotonic() - float('$start')))")"
+  rm -f "$childfile"
+  if kill -0 "$dummy" >/dev/null 2>&1; then
+    die "reap selftest: dummy engine $dummy still alive"
+  fi
+  if [[ -n "$child" ]] && kill -0 "$child" >/dev/null 2>&1; then
+    kill -KILL "$child" >/dev/null 2>&1 || true
+    die "reap selftest: dummy child $child still alive"
+  fi
+  python3 -c "import sys; sys.exit(0 if float('$elapsed') < 2.0 else 1)" \
+    || die "reap selftest: took ${elapsed}s; must not wait on leftover processes"
+  log "selftest: PASS engine reap after PASS (${elapsed}s)"
+}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-build) RUN_BUILD=0; shift ;;
     --skip-vocals) RUN_VOCALS=0; shift ;;
     --require-vocals) REQUIRE_VOCALS=1; shift ;;
+    --reap-selftest) REAP_SELFTEST_ONLY=1; shift ;;
     --build-dir) BUILD_DIR="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) die "unknown option: $1" ;;
@@ -66,6 +138,10 @@ cd "$ROOT"
 chmod +x "$ROOT/scripts/download_model.sh" "$ROOT/scripts/engine_smoke.sh" 2>/dev/null || true
 
 python3 "$ROOT/scripts/verify_engine.py" selftest
+reap_selftest
+if [[ "$REAP_SELFTEST_ONLY" -eq 1 ]]; then
+  exit 0
+fi
 
 if port_busy; then
   die "127.0.0.1:${PORT} is already listening. Stop that engine; this script will not hijack it."
@@ -196,4 +272,6 @@ else
 fi
 
 log "engine_smoke: PASS (no Logic)"
+kill_engine_tree "${ENGINE_PID:-}"
+ENGINE_PID=""
 exit 0
