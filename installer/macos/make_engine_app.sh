@@ -85,4 +85,11 @@ cat > "${DEST_APP}/Contents/Info.plist" <<'PLIST'
 PLIST
 
 echo "APPL????" > "${DEST_APP}/Contents/PkgInfo"
+
+# Ad-hoc sign the APPL so `open -g -n` after an unsigned pkg install is not
+# blocked solely for lack of a signature. Quarantine strip is postinstall.
+if command -v codesign >/dev/null 2>&1; then
+  codesign --force -s - --deep "${DEST_APP}" >/dev/null 2>&1 || true
+fi
+
 echo "Created ${DEST_APP}"

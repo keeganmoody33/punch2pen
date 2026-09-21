@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import socket
 import struct
-from typing import List, Optional, Tuple
+import threading
+import time
+from typing import Callable, List, Optional, Tuple
 
 MESSAGE_AUDIO = 1
 MESSAGE_RESULT = 2
@@ -119,23 +121,37 @@ def parse_transcription_result(payload: bytes) -> Tuple[str, float, float, int]:
 def wait_for_results(
     sock: socket.socket, timeout: float, min_results: int = 1
 ) -> List[Tuple[str, float, float, int]]:
-    sock.settimeout(timeout)
-    results = []
-    deadline_chunks = 32
-    for _ in range(deadline_chunks):
+    """Wait until `timeout` seconds of wall clock elapse or results arrive.
+
+    `timeout` is a single deadline (time.monotonic), not a per-recv budget.
+    A silent engine must fail in ~timeout seconds, not N serial recvs.
+    """
+    deadline = time.monotonic() + max(float(timeout), 0.0)
+    results: List[Tuple[str, float, float, int]] = []
+    draining = False
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        if draining:
+            remaining = min(remaining, 1.0)
+        sock.settimeout(remaining)
         try:
             msg_type, payload = read_message(sock)
-        except socket.timeout as exc:
+        except (TimeoutError, socket.timeout):
+            break
+        except RuntimeError:
             if results:
                 break
-            raise TimeoutError("timed out waiting for TranscriptionResult") from exc
-        if msg_type == MESSAGE_RESULT:
-            results.append(parse_transcription_result(payload))
-            if len(results) >= min_results:
-                # Keep draining briefly in case more segments follow.
-                sock.settimeout(1.0)
-                min_results = 10**9
-        # Ignore other post-handshake types.
+            raise
+        if msg_type != MESSAGE_RESULT:
+            continue
+        results.append(parse_transcription_result(payload))
+        if len(results) >= min_results:
+            # Drain trailing segments, still capped by the same deadline.
+            draining = True
+    if not results:
+        raise TimeoutError("timed out waiting for TranscriptionResult")
     return results
 
 
@@ -146,4 +162,116 @@ def packed_sizes_ok() -> Optional[str]:
         return f"TranscriptionResultHeader size {RESULT_HEADER.size} != 24"
     if TRANSPORT_STOP_HEADER.size != 4:
         return f"TransportStopHeader size {TRANSPORT_STOP_HEADER.size} != 4"
+    return None
+
+
+def _serve_once(handler: Callable[[socket.socket], None]) -> socket.socket:
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind((HOST, 0))
+    server.listen(1)
+    thread = threading.Thread(target=handler, args=(server,), daemon=True)
+    thread.start()
+    return server
+
+
+def wait_deadline_ok(bound: float = 0.35) -> Optional[str]:
+    """Fail if wait_for_results can run many serial recvs instead of one deadline."""
+
+    def silent(server: socket.socket) -> None:
+        conn, _unused = server.accept()
+        try:
+            time.sleep(bound + 1.0)
+        except OSError:
+            pass
+        finally:
+            conn.close()
+
+    stop_flood = threading.Event()
+
+    def flood_ignored(server: socket.socket) -> None:
+        conn, _unused = server.accept()
+        payload = HANDSHAKE.pack(PROTOCOL_VERSION)
+        packet = MESSAGE_HEADER.pack(MESSAGE_HANDSHAKE, len(payload)) + payload
+        try:
+            while not stop_flood.is_set():
+                conn.sendall(packet)
+                time.sleep(0.04)
+        except OSError:
+            pass
+        finally:
+            conn.close()
+
+    def timed_wait(server: socket.socket) -> tuple[float, Optional[int], Optional[Exception]]:
+        sock = connect(port=server.getsockname()[1], timeout=1.0)
+        start = time.monotonic()
+        count: Optional[int] = None
+        err: Optional[Exception] = None
+        try:
+            count = len(wait_for_results(sock, timeout=bound))
+        except Exception as exc:
+            err = exc
+        elapsed = time.monotonic() - start
+        sock.close()
+        return elapsed, count, err
+
+    silent_server = _serve_once(silent)
+    try:
+        elapsed, count, err = timed_wait(silent_server)
+    finally:
+        silent_server.close()
+    if not isinstance(err, TimeoutError):
+        return (
+            f"silent peer: expected TimeoutError within {bound:.2f}s, "
+            f"got results={count} err={err!r} after {elapsed:.2f}s"
+        )
+    if elapsed > bound + 0.8:
+        return (
+            f"silent peer: wait_for_results took {elapsed:.2f}s for timeout={bound:.2f}s "
+            "(must be one wall-clock deadline, not 32 serial recvs)"
+        )
+
+    flood_server = _serve_once(flood_ignored)
+    try:
+        elapsed, count, err = timed_wait(flood_server)
+    finally:
+        stop_flood.set()
+        flood_server.close()
+    if not isinstance(err, TimeoutError):
+        return (
+            "ignored-message flood: expected TimeoutError at the deadline, "
+            f"got results={count} err={err!r} after {elapsed:.2f}s"
+        )
+    if elapsed > bound + 0.8:
+        return (
+            f"ignored-message flood: wait_for_results took {elapsed:.2f}s "
+            f"for timeout={bound:.2f}s"
+        )
+
+    stop_result = threading.Event()
+
+    def one_result(server: socket.socket) -> None:
+        conn, _unused = server.accept()
+        text = b"check"
+        payload = RESULT_HEADER.pack(len(text), 0.0, 1.0, 0) + text
+        try:
+            conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            conn.sendall(MESSAGE_HEADER.pack(MESSAGE_RESULT, len(payload)) + payload)
+            stop_result.wait(timeout=2.0)
+        except OSError:
+            pass
+        finally:
+            conn.close()
+
+    result_server = _serve_once(one_result)
+    try:
+        elapsed, count, err = timed_wait(result_server)
+    finally:
+        stop_result.set()
+        result_server.close()
+    if err is not None or count != 1:
+        return (
+            f"one TranscriptionResult: expected 1 result, "
+            f"got results={count} err={err!r} after {elapsed:.2f}s"
+        )
     return None

@@ -105,12 +105,23 @@ bool IPCServer::start() {
 
 void IPCServer::stop() {
   running = false;
+  // close() alone does not always wake a blocking accept() on macOS, so
+  // SIGTERM then wait() in engine_smoke hung until the 10-minute CI cap.
   if (serverSocket >= 0) {
-    close(serverSocket);
-    serverSocket = -1;
+    shutdown(serverSocket, SHUT_RDWR);
+  }
+  {
+    std::lock_guard<std::mutex> lock(clientLock);
+    if (activeClientSocket >= 0) {
+      shutdown(activeClientSocket, SHUT_RDWR);
+    }
   }
   if (acceptThread.joinable()) {
     acceptThread.join();
+  }
+  if (serverSocket >= 0) {
+    close(serverSocket);
+    serverSocket = -1;
   }
 }
 

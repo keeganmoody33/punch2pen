@@ -13,7 +13,7 @@ Engine ready is the local `punch2penEngine` daemon listening on loopback so the 
 ## How to get to it (user POV)
 
 - Run `./build/bin/punch2penEngine` in a terminal after `scripts/download_model.sh base`.
-- Insert the punch2pen plugin in a DAW so `IPCClient` auto-launches the nested `Contents/Helpers/punch2penEngine.app` (or `/Applications/Punch2Pen/punch2penEngine.app`) if 7483 is down. Leftover `~/punch2pen/bin/punch2penEngine` is not launched.
+- Insert the punch2pen plugin in a DAW so `IPCClient` auto-launches `/Applications/Punch2Pen/punch2penEngine.app` (or the nested `Contents/Helpers/punch2penEngine.app`) if 7483 is down. Leftover `~/punch2pen/bin/punch2penEngine` is not launched. A pkg install also starts a RunAtLoad LaunchAgent.
 - Run `./scripts/test_daw_integration.sh` (it starts a temporary engine unless `--skip-engine`).
 
 ## Driving it with control-punch2pen

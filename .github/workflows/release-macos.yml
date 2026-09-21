@@ -102,10 +102,10 @@ jobs:
           - Bundle ID: `com.doctaaa.punch2pen`
           - Manufacturer / plugin / type: **Dcta / P2pn / aufx**
           - Not signed or notarized. Gatekeeper will warn.
-          - Place the Whisper model at `~/.punch2pen/models/ggml-base.bin` (not included).
-          - Engine helper is `punch2penEngine.app` (also nested in the AU/VST3 bundle). The plugin launches it with Launch Services so Logic can reach `127.0.0.1:7483`.
+          - Place the Whisper model at `~/.punch2pen/models/ggml-base.bin` if the installer could not download it.
+          - Engine helper is `punch2penEngine.app` (also nested in the AU/VST3 bundle). The pkg postinstall strips quarantine, ad-hoc signs the helper, mirrors AU/VST3 into `~/Library/Audio/Plug-Ins` (so a leftover user copy cannot hide Helpers), seeds the whisper model, registers a RunAtLoad LaunchAgent, and starts the engine so Logic is not stuck on WAIT. The plugin still auto-launches with `open -g -n` if 7483 is down.
           - whisper/ggml/ixwebsocket are statically linked when possible; remaining dylibs ship next to the engine with `@executable_path` / `@loader_path`. Leftover `~/punch2pen/bin/punch2penEngine` is not auto-launched.
-          - `auval` is skipped in GitHub Actions. On a Mac after install: `auval -strict -v aufx P2pn Dcta`
+          - `auval` is skipped in GitHub Actions. On a Mac after install: `auval -strict -v aufx P2pn Dcta`. Quit Logic before installing.
 
           No Windows build, prices, or vendor keys.
           EOF

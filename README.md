@@ -101,7 +101,7 @@ cmake --build build -j4
 
 The `--api-key=` flag can be omitted if the `OPENAI_API_KEY` environment variable is set. Do not bake a vendor key into the installer.
 
-Plugin auto-launch looks for `PUNCH2PEN_ENGINE`, then a nested `Contents/Helpers/punch2penEngine.app` inside the AU/VST3 bundle, then `/Applications/Punch2Pen/punch2penEngine.app`. It starts that app with Launch Services (`open -g`) so Logic's AU sandbox does not inherit onto the engine. A bare `punch2penEngine` at `/Applications/Punch2Pen/punch2penEngine` is the posix_spawn fallback. Leftover `~/punch2pen/bin/punch2penEngine` from old builds is ignored (those binaries still have a CI/build-machine rpath and die in dyld). Launch is retried every few seconds until TCP `127.0.0.1:7483` handshakes.
+Plugin auto-launch looks for `PUNCH2PEN_ENGINE`, then `/Applications/Punch2Pen/punch2penEngine.app`, then a nested `Contents/Helpers/punch2penEngine.app` inside the AU/VST3 bundle. It starts that app with Launch Services (`open -g -n`) so Logic's AU sandbox does not inherit onto the engine. If `open` fails, it posix_spawns `Contents/MacOS/punch2penEngine`. A bare `punch2penEngine` at `/Applications/Punch2Pen/punch2penEngine` is the last fallback. Leftover `~/punch2pen/bin/punch2penEngine` from old builds is ignored (those binaries still have a CI/build-machine rpath and die in dyld). Launch is retried every few seconds until TCP `127.0.0.1:7483` handshakes. The unsigned pkg postinstall also strips quarantine, mirrors the AU/VST3 into `~/Library/Audio/Plug-Ins` so a leftover user copy cannot hide the nested helper, seeds `ggml-base.bin`, and starts a RunAtLoad LaunchAgent so a freshly installed pkg is not stuck on WAIT.
 
 The engine is built with whisper/ggml/ixwebsocket statically linked when possible. Any remaining dylibs ship next to the binary. `LC_RPATH` is `@executable_path` / `@loader_path`, not the GitHub Actions runner or a `/tmp` build dir.
 
@@ -117,7 +117,13 @@ Writes an unsigned `dist/Punch2Pen_Installer.pkg`. Requires CMake plugin builds 
 auval -strict -v aufx P2pn Dcta
 ```
 
-The plugin must instantiate with the engine down. Auto-launch is a background helper, not part of AU initialize.
+The plugin must instantiate with the engine down. Auto-launch is a background helper, not part of AU initialize. Quit Logic before installing. After this pkg, `127.0.0.1:7483` should already be listening (LaunchAgent + postinstall `open`); the editor leaves WAIT once Handshake completes. Keegan dispatches **macOS Release** (agents get 403). Postinstall tries to download `ggml-base.bin` into `~/.punch2pen/models/` when it is missing.
+
+To stop the login helper (needed before `scripts/engine_smoke.sh` if port 7483 is taken):
+
+```bash
+launchctl bootout "gui/$(id -u)" /Library/LaunchAgents/com.doctaaa.punch2pen.engine.plist
+```
 
 ### GitHub Release (unsigned Mac pkg)
 
@@ -145,8 +151,6 @@ cd site
 npm install
 npx wrangler deploy
 ```
-
-## Repository Structure
 
 ## Repository Structure
 
