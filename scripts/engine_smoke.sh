@@ -23,6 +23,7 @@ Options:
   --skip-build       Use an existing \$PUNCH2PEN_BUILD_DIR/bin/punch2penEngine
   --skip-vocals      Do not run scripts/verify_engine.py vocals
   --require-vocals   Fail if fixtures/vocals/dry-vocal.wav is missing
+  --self-test        Prove EXIT teardown SIGKILLs a SIGTERM-ignoring child
   --build-dir PATH   CMake build directory (default: $BUILD_DIR)
   -h, --help
 USAGE
@@ -43,19 +44,69 @@ finally:
 PY
 }
 
-cleanup() {
-  if [[ -n "${ENGINE_PID:-}" ]] && kill -0 "$ENGINE_PID" >/dev/null 2>&1; then
-    kill "$ENGINE_PID" >/dev/null 2>&1 || true
-    wait "$ENGINE_PID" >/dev/null 2>&1 || true
+# SIGTERM is handled by the engine (sets a flag). If accept() or whisper
+# does not return, wait-forever after kill hangs GitHub's 10-minute step.
+stop_pid() {
+  local pid="${1:-}"
+  [[ -n "$pid" ]] || return 0
+  if kill -0 "$pid" >/dev/null 2>&1; then
+    kill "$pid" >/dev/null 2>&1 || true
+    local n=0
+    while kill -0 "$pid" >/dev/null 2>&1 && [[ "$n" -lt 15 ]]; do
+      sleep 0.2
+      n=$((n + 1))
+    done
+    if kill -0 "$pid" >/dev/null 2>&1; then
+      kill -9 "$pid" >/dev/null 2>&1 || true
+    fi
   fi
+  wait "$pid" >/dev/null 2>&1 || true
+}
+
+cleanup() {
+  stop_pid "${ENGINE_PID:-}"
 }
 trap cleanup EXIT
+
+selftest_stop_pid() {
+  local ready
+  ready="$(mktemp /tmp/punch2pen-stop-ready.XXXXXX)"
+  python3 -c 'import signal, sys, time
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+open(sys.argv[1], "w").write("ready")
+time.sleep(3600)' "$ready" &
+  local pid=$!
+  local i=0
+  while [[ ! -s "$ready" ]] && [[ "$i" -lt 50 ]]; do
+    sleep 0.05
+    i=$((i + 1))
+  done
+  rm -f "$ready"
+  kill -0 "$pid" >/dev/null 2>&1 \
+    || die "self-test: SIGTERM-ignoring child died before stop_pid"
+  kill "$pid" >/dev/null 2>&1 || true
+  sleep 0.2
+  kill -0 "$pid" >/dev/null 2>&1 \
+    || die "self-test: child exited on SIGTERM; handler was not installed"
+  local start elapsed
+  start="$(python3 -c 'import time; print("%.3f" % time.monotonic())')"
+  stop_pid "$pid"
+  elapsed="$(python3 -c "import time; print('%.3f' % (time.monotonic() - ${start}))")"
+  if kill -0 "$pid" >/dev/null 2>&1; then
+    kill -9 "$pid" >/dev/null 2>&1 || true
+    die "self-test: stop_pid left a SIGTERM-ignoring child alive"
+  fi
+  python3 -c "import sys; sys.exit(0 if float('${elapsed}') < 8.0 else 1)" \
+    || die "self-test: stop_pid took ${elapsed}s (must SIGKILL, not wait forever)"
+  log "engine_smoke: stop_pid self-test PASS (${elapsed}s)"
+}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-build) RUN_BUILD=0; shift ;;
     --skip-vocals) RUN_VOCALS=0; shift ;;
     --require-vocals) REQUIRE_VOCALS=1; shift ;;
+    --self-test) selftest_stop_pid; exit 0 ;;
     --build-dir) BUILD_DIR="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) die "unknown option: $1" ;;
@@ -66,6 +117,7 @@ cd "$ROOT"
 chmod +x "$ROOT/scripts/download_model.sh" "$ROOT/scripts/engine_smoke.sh" 2>/dev/null || true
 
 python3 "$ROOT/scripts/verify_engine.py" selftest
+selftest_stop_pid
 
 if port_busy; then
   die "127.0.0.1:${PORT} is already listening. Stop that engine; this script will not hijack it."
