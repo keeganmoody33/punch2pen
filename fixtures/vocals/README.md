@@ -4,8 +4,9 @@ This folder is how Punch2Pen gets an honest transcription check **without Logic*
 The engine still needs **real vocals**. A sine wave, a metronome, or a mixed
 beat is not a fixture.
 
-Checked-in audio is **not** shipped. Drop your own file locally. Commit it
-only if you own the recording.
+The checked-in `dry-vocal.wav` is Keegan Moody's original 11.4-second spoken
+punch, extracted from his Cap take as 16-bit mono PCM at 48 kHz. Its matching
+words are in `expected-words.txt`.
 
 ## What to drop in
 
@@ -58,9 +59,9 @@ If `dry-vocal.wav` is **your** original recording:
 git add -f fixtures/vocals/dry-vocal.wav fixtures/vocals/expected-words.txt
 ```
 
-Until that file exists, `scripts/verify_engine.py vocals` prints **SKIP** and
-exits 0. Pass `--require` (or `./scripts/engine_smoke.sh --require-vocals`)
-when you want a missing fixture to fail.
+If either required fixture is absent, `scripts/verify_engine.py vocals` prints
+**SKIP** and exits 0. Pass `--require` (or
+`./scripts/engine_smoke.sh --require-vocals`) when a missing fixture must fail.
 
 ## Run
 
