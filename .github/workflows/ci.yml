@@ -69,4 +69,4 @@ jobs:
         run: |
           chmod +x scripts/engine_smoke.sh scripts/download_model.sh
           ./scripts/engine_smoke.sh --skip-build
-        # vocals SKIP (exit 0) until fixtures/vocals/dry-vocal.wav is force-added.
+        # The checked-in Cap vocal fixture makes the vocals check run instead of skip.
