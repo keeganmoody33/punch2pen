@@ -22,12 +22,20 @@ namespace punch2pen {
       setConnectionStatus(connected)
       updatePosition(bar, beat)
       setState(stateName)
+      setActiveProfile({name, kind, detail})  // kind: 'local' | 'pro' | 'seat'
+      setProfileStatus(jsonString)   // optional; raw engine ProfileStatus
+                                     // (tier, profiles, dictionary, login
+                                     // stage) for a sign-in panel
 
     JS → C++ (registered as native functions on window.punch2pen):
       onWordClicked(word, x, y)
       submitCorrection(original, corrected)
       onCorrectionCancelled()
       onReady()
+      profileCommand(jsonString)     // {"op":"login_start","email"} |
+                                     // {"op":"login_verify","email","code"} |
+                                     // {"op":"set_active","profileId"} |
+                                     // {"op":"logout"|"status"|"refresh"}
  */
 class WebViewEditor : public juce::Component,
                       public IPCClient::Listener,
@@ -43,6 +51,7 @@ public:
   void onTranscriptionReceived(const std::string &text, double startTime,
                                double endTime, uint32_t captureEpoch) override;
   void onStatusChanged(bool connected) override;
+  void onProfileStatus(const std::string &json) override;
 
 private:
   void timerCallback() override;
@@ -61,12 +70,14 @@ private:
   void jsUpdatePosition(int bar, int beat);
   void jsSetConnectionStatus(bool connected);
   void jsSetState(const juce::String &state);
+  void jsSetProfileStatus(const juce::String &json);
 
   // Native callbacks invoked by the page.
   juce::var nativeOnWordClicked(const juce::Array<juce::var> &args);
   juce::var nativeSubmitCorrection(const juce::Array<juce::var> &args);
   juce::var nativeOnCorrectionCancelled(const juce::Array<juce::var> &args);
   juce::var nativeOnReady(const juce::Array<juce::var> &args);
+  juce::var nativeProfileCommand(const juce::Array<juce::var> &args);
 
   Punch2PenAudioProcessor &audioProcessor;
   std::unique_ptr<juce::WebBrowserComponent> webView;
@@ -78,6 +89,7 @@ private:
   int    lastBar           = -1;
   int    lastBeat          = -1;
   juce::String lastState   = {};
+  juce::String lastProfileStatus = {};
   bool   pageReady         = false;
 
   // Buffer for any setState / append calls that fire before onReady.

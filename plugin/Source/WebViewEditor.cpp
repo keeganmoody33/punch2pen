@@ -65,6 +65,12 @@ WebViewEditor::WebViewEditor(Punch2PenAudioProcessor &p)
                        auto completion) {
                   completion(nativeOnReady(args));
                 })
+            .withNativeFunction(
+                "profileCommand",
+                [this](const juce::Array<juce::var> &args,
+                       auto completion) {
+                  completion(nativeProfileCommand(args));
+                })
             .withResourceProvider(
                 [](const juce::String &url)
                     -> std::optional<juce::WebBrowserComponent::Resource> {
@@ -98,6 +104,11 @@ WebViewEditor::WebViewEditor(Punch2PenAudioProcessor &p)
   if (auto *client = audioProcessor.getIPCClient()) {
     client->addListener(this);
     lastConnected = client->isConnected();
+    // The engine may have reported the active profile before this editor
+    // existed; replay it so the pill is right on first paint.
+    const std::string cached = client->lastProfileStatus();
+    if (!cached.empty())
+      jsSetProfileStatus(juce::String::fromUTF8(cached.c_str()));
   }
 
   startTimerHz(30);
@@ -183,6 +194,15 @@ void WebViewEditor::onStatusChanged(bool connected) {
   });
 }
 
+void WebViewEditor::onProfileStatus(const std::string &json) {
+  juce::Component::SafePointer<WebViewEditor> safeThis(this);
+  const juce::String payload = juce::String::fromUTF8(json.c_str());
+  juce::MessageManager::callAsync([safeThis, payload] {
+    if (safeThis == nullptr) return;
+    safeThis->jsSetProfileStatus(payload);
+  });
+}
+
 // ── JS dispatch ─────────────────────────────────────────────────────────────
 void WebViewEditor::runJs(const juce::String &script, bool queueIfPending) {
   if (!webView) return;
@@ -235,6 +255,69 @@ void WebViewEditor::jsSetState(const juce::String &state) {
   runJs("window.setState(" + juce::JSON::toString(juce::var(state)) + ");");
 }
 
+void WebViewEditor::jsSetProfileStatus(const juce::String &json) {
+  // Only the newest status matters; drop any older one still queued.
+  if (!pageReady) {
+    for (int i = queuedJs.size(); --i >= 0;)
+      if (queuedJs[i].startsWith("/*profile*/"))
+        queuedJs.remove(i);
+  }
+  lastProfileStatus = json;
+
+  // Fold the engine's ProfileStatus into the page's active-profile pill:
+  //   window.setActiveProfile({ name, kind: 'local'|'pro'|'seat', detail })
+  // Free/lite stays 'local'. A signed-in seat is 'seat' (studio workspace)
+  // or 'pro' (the artist owns the workspace). The raw status also goes to
+  // window.setProfileStatus when the page defines it, so a sign-in panel
+  // can drive profileCommand without a bridge change.
+  juce::String name = "Local";
+  juce::String kind = "local";
+  const juce::String dot = juce::String::fromUTF8(" \xC2\xB7 ");
+  juce::String detail = "This Mac" + dot + "no account";
+  const juce::var status = juce::JSON::parse(json);
+  if (auto *obj = status.getDynamicObject()) {
+    const juce::String tier = obj->getProperty("tier").toString();
+    const bool signedIn = static_cast<bool>(obj->getProperty("signedIn"));
+    const juce::var active = obj->getProperty("activeProfile");
+    const juce::var dictionary = obj->getProperty("dictionary");
+    const int entries = dictionary.getDynamicObject() != nullptr
+                            ? static_cast<int>(dictionary["entries"])
+                            : 0;
+    if (tier == "paid" && active.getDynamicObject() != nullptr) {
+      name = active["name"].toString();
+      if (name.isEmpty()) name = "Profile";
+      kind = active["role"].toString() == "owner" ? "pro" : "seat";
+      const juce::String workspace = active["workspaceName"].toString();
+      const juce::String sync = obj->getProperty("sync").toString();
+      detail = (workspace.isNotEmpty() ? workspace + dot : juce::String())
+               + juce::String(entries) + (entries == 1 ? " word" : " words")
+               + " in dictionary"
+               + (sync.isNotEmpty() ? dot + sync : juce::String());
+    } else if (signedIn) {
+      name = "No seat";
+      detail = obj->getProperty("message").toString();
+      if (detail.isEmpty()) detail = "Signed in" + dot + "no active seat";
+    } else if (entries > 0) {
+      detail = "This Mac" + dot + juce::String(entries)
+               + (entries == 1 ? " correction" : " corrections")
+               + " in this session only";
+    }
+  }
+
+  auto *profile = new juce::DynamicObject();
+  profile->setProperty("name", name);
+  profile->setProperty("kind", kind);
+  profile->setProperty("detail", detail);
+  const juce::String profileJson = juce::JSON::toString(juce::var(profile));
+
+  // The status is passed as a JSON *string*; the page parses it so a
+  // malformed payload cannot turn into script.
+  runJs("/*profile*/"
+        "if (window.setActiveProfile) window.setActiveProfile(" + profileJson + ");"
+        "if (window.setProfileStatus) window.setProfileStatus("
+        + juce::JSON::toString(juce::var(json)) + ");");
+}
+
 // ── Native callbacks from the page ──────────────────────────────────────────
 juce::var WebViewEditor::nativeOnReady(const juce::Array<juce::var> &) {
   pageReady = true;
@@ -272,6 +355,15 @@ juce::var WebViewEditor::nativeSubmitCorrection(const juce::Array<juce::var> &ar
 }
 
 juce::var WebViewEditor::nativeOnCorrectionCancelled(const juce::Array<juce::var> &) {
+  return {};
+}
+
+juce::var WebViewEditor::nativeProfileCommand(const juce::Array<juce::var> &args) {
+  if (args.size() < 1) return {};
+  const auto json = args[0].toString().toStdString();
+  if (json.empty()) return {};
+  if (auto *client = audioProcessor.getIPCClient())
+    client->sendProfileCommand(json);
   return {};
 }
 
