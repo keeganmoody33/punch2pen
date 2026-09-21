@@ -3,75 +3,80 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
   <title>punch2pen</title>
   <!--
-    punch2pen WebView UI.
+    punch2pen WebView UI — vibe Open (dark, DAW-native, not a toy).
 
-    This single file is the entire plugin face. It is loaded by
-    WebViewEditor and driven over a tiny JS API:
+    Single HTML blob loaded by WebViewEditor. Product states and the
+    C++ bridge are unchanged; look, mark, and chrome are new.
 
-      C++ → JS (call via evaluateJavascript):
+      C++ → JS (evaluateJavascript):
         appendWord(text, startSample, endSample, barNumber)
         updatePlayhead(currentDAWSample)
-        setConnectionStatus(connected)        // boolean
-        updatePosition(bar, beat)             // ints
-        setState(stateName)                   // disconnected|idle|recording|playback|correction
-        resetTranscript()                     // clears all words (e.g. new take)
-        showCorrection(originalWord, x, y)    // opens the popup at a position
+        setConnectionStatus(connected)
+        updatePosition(bar, beat)
+        setState(stateName)            // disconnected|idle|recording|playback|correction
+        resetTranscript()
+        showCorrection(originalWord, x, y)
         hideCorrection()
 
-      JS → C++ (registered as native functions on window.punch2pen):
+      JS → C++ (native functions on window.punch2pen):
         onWordClicked(word, x, y)
         submitCorrection(original, corrected)
         onCorrectionCancelled()
+        onReady()
 
-    Element IDs that the bridge / DAW side may bind to:
-      #header-bar  #app-title  #status-badge
+    Bindable IDs:
+      #header-bar  #app-title  #status-badge  #logo-mark
       #position-display  #position-text
       #connection-banner
       #transcript-container
       #correction-overlay  #correction-original
       #correction-input  #correction-submit  #correction-cancel
-      #logo-mark
   -->
   <style>
-    /* ──────────────────────────────────────────────────────────
-       Tokens — taken from the existing JUCE codebase:
-         TranscriptView.h         lines 65–67
-         CorrectionEditor.cpp     lines 16–28
-         PluginEditor.cpp paint() line 61
-       ────────────────────────────────────────────────────────── */
     :root {
-      --bg-primary:      #1C1917;
-      --text-primary:    #FAFAF9;
-      --accent-primary:  #FCD34D;
       --window-bg:       #1E1E1E;
-      --header-bg:       #2D2D2D;
-      --input-bg:        #3A3A3A;
-      --border-color:    #505050;
-      --submit-green:    #4A9F4A;
-      --cancel-red:      #9F4A4A;
-
-      /* Derived */
-      --ink-mid:         rgba(250, 250, 249, 0.55);
-      --ink-dim:         rgba(250, 250, 249, 0.30);
-      --rule:            rgba(250, 250, 249, 0.10);
-      --past:            0.4;     /* per spec — past-word alpha */
-      --upcoming:        0.6;
+      --bg-primary:      #14151A;
+      --header-bg:       #22242A;
+      --elevated:        #2A2D34;
+      --text-primary:    #F3F4F6;
+      --ink-mid:         rgba(243, 244, 246, 0.58);
+      --ink-dim:         rgba(243, 244, 246, 0.32);
+      --accent-primary:  #7AD4C0;
+      --accent-dim:      rgba(122, 212, 192, 0.16);
+      --accent-line:     rgba(122, 212, 192, 0.45);
+      --wait:            #D7B07A;
+      --rec:             #FF453A;
+      --play:            #7AD4C0;
+      --idle:            #8B919C;
+      --input-bg:        #1A1C21;
+      --border-color:    rgba(255, 255, 255, 0.10);
+      --rule:            rgba(255, 255, 255, 0.08);
+      --submit-green:    #7AD4C0;
+      --cancel-red:      #8A9099;
+      --past:            0.38;
+      --upcoming:        0.62;
       --active:          1.0;
-
-      --mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+      --ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
+            "Segoe UI", sans-serif;
+      --mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+      --line-h: 44px;
     }
 
     * { box-sizing: border-box; }
     html, body {
-      margin: 0; padding: 0;
-      width: 100%; height: 100%;
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
       background: var(--window-bg);
       color: var(--text-primary);
-      font-family: var(--mono);
+      font-family: var(--ui);
       font-size: 13px;
       overflow: hidden;
+      color-scheme: dark;
       -webkit-font-smoothing: antialiased;
       user-select: none;
     }
@@ -79,296 +84,508 @@
       position: relative;
       display: flex;
       flex-direction: column;
+      min-width: 0;
+      min-height: 0;
     }
 
     /* ── HEADER ─────────────────────────────────────────────── */
     #header-bar {
-      height: 40px;
+      height: 46px;
       flex-shrink: 0;
       background: var(--header-bg);
-      display: flex; align-items: center; gap: 10px;
-      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 12px 0 10px;
       border-bottom: 1px solid var(--rule);
       position: relative;
-      z-index: 2;
+      z-index: 3;
     }
+    #logo-mark {
+      width: 24px;
+      height: 24px;
+      flex-shrink: 0;
+      color: var(--accent-primary);
+      pointer-events: none;
+    }
+    #logo-mark svg { width: 100%; height: 100%; display: block; overflow: visible; }
     #app-title {
-      font-weight: 700;
+      font-weight: 600;
+      font-size: 13px;
       letter-spacing: 0.04em;
-      font-size: 16px;
       color: var(--text-primary);
     }
-    #app-title .accent { color: var(--accent-primary); font-size: 19px; }
+    #app-title .accent {
+      color: var(--accent-primary);
+      font-weight: 700;
+    }
     #status-badge {
       margin-left: auto;
-      font-weight: 700;
+      font-family: var(--mono);
+      font-weight: 600;
       letter-spacing: 0.18em;
-      font-size: 10px;
+      font-size: 9px;
       text-transform: uppercase;
-      display: inline-flex; align-items: center; gap: 6px;
-      color: var(--ink-mid);
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--idle);
+      padding: 5px 9px 5px 8px;
+      border: 1px solid var(--border-color);
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.22);
     }
     #status-badge::before {
-      content: ""; width: 8px; height: 8px; border-radius: 50%;
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
       background: currentColor;
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
     }
-    /* State → badge */
-    body[data-state="disconnected"] #status-badge { color: var(--accent-primary); }
-    body[data-state="idle"]         #status-badge { color: var(--ink-mid); }
-    body[data-state="recording"]    #status-badge { color: #ff4d57; }
-    body[data-state="playback"]     #status-badge { color: var(--submit-green); }
+    body[data-state="disconnected"] #status-badge { color: var(--wait); }
+    body[data-state="idle"]         #status-badge { color: var(--idle); }
+    body[data-state="recording"]    #status-badge { color: var(--rec); }
+    body[data-state="playback"]     #status-badge { color: var(--play); }
     body[data-state="recording"] #status-badge::before {
-      animation: p2p-pulse 1.3s ease-out infinite;
+      animation: p2p-pulse 1.25s ease-out infinite;
+    }
+    body[data-state="recording"] #header-bar {
+      box-shadow: inset 0 -1px 0 var(--rec);
     }
     @keyframes p2p-pulse {
-      0%   { box-shadow: 0 0 0 0   #ff4d57aa; }
-      70%  { box-shadow: 0 0 0 10px transparent; }
-      100% { box-shadow: 0 0 0 0   transparent; }
+      0%   { box-shadow: 0 0 0 0 rgba(255, 69, 58, 0.55); }
+      70%  { box-shadow: 0 0 0 8px transparent; }
+      100% { box-shadow: 0 0 0 0 transparent; }
     }
 
-    /* ── POSITION DISPLAY ───────────────────────────────────── */
+    /* ── TRANSPORT / TIMECODE ───────────────────────────────── */
     #position-display {
-      height: 36px;                           /* bumped from 30 per spec */
       flex-shrink: 0;
-      display: flex; align-items: center;
-      padding: 0 14px;
+      display: flex;
+      align-items: stretch;
+      padding: 10px 12px 12px;
       border-bottom: 1px solid var(--rule);
-      background: var(--bg-primary);
+      background: var(--window-bg);
     }
     #position-text {
-      font-size: 18px;                        /* dropped from 24 per spec */
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      font-variant-numeric: tabular-nums;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      width: 100%;
     }
-    #position-text .bar-num,
-    #position-text .beat-num { color: var(--accent-primary); }
+    .pos-cell {
+      background: var(--bg-primary);
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      padding: 8px 12px 7px;
+      min-width: 0;
+    }
+    .pos-label {
+      display: block;
+      font-family: var(--mono);
+      font-size: 8px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--ink-dim);
+      margin-bottom: 2px;
+    }
+    .bar-num,
+    .beat-num {
+      display: block;
+      font-family: var(--mono);
+      font-size: 26px;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.1;
+      color: var(--text-primary);
+    }
+    body[data-state="recording"] .bar-num,
+    body[data-state="recording"] .beat-num { color: var(--rec); }
+    body[data-state="playback"] .bar-num,
+    body[data-state="playback"] .beat-num { color: var(--accent-primary); }
 
     /* ── CONNECTION BANNER ──────────────────────────────────── */
     #connection-banner {
-      display: none;                          /* shown only in disconnected */
-      flex-shrink: 0;
-      padding: 14px 16px;
-      font-size: 13px; font-weight: 700;
-      letter-spacing: 0.12em; text-transform: uppercase;
-      color: var(--accent-primary);
+      display: none;
+      flex: 1 1 auto;
+      min-height: 0;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 28px 28px 40px;
+      text-align: center;
       background:
-        linear-gradient(180deg,
-          rgba(252,211,77,0.10),
-          rgba(252,211,77,0.02));
-      border-bottom: 1px dashed rgba(252,211,77,0.4);
+        radial-gradient(120% 80% at 50% 0%, rgba(215, 176, 122, 0.08), transparent 55%),
+        var(--bg-primary);
     }
-    body[data-state="disconnected"] #connection-banner { display: block; }
+    body[data-state="disconnected"] #connection-banner { display: flex; }
+    body[data-state="disconnected"] #transcript-container { display: none; }
+    .engine-glyph {
+      width: 44px;
+      height: 44px;
+      color: var(--wait);
+      opacity: 0.9;
+      margin-bottom: 6px;
+    }
+    .engine-glyph svg { width: 100%; height: 100%; display: block; }
+    .banner-copy {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--wait);
+      max-width: 22em;
+      line-height: 1.55;
+    }
+    .banner-sub {
+      font-size: 12px;
+      color: var(--ink-mid);
+      max-width: 22em;
+      line-height: 1.45;
+    }
 
     /* ── TRANSCRIPT ─────────────────────────────────────────── */
     #transcript-container {
       position: relative;
-      background: var(--bg-primary);
+      background:
+        linear-gradient(90deg, rgba(255,255,255,0.03) 36px, transparent 37px),
+        var(--bg-primary);
       flex: 1 1 auto;
       min-height: 0;
       overflow: hidden;
     }
     #transcript-inner {
-      position: absolute; left: 0; right: 0; top: 50%;
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
       will-change: transform;
-      transform: translateY(0);               /* updated by RAF spring */
-      transition: none;
+      transform: translateY(0);
     }
     .lyric-line {
-      height: 40px;
-      display: flex; align-items: center; gap: 6px;
-      padding: 0 22px;
-      font-size: 16px;
+      height: var(--line-h);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 14px 0 0;
+      font-size: 15px;
+      letter-spacing: -0.01em;
       white-space: nowrap;
+    }
+    .line-bar {
+      flex: 0 0 36px;
+      width: 36px;
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      font-variant-numeric: tabular-nums;
+      color: rgba(243, 244, 246, 0.42);
+      text-align: right;
+      padding-right: 8px;
+    }
+    .lyric-line.is-active .line-bar { color: var(--accent-primary); }
+    .lyric-words {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
     }
     .lyric-word {
       cursor: pointer;
-      padding: 2px 4px;
-      border-radius: 2px;
-      transition: background 140ms ease, color 140ms ease, opacity 140ms ease;
-      opacity: 0.6;                            /* default = upcoming */
+      padding: 3px 5px;
+      border-radius: 3px;
+      color: var(--text-primary);
+      opacity: 0.62;
+      transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
     }
-    .lyric-word:hover { background: rgba(255,255,255,0.06); }
+    .lyric-word:hover { background: rgba(255, 255, 255, 0.06); }
     .lyric-word.active {
-      opacity: 1.0;
-      color: var(--bg-primary);
-      background: var(--text-primary);
-      font-weight: 700;
+      opacity: 1;
+      color: var(--text-primary);
+      background: var(--accent-dim);
+      box-shadow: inset 0 -2px 0 var(--accent-primary);
+      font-weight: 600;
     }
-    .lyric-word.past { opacity: 0.4; }
-    .lyric-word.upcoming { opacity: 0.6; }
+    .lyric-word.past { opacity: 0.38; }
+    .lyric-word.upcoming { opacity: 0.62; }
+    .lyric-word.editing {
+      outline: 1px solid var(--accent-line);
+      background: var(--accent-dim);
+      opacity: 1;
+    }
 
-    /* Recording state: uniform "provisional" alpha, no active hot word */
     body[data-state="recording"] .lyric-word {
-      opacity: 0.6 !important;
+      opacity: 0.62 !important;
       color: var(--text-primary) !important;
       background: transparent !important;
+      box-shadow: none !important;
       font-weight: 400 !important;
     }
-    body[data-state="recording"] .lyric-word:last-of-type {
-      opacity: 0.85 !important;                /* newest word slight emphasis */
+    body[data-state="recording"] .lyric-line:last-child .lyric-word:last-of-type {
+      opacity: 0.92 !important;
     }
 
-    /* Idle empty-state hint */
-    #idle-hint, #connecting-hint {
+    #idle-hint, #rec-hint {
       display: none;
-      position: absolute; inset: 0;
-      align-items: center; justify-content: center;
-      flex-direction: column; gap: 6px;
-      color: var(--ink-mid); font-size: 11px;
-      letter-spacing: 0.22em; text-transform: uppercase;
+      position: absolute;
+      inset: 0;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 6px;
       text-align: center;
       pointer-events: none;
     }
-    #idle-hint .sub {
+    .arm-glyph {
+      width: 28px;
+      height: 28px;
+      color: var(--rec);
+      opacity: 0.85;
+      margin-bottom: 4px;
+    }
+    .arm-glyph svg { width: 100%; height: 100%; display: block; }
+    .idle-kicker {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-primary);
+      opacity: 0.72;
+    }
+    #idle-hint .sub,
+    #rec-hint .sub {
+      color: var(--ink-dim);
+      font-size: 12px;
       letter-spacing: 0;
       text-transform: none;
-      color: var(--ink-dim); font-size: 11px;
-      margin-top: 4px;
     }
-    body[data-state="idle"]:not(.has-words) #transcript-container #idle-hint { display: flex; }
+    body[data-state="idle"]:not(.has-words) #idle-hint { display: flex; }
+    body[data-state="recording"]:not(.has-words) #rec-hint { display: flex; }
 
-    /* Streaming cursor at the very end of the transcript during recording */
     #stream-cursor {
       display: none;
-      width: 8px; height: 16px;
-      background: #ff4d57;
+      width: 2px;
+      height: 16px;
+      margin-left: 2px;
+      background: var(--rec);
       animation: p2p-blink 1s steps(2) infinite;
       vertical-align: middle;
     }
     body[data-state="recording"] #stream-cursor { display: inline-block; }
     @keyframes p2p-blink { 50% { opacity: 0; } }
 
-    /* Top/bottom fade so the karaoke scroll feels physical */
-    .fade-top, .fade-bot {
-      position: absolute; left: 0; right: 0; height: 50px;
-      pointer-events: none; z-index: 1;
+    #playhead-rail {
+      display: none;
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: var(--line-h);
+      margin-top: calc(var(--line-h) / -2);
+      pointer-events: none;
+      z-index: 1;
+      border-top: 1px solid rgba(122, 212, 192, 0.18);
+      border-bottom: 1px solid rgba(122, 212, 192, 0.18);
+      background: rgba(122, 212, 192, 0.04);
     }
-    .fade-top { top: 0;    background: linear-gradient(var(--bg-primary), transparent); }
+    body[data-state="playback"] #playhead-rail { display: block; }
+
+    .fade-top, .fade-bot {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 56px;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .fade-top { top: 0; background: linear-gradient(var(--bg-primary), transparent); }
     .fade-bot { bottom: 0; background: linear-gradient(transparent, var(--bg-primary)); }
 
-    /* ── CORRECTION OVERLAY (260×90, 6px padding per spec) ──── */
+    /* ── CORRECTION (docked inspector) ──────────────────────── */
     #correction-overlay {
       display: none;
       position: absolute;
-      width: 260px; height: 90px;
+      left: 10px;
+      right: 10px;
+      bottom: 10px;
+      width: auto;
+      height: auto;
       background: var(--header-bg);
       border: 1px solid var(--border-color);
-      padding: 6px;
-      box-shadow: 0 12px 28px rgba(0,0,0,0.55);
+      border-radius: 8px;
+      padding: 12px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
       z-index: 10;
-      font-family: var(--mono);
-      animation: p2p-pop 140ms ease-out;
+      animation: p2p-sheet 140ms ease-out;
     }
-    body[data-state="correction"] #correction-overlay { display: block; }
-    @keyframes p2p-pop {
-      from { transform: translateY(-4px) scale(0.96); opacity: 0; }
-      to   { transform: translateY(0) scale(1);       opacity: 1; }
+    body.correction-open #correction-overlay { display: block; }
+    body.correction-open #transcript-container { padding-bottom: 148px; }
+    @keyframes p2p-sheet {
+      from { transform: translateY(8px); opacity: 0; }
+      to   { transform: translateY(0); opacity: 1; }
+    }
+    .correction-kicker {
+      font-family: var(--mono);
+      font-size: 8px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--ink-dim);
+      margin-bottom: 4px;
     }
     #correction-original {
       display: block;
-      font-size: 12px; font-weight: 700;
+      font-size: 12px;
+      font-weight: 600;
       color: var(--text-primary);
-      height: 22px; line-height: 22px;
+      margin-bottom: 8px;
     }
     #correction-original::before {
-      content: "Original: ";
-      font-weight: 400;
+      content: "Original  ";
+      font-weight: 500;
       color: var(--ink-mid);
+      font-size: 11px;
     }
-    #correction-original .strike { text-decoration: line-through; text-decoration-color: var(--cancel-red); }
+    #correction-original .strike {
+      text-decoration: line-through;
+      text-decoration-color: rgba(255, 69, 58, 0.7);
+    }
     #correction-input {
       display: block;
-      width: 100%; height: 24px;
-      margin-top: 4px;
-      padding: 2px 6px;
+      width: 100%;
+      height: 32px;
+      margin: 0;
+      padding: 0 10px;
       background: var(--input-bg);
       color: var(--text-primary);
       border: 1px solid var(--border-color);
-      font-family: var(--mono); font-size: 13px; font-weight: 600;
+      border-radius: 5px;
+      font-family: var(--ui);
+      font-size: 14px;
+      font-weight: 600;
       outline: none;
       caret-color: var(--accent-primary);
+      -webkit-user-select: text;
+      user-select: text;
+      -webkit-appearance: none;
     }
     #correction-input:focus { border-color: var(--accent-primary); }
-    .button-row { display: flex; gap: 4px; margin-top: 4px; }
+    .button-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
     #correction-submit, #correction-cancel {
-      flex: 1; height: 24px;
-      border: none; cursor: pointer;
-      color: #fff; font-family: var(--mono);
-      font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+      flex: 1;
+      height: 30px;
+      border: 1px solid transparent;
+      border-radius: 5px;
+      cursor: pointer;
+      font-family: var(--ui);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
       font-size: 10px;
+      -webkit-appearance: none;
     }
-    #correction-submit { background: var(--submit-green); }
-    #correction-cancel { background: var(--cancel-red); }
-
-    /* ── LOGO MARK (bottom-right, all states) ───────────────── */
-    #logo-mark {
-      position: fixed;
-      right: 12px; bottom: 12px;
-      width: 56px; height: 56px;
-      opacity: 0.45;
-      pointer-events: none;
-      z-index: 0;
+    #correction-submit {
+      background: var(--accent-primary);
+      color: #10211C;
+    }
+    #correction-cancel {
+      background: transparent;
       color: var(--text-primary);
+      border-color: var(--border-color);
     }
-    #logo-mark svg { width: 100%; height: 100%; display: block; }
+    #correction-submit:hover { filter: brightness(1.06); }
+    #correction-cancel:hover { background: rgba(255, 255, 255, 0.04); }
+
+    @media (max-height: 480px) {
+      #header-bar { height: 40px; }
+      .bar-num, .beat-num { font-size: 20px; }
+      .pos-cell { padding: 6px 10px 5px; }
+      #correction-overlay { padding: 10px; }
+      body.correction-open #transcript-container { padding-bottom: 128px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #status-badge::before, #stream-cursor { animation: none; }
+      #correction-overlay { animation: none; }
+    }
   </style>
 </head>
-<body data-state="disconnected">
+<body data-state="disconnected" data-vibe="open">
 
-  <!-- HEADER ─────────────────────────────────────────────── -->
   <div id="header-bar">
-    <span id="app-title">[ PUNCH<span class="accent">2</span>PEN ]</span>
+    <div id="logo-mark" aria-hidden="true">
+      <!-- Playhead in an open frame. Inline so WKWebView needs no extra C++ resources. -->
+      <svg viewBox="0 0 32 32" fill="none">
+        <rect x="5.5" y="5.5" width="21" height="21" rx="5" stroke="currentColor" stroke-width="2"/>
+        <path d="M13 11.5v9l8-4.5-8-4.5z" fill="currentColor"/>
+      </svg>
+    </div>
+    <span id="app-title">punch<span class="accent">2</span>pen</span>
     <span id="status-badge">WAIT</span>
   </div>
 
-  <!-- POSITION ───────────────────────────────────────────── -->
   <div id="position-display">
-    <span id="position-text">
-      Bar <span class="bar-num">1</span>&nbsp;|&nbsp;Beat <span class="beat-num">1</span>
-    </span>
+    <div id="position-text">
+      <div class="pos-cell">
+        <span class="pos-label">Bar</span>
+        <span class="bar-num">001</span>
+      </div>
+      <div class="pos-cell">
+        <span class="pos-label">Beat</span>
+        <span class="beat-num">1</span>
+      </div>
+    </div>
   </div>
 
-  <!-- CONNECTION BANNER (only Disconnected) ───────────────── -->
-  <div id="connection-banner">Waiting for engine connection…</div>
+  <div id="connection-banner">
+    <div class="engine-glyph" aria-hidden="true">
+      <svg viewBox="0 0 44 44" fill="none">
+        <circle cx="22" cy="22" r="15" stroke="currentColor" stroke-width="1.6" stroke-dasharray="4 5"/>
+        <path d="M22 14v8l5 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="banner-copy">Waiting for engine connection…</div>
+    <div class="banner-sub">The local engine is offline. This insert stays quiet until it comes up.</div>
+  </div>
 
-  <!-- TRANSCRIPT ─────────────────────────────────────────── -->
   <div id="transcript-container">
     <div class="fade-top"></div>
+    <div id="playhead-rail" aria-hidden="true"></div>
     <div id="idle-hint">
-      — no signal —
-      <span class="sub">armed and ready · press ● REC on your DAW</span>
+      <div class="arm-glyph" aria-hidden="true">
+        <svg viewBox="0 0 28 28" fill="none">
+          <circle cx="14" cy="14" r="9" stroke="currentColor" stroke-width="1.6"/>
+          <circle cx="14" cy="14" r="4" fill="currentColor"/>
+        </svg>
+      </div>
+      <span class="idle-kicker">Armed</span>
+      <span class="sub">Record in the DAW to punch in</span>
+    </div>
+    <div id="rec-hint">
+      <span class="idle-kicker">Live</span>
+      <span class="sub">Listening for the take</span>
     </div>
     <div id="transcript-inner"></div>
     <div class="fade-bot"></div>
   </div>
 
-  <!-- CORRECTION OVERLAY ─────────────────────────────────── -->
   <div id="correction-overlay">
+    <div class="correction-kicker">Correct word</div>
     <span id="correction-original"></span>
     <input id="correction-input" type="text" spellcheck="false" autocomplete="off" />
     <div class="button-row">
-      <button id="correction-submit">Apply ↵</button>
-      <button id="correction-cancel">Cancel</button>
+      <button type="button" id="correction-submit">Apply</button>
+      <button type="button" id="correction-cancel">Cancel</button>
     </div>
   </div>
 
-  <!-- LOGO MARK ──────────────────────────────────────────── -->
-  <div id="logo-mark" aria-hidden="true">
-    <!-- Minimal fist+bolt placeholder. Replace with the real
-         binary-embedded PNG once it's wired into the resource provider. -->
-    <svg viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="2.5"
-         stroke-linecap="round" stroke-linejoin="round">
-      <path d="M12 22 L20 22 L20 14 L28 14 L28 22 L36 22 L36 38 L20 44 L12 38 Z" />
-      <path d="M36 16 L44 16 L40 26 L46 26 L34 44 L38 32 L32 32 Z"
-            fill="currentColor" fill-opacity="0.85" stroke="none" />
-    </svg>
-  </div>
-
   <script>
-    // ────────────────────────────────────────────────────────────
-    // State machine + DOM helpers
-    // ────────────────────────────────────────────────────────────
     const body         = document.body;
     const badge        = document.getElementById('status-badge');
     const positionBar  = document.querySelector('#position-text .bar-num');
@@ -384,33 +601,41 @@
       idle:         'IDLE',
       recording:    'REC',
       playback:     'PLAY',
-      correction:   '—',   // preserved by setState
+      correction:   '—',
     };
 
     let currentState = 'disconnected';
+    let pendingWordEl = null;
+    let editingWordEl = null;
+
     function setState(stateName) {
-      // 'correction' is an overlay layer — preserve the underlying state
-      // so when the popup closes we drop back to it.
       if (stateName === 'correction') {
+        // Overlay only — keep the transport data-state so WAIT/IDLE/REC/PLAY chrome stays.
         body.classList.add('correction-open');
-        body.dataset.state = 'correction';
         return;
       }
+      body.classList.remove('correction-open');
       currentState = stateName;
       body.dataset.state = stateName;
       if (badge) badge.textContent = BADGE_TEXT[stateName] || '';
-      // Toggle the idle empty-state class based on whether we have words
       body.classList.toggle('has-words', transcript.children.length > 0);
     }
 
-    // ────────────────────────────────────────────────────────────
-    // Transcript model
-    // Each .lyric-line holds .lyric-word spans with data-start/data-end
-    // (in DAW samples). updatePlayhead() walks them every frame.
-    // ────────────────────────────────────────────────────────────
+    function lineHeightPx() {
+      const line = transcript.querySelector('.lyric-line');
+      if (!line) return 44;
+      const h = line.getBoundingClientRect().height;
+      return h > 0 ? h : 44;
+    }
+
+    function padBar(bar) {
+      const n = Number(bar);
+      if (!Number.isFinite(n)) return String(bar);
+      return String(Math.max(0, Math.floor(n))).padStart(3, '0');
+    }
+
     function appendWord(text, startSample, endSample, barNumber) {
       let line = transcript.lastElementChild;
-      // Start a new line when bar changes or the current line has 8+ words.
       const startNewLine =
         !line ||
         (line.dataset.bar && Number(line.dataset.bar) !== Number(barNumber)) ||
@@ -420,39 +645,54 @@
         line = document.createElement('div');
         line.className = 'lyric-line';
         line.dataset.bar = String(barNumber);
+        const gutter = document.createElement('span');
+        gutter.className = 'line-bar';
+        gutter.textContent = padBar(barNumber);
+        const words = document.createElement('span');
+        words.className = 'lyric-words';
+        line.appendChild(gutter);
+        line.appendChild(words);
         transcript.appendChild(line);
       }
 
+      const words = line.querySelector('.lyric-words') || line;
       const span = document.createElement('span');
       span.className = 'lyric-word upcoming';
       span.dataset.start = String(startSample);
       span.dataset.end   = String(endSample);
       span.textContent   = text;
-      line.appendChild(span);
+      words.appendChild(span);
 
       let cursor = document.getElementById('stream-cursor');
       if (!cursor) {
         cursor = document.createElement('i');
         cursor.id = 'stream-cursor';
       }
-      line.appendChild(cursor);
+      words.appendChild(cursor);
 
       body.classList.add('has-words');
+
+      if (currentState === 'recording') {
+        const lines = transcript.querySelectorAll('.lyric-line');
+        const nextTarget = Math.max(0, (lines.length - 1) * lineHeightPx());
+        if (Math.abs(nextTarget - targetScrollY) > 0.1) {
+          targetScrollY = nextTarget;
+          scheduleSpringLoop();
+        }
+      }
     }
 
     function resetTranscript() {
       transcript.innerHTML = '';
       body.classList.remove('has-words');
+      pendingWordEl = null;
+      editingWordEl = null;
       currentSamplePos = 0;
       targetScrollY = 0;
       currentScrollY = 0;
       transcript.style.transform = 'translateY(0)';
     }
 
-    // ────────────────────────────────────────────────────────────
-    // Playhead + scroll. Mirrors juce::VBlankAttachment behaviour
-    // from TranscriptView.cpp (scroll += (target - scroll) * 0.15).
-    // ────────────────────────────────────────────────────────────
     let currentSamplePos = 0;
     let targetScrollY    = 0;
     let currentScrollY   = 0;
@@ -495,12 +735,12 @@
             w.classList.add('upcoming');
           }
         });
+        line.classList.toggle('is-active', lineHasActive);
         if (lineHasActive) activeLineIdx = li;
       });
 
       if (activeLineIdx !== -1) {
-        // Center the active line. 40 = .lyric-line height.
-        const nextTargetScrollY = activeLineIdx * 40;
+        const nextTargetScrollY = activeLineIdx * lineHeightPx();
         if (Math.abs(nextTargetScrollY - targetScrollY) > 0.1) {
           targetScrollY = nextTargetScrollY;
           scheduleSpringLoop();
@@ -508,7 +748,6 @@
       }
     }
 
-    // RAF spring loop — matches the 0.15 ease factor from JUCE.
     function springLoop() {
       springFramePending = false;
       const delta = targetScrollY - currentScrollY;
@@ -523,52 +762,66 @@
       if (!connected) {
         setState('disconnected');
       } else if (currentState === 'disconnected') {
-        // promote to idle on first connection unless host overrides
         setState(body.classList.contains('has-words') ? 'playback' : 'idle');
       }
     }
 
     function updatePosition(bar, beat) {
-      if (positionBar)  positionBar.textContent  = bar;
-      if (positionBeat) positionBeat.textContent = beat;
+      if (positionBar)  positionBar.textContent  = padBar(bar);
+      if (positionBeat) positionBeat.textContent = String(beat);
     }
 
-    // ────────────────────────────────────────────────────────────
-    // Correction overlay
-    // ────────────────────────────────────────────────────────────
     let savedState = 'playback';
+
+    function resolveEditingWord(word) {
+      if (pendingWordEl && pendingWordEl.textContent === word) return pendingWordEl;
+      const nodes = transcript.querySelectorAll('.lyric-word');
+      for (let i = 0; i < nodes.length; i++) {
+        if (nodes[i].textContent === word) return nodes[i];
+      }
+      return null;
+    }
 
     function showCorrection(word, x, y) {
       savedState = currentState === 'correction' ? savedState : currentState;
+      if (editingWordEl) editingWordEl.classList.remove('editing');
+      editingWordEl = resolveEditingWord(word);
+      if (editingWordEl) editingWordEl.classList.add('editing');
+
       original.textContent = '';
       const strike = document.createElement('span');
       strike.className = 'strike';
       strike.textContent = word;
       original.appendChild(strike);
       input.value = word;
-      // Clamp to the live plugin viewport (overlay is 260×90)
-      const overlayW = 260;
-      const overlayH = 90;
-      const vw = document.documentElement.clientWidth || window.innerWidth || 400;
-      const vh = document.documentElement.clientHeight || window.innerHeight || 600;
-      const clampedX = Math.max(8, Math.min(x, vw - overlayW - 8));
-      const clampedY = Math.max(50, Math.min(y, vh - overlayH - 8));
-      overlay.style.left = clampedX + 'px';
-      overlay.style.top  = clampedY + 'px';
       overlay.dataset.original = word;
+      overlay.style.left = '';
+      overlay.style.top = '';
+      void x;
+      void y;
       setState('correction');
-      // Defer focus so the overlay is laid out
       setTimeout(() => { input.focus(); input.select(); }, 0);
     }
 
     function hideCorrection() {
+      if (editingWordEl) editingWordEl.classList.remove('editing');
+      editingWordEl = null;
+      pendingWordEl = null;
       setState(savedState);
+    }
+
+    function cancelCorrection() {
+      if (window.punch2pen && window.punch2pen.onCorrectionCancelled) {
+        window.punch2pen.onCorrectionCancelled();
+      }
+      hideCorrection();
     }
 
     function commitCorrection() {
       const orig = overlay.dataset.original || '';
       const next = input.value.trim();
       if (next && next !== orig) {
+        if (editingWordEl) editingWordEl.textContent = next;
         if (window.punch2pen && window.punch2pen.submitCorrection) {
           window.punch2pen.submitCorrection(orig, next);
         }
@@ -577,26 +830,12 @@
     }
 
     document.getElementById('correction-submit').addEventListener('click', commitCorrection);
-    document.getElementById('correction-cancel').addEventListener('click', () => {
-      if (window.punch2pen && window.punch2pen.onCorrectionCancelled) {
-        window.punch2pen.onCorrectionCancelled();
-      }
-      hideCorrection();
-    });
+    document.getElementById('correction-cancel').addEventListener('click', cancelCorrection);
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter')  { e.preventDefault(); commitCorrection(); }
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        if (window.punch2pen && window.punch2pen.onCorrectionCancelled) {
-          window.punch2pen.onCorrectionCancelled();
-        }
-        hideCorrection();
-      }
+      if (e.key === 'Escape') { e.preventDefault(); cancelCorrection(); }
     });
 
-    // ────────────────────────────────────────────────────────────
-    // Word click → C++
-    // ────────────────────────────────────────────────────────────
     container.addEventListener('click', (e) => {
       const w = e.target.closest('.lyric-word');
       if (!w) return;
@@ -604,8 +843,7 @@
       const x = Math.round(rect.left);
       const y = Math.round(rect.bottom);
       const word = w.textContent || '';
-      // Fire native callback if registered; otherwise open the popup
-      // locally so the page also works as a static preview.
+      pendingWordEl = w;
       if (window.punch2pen && window.punch2pen.onWordClicked) {
         window.punch2pen.onWordClicked(word, x, y);
       } else {
@@ -613,9 +851,6 @@
       }
     });
 
-    // ────────────────────────────────────────────────────────────
-    // Expose the C++ → JS API on window for evaluateJavascript().
-    // ────────────────────────────────────────────────────────────
     window.appendWord           = appendWord;
     window.updatePlayhead       = updatePlayhead;
     window.setConnectionStatus  = setConnectionStatus;
@@ -625,15 +860,68 @@
     window.showCorrection       = showCorrection;
     window.hideCorrection       = hideCorrection;
 
-    // ────────────────────────────────────────────────────────────
-    // Initial state — disconnected until the engine reports in.
-    // ────────────────────────────────────────────────────────────
     setState('disconnected');
 
-    // Notify host that the page is ready for binding.
     if (window.punch2pen && window.punch2pen.onReady) {
       window.punch2pen.onReady();
     }
+
+    // Browser-only state preview. Resource provider has no query string,
+    // so this never runs inside the plugin.
+    (function previewHarness() {
+      if (window.__JUCE__ && window.__JUCE__.backend) return;
+      const params = new URLSearchParams(location.search);
+      const mode = params.get('preview');
+      if (!mode) return;
+
+      const demo = [
+        ['hell', 0, 4800, 1],
+        ['nah', 4800, 9600, 1],
+        ['we', 9600, 14400, 1],
+        ['outside', 14400, 24000, 1],
+        ['tonight', 24000, 33600, 1],
+        ['keep', 33600, 38400, 2],
+        ['the', 38400, 43200, 2],
+        ['punch', 43200, 50400, 2],
+        ['on', 50400, 52800, 2],
+        ['one', 52800, 57600, 2],
+      ];
+
+      function seedWords() {
+        resetTranscript();
+        demo.forEach((row) => appendWord(row[0], row[1], row[2], row[3]));
+      }
+
+      if (mode === 'disconnected') {
+        setConnectionStatus(false);
+        updatePosition(1, 1);
+      } else if (mode === 'idle') {
+        setConnectionStatus(true);
+        setState('idle');
+        updatePosition(1, 1);
+      } else if (mode === 'recording') {
+        setConnectionStatus(true);
+        setState('recording');
+        updatePosition(2, 1);
+        seedWords();
+      } else if (mode === 'playback') {
+        setConnectionStatus(true);
+        seedWords();
+        setState('playback');
+        updatePosition(1, 3);
+        updatePlayhead(26000);
+      } else if (mode === 'correction') {
+        setConnectionStatus(true);
+        seedWords();
+        setState('playback');
+        updatePosition(1, 3);
+        updatePlayhead(26000);
+        const target = Array.from(document.querySelectorAll('.lyric-word'))
+          .find((el) => el.textContent === 'tonight');
+        pendingWordEl = target || null;
+        showCorrection('tonight', 24, 180);
+      }
+    })();
   </script>
 </body>
 </html>
