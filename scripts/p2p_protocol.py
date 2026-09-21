@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import socket
 import struct
 import threading
@@ -15,7 +16,10 @@ MESSAGE_HANDSHAKE = 3
 MESSAGE_HANDSHAKE_RESPONSE = 4
 MESSAGE_CORRECTION = 5
 MESSAGE_TRANSPORT_STOP = 6
+MESSAGE_PROFILE_COMMAND = 7
+MESSAGE_PROFILE_STATUS = 8
 PROTOCOL_VERSION = 1
+MAX_JSON_PAYLOAD = 256 * 1024
 
 HOST = "127.0.0.1"
 PORT = 7483
@@ -95,6 +99,28 @@ def send_transport_stop(sock: socket.socket, capture_epoch: int = 0) -> None:
         MESSAGE_HEADER.pack(MESSAGE_TRANSPORT_STOP, TRANSPORT_STOP_HEADER.size)
     )
     sock.sendall(TRANSPORT_STOP_HEADER.pack(capture_epoch))
+
+
+def send_profile_command(sock: socket.socket, command: dict) -> None:
+    """ProfileCommand: header + raw UTF-8 JSON, no sub-header."""
+    payload = json.dumps(command, separators=(",", ":")).encode("utf-8")
+    if len(payload) > MAX_JSON_PAYLOAD:
+        raise ValueError("profile command too large")
+    sock.sendall(MESSAGE_HEADER.pack(MESSAGE_PROFILE_COMMAND, len(payload)))
+    sock.sendall(payload)
+
+
+def wait_for_profile_status(sock: socket.socket, timeout: float) -> dict:
+    """Return the next ProfileStatus JSON document, skipping other types."""
+    sock.settimeout(timeout)
+    for _ in range(64):
+        msg_type, payload = read_message(sock)
+        if msg_type == MESSAGE_PROFILE_STATUS:
+            doc = json.loads(payload.decode("utf-8"))
+            if not isinstance(doc, dict) or doc.get("type") != "profileStatus":
+                raise RuntimeError("ProfileStatus payload is not a status document")
+            return doc
+    raise TimeoutError("no ProfileStatus among the last 64 messages")
 
 
 def read_message(
