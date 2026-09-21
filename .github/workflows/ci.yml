@@ -122,14 +122,14 @@ jobs:
           from pathlib import Path
           text = Path("engine/src/main.cpp").read_text()
           bind = text.index("IPCServer server(7483)")
-          db = text.index("DatabaseManager db")
           start = text.index("server.start()")
+          account = text.index("AccountManager account(")
           whisper = text.index("make_unique<punch2pen::Transcriber>")
-          if not bind < db < whisper:
-              raise SystemExit("engine must construct IPCServer before DatabaseManager")
-          if not start < whisper:
-              raise SystemExit("engine must bind before constructing Transcriber")
-          print("[PASS] engine binds 7483 before db/whisper")
+          if not bind < start < account:
+              raise SystemExit("engine must bind 7483 before constructing AccountManager")
+          if not account < whisper:
+              raise SystemExit("engine must construct AccountManager before Transcriber")
+          print("[PASS] engine binds 7483 before account/whisper")
           PY
       - name: Build AU, VST3, and engine
         run: cmake --build build --config Release --target punch2penEngine punch2pen_plugin_AU punch2pen_plugin_VST3 -j4
