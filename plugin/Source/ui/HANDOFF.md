@@ -1,60 +1,93 @@
-# punch2pen — Design HANDOFF (WebView UI)
+# punch2pen — Design HANDOFF (Living Transcript WebView)
 
-This is the production hand-off for the **Studio Receipt** design direction
-(Direction C, approved). The plugin's visual face is now a single HTML
-document loaded into a JUCE `WebBrowserComponent`. All five canonical UI
-states the design system explored are implemented and driven by a small
-JS bridge.
+The plugin's visual face is one HTML document, `plugin/Source/ui/public/index.html`,
+loaded into a JUCE `WebBrowserComponent`. It is the **Living Transcript**: it
+highlights the word under the playhead, treats the active line as the title,
+renders a Temporal Hierarchy (past / active / upcoming), scrolls in sync with
+the DAW, and offers **Return to Live** when the user scrolls away.
+
+Vibe: **Open** — dark, DAW-native, not a toy. Default window **400×600**
+(C++ `setSize`), resizable; the CSS is fluid and follows the host.
+
+The language is lyric highlighting, nothing else: Living Transcript, Temporal
+Hierarchy, highlight the word, active line as title, synced scroll, Return to
+Live. Do not borrow sing-along wording anywhere in copy or code.
 
 ---
 
-## Files in this hand-off
+## Files
 
 ```
 plugin/
-├── CMakeLists.txt                    (MODIFIED)
+├── CMakeLists.txt                    (juce_add_binary_data embeds index.html)
 └── Source/
-    ├── PluginEditor.h                (REWRITTEN — thin shell that hosts WebViewEditor)
-    ├── PluginEditor.cpp              (REWRITTEN — same)
-    ├── WebViewEditor.h               (NEW — C++ ↔ JS bridge)
-    ├── WebViewEditor.cpp             (NEW — same)
-    └── ui/
-        └── public/
-            └── index.html            (NEW — entire plugin UI)
+    ├── PluginEditor.{h,cpp}          (thin shell; 400×600 default, resizable ≥400×400)
+    ├── WebViewEditor.{h,cpp}         (C++ ↔ JS bridge, 30 Hz timer)
+    └── ui/public/index.html          (entire plugin UI)
 ```
 
-The legacy native components (`TranscriptView`, `CorrectionEditor`,
-`PositionDisplay`) have been dropped from `target_sources` and deleted.
-The shipping face is `index.html` in `juce::WebBrowserComponent`.
+Identity is untouched: **Dcta / P2pn / aufx**.
 
 ---
 
-## Element IDs (14, all bindable from C++)
+## Layout (top → bottom)
 
-| ID                       | Role                                                    |
-|--------------------------|---------------------------------------------------------|
-| `header-bar`             | 40px header strip                                       |
-| `app-title`              | `[ PUNCH2PEN ]` wordmark                                |
-| `status-badge`           | WAIT / IDLE / REC / PLAY                                |
-| `position-display`       | 36px transport strip                                    |
-| `position-text`          | "Bar X | Beat Y" — children `.bar-num`, `.beat-num`     |
-| `connection-banner`      | Yellow "Waiting for engine connection…" (Disconnected)  |
-| `transcript-container`   | Scroll viewport                                         |
-| `correction-overlay`     | 260×90 popup                                            |
-| `correction-original`    | The mis-transcribed word                                |
-| `correction-input`       | `<input>` for the corrected text                        |
-| `correction-submit`      | Green Apply button                                      |
-| `correction-cancel`      | Red Cancel button                                       |
-| `logo-mark`              | Fist+bolt placeholder, bottom-right                     |
-| _(implicit)_ `body`      | Carries `data-state` for state-driven CSS               |
+| Region | ID | Height | Contents |
+|---|---|---|---|
+| Header | `#header-bar` | 44px | `[ PUNCH2PEN ]` wordmark (`#app-title`), **active-profile pill** (`#profile-pill`, placeholder), status badge (`#status-badge`: WAIT / IDLE / REC / PLAY) |
+| Transport strip | `#position-display` | 30px | `BAR n · BEAT n` (`#position-text` with `.bar-num` / `.beat-num`), `#sync-indicator` (LIVE / SCROLLED) |
+| Connection banner | `#connection-banner` | auto | “Waiting for engine connection…” — disconnected only |
+| Transcript | `#transcript-container` | flex | `#transcript-scroll` (native scroller) → `#transcript-inner` → `.lyric-line` → `.lyric-word`; empty-state hints; fades; `#return-to-live`; docked `#correction-overlay` |
+| Status bar | `#status-bar` | 30px | `#status-text` (state copy and the non-modal upgrade nudge), `#logo-mark` (placeholder) |
 
-Inside `#transcript-container`, the bridge populates:
+Inside `#transcript-inner` the bridge populates one line per bar (max 8 words):
 
 ```html
-<div class="lyric-line" data-bar="N">
-  <span class="lyric-word" data-start="48000" data-end="52800">hello</span>
+<div class="lyric-line line-active" data-bar="12">
+  <span class="lyric-word past"   data-start="48000" data-end="52800">pen</span>
+  <span class="lyric-word active" data-start="53000" data-end="57000">it</span>
+  <span class="lyric-word upcoming" …>down</span>
 </div>
 ```
+
+---
+
+## Temporal Hierarchy
+
+| Tier | Line class | Treatment |
+|---|---|---|
+| Past | `.line-past` | sans, ~15px, opacity 0.34 |
+| **Active (title)** | `.line-active` | sans **bold**, ~22px (scales with width via `cqi`), opacity 1 |
+| Upcoming | `.line-upcoming` | sans, ~15px, opacity 0.66 |
+
+Word under the playhead: `.lyric-word.active` — accent fill (`--accent` #FCD34D)
+with dark ink. Past words inside the active line sit at 0.55. Between two word
+timestamps the highlight **holds** on the last sung word (no flicker in whisper's
+gaps); after the final word it holds for ~0.75 s.
+
+While **recording**, words are provisional: the newest line is the title, no word
+is filled, and `#stream-cursor` blinks at the end of the line. Playback
+re-evaluates everything against real `startTime` / `endTime` samples.
+
+Synced scroll keeps the active line at a focal point (~40% down the pane; ~60%
+while recording) with an eased RAF scroll. Wheel / touch / scrollbar-drag by the
+user leaves follow mode: `body.scrolled-away`, `#sync-indicator` reads SCROLLED,
+and **Return to Live** appears bottom-right. Clicking it re-centres and resumes.
+Programmatic scrolls, host resizes, and content growth never trip it.
+
+---
+
+## States
+
+Contract attribute `body[data-state]` ∈ `disconnected | idle | recording | playback | correction`.
+`body[data-mode]` carries the underlying transport state while a correction is
+open, so REC/PLAY styling survives the sheet.
+
+1. **disconnected** — banner + WAIT; empty-state “Waiting for the local engine”.
+2. **idle** — connected, stopped. Empty-state “Arm the track and record” until words exist; with words, the line at/before the playhead is the title.
+3. **recording** — REC pulse, provisional words, newest line as title, stream cursor.
+4. **playback** — Living Transcript: highlight the word, active line as title, Temporal Hierarchy, synced scroll, Return to Live.
+5. **correction** — docked sheet at the bottom of the transcript (`#correction-overlay`), composited over the underlying mode. Clicked word gets `.correcting`. Apply replaces every exact match in the take (`.corrected`) and sends `submitCorrection`; Cancel / Esc sends `onCorrectionCancelled`.
 
 ---
 
@@ -66,17 +99,17 @@ window.updatePlayhead(currentDAWSample)
 window.setConnectionStatus(connected)        // boolean
 window.updatePosition(bar, beat)             // ints
 window.setState(stateName)                   // disconnected|idle|recording|playback|correction
-window.resetTranscript()                     // clears all words
-window.showCorrection(originalWord, x, y)
+window.resetTranscript()                     // clears all words (new take)
+window.showCorrection(originalWord, x, y)    // x,y accepted; the sheet is docked
 window.hideCorrection()
+window.setActiveProfile({ name, kind, detail })   // placeholder for the login/profile PR
 ```
 
-`updatePlayhead` iterates `.lyric-word`, classifies each as
-`past`/`active`/`upcoming` per the spec's alpha system (1.0 / 0.6 / 0.4),
-and updates `#transcript-inner.style.transform` via a `requestAnimationFrame`
-spring loop in `plugin/Source/ui/public/index.html` (`scroll += (target - scroll) * 0.15`).
+`setActiveProfile` drives `#profile-pill`; `kind` ∈ `local | pro | seat`. Until
+login ships the pill reads **Local · This Mac · no account** and its popover's
+Sign in button is disabled. No prices anywhere.
 
-## JS → C++ API (registered as native functions on `window.punch2pen`)
+## JS → C++ API (native functions on `window.punch2pen`)
 
 ```js
 window.punch2pen.onWordClicked(word, x, y)
@@ -85,84 +118,58 @@ window.punch2pen.onCorrectionCancelled()
 window.punch2pen.onReady()
 ```
 
-`onReady()` is the page handshake: the bridge buffers any C++→JS calls
-made before it fires and flushes them once the DOM is alive.
+`onReady()` is the page handshake: the bridge buffers C++→JS calls made before
+it fires and flushes them once the DOM is alive.
 
 ---
 
-## 5 canonical visual states
+## Status-bar copy (non-modal)
 
-Driven by `body[data-state]`. The bridge sets it from the processor's
-transport flags and IPC connection status (see
-`WebViewEditor::timerCallback`):
+| Situation | `#status-text` |
+|---|---|
+| disconnected | Local engine offline · transcription runs on this Mac |
+| idle, no words | Local transcription · no account needed |
+| idle, words | N words in this take · click a word to correct it |
+| recording | Transcribing the punch · words land as the engine hears them |
+| playback, following | Following the playhead · click a word to correct it |
+| scrolled away | Scrolled away from the playhead |
+| after a correction | “x” → “y” (in N places) · session-only on this Mac. A profile carries your dictionary between rooms. |
 
-1. **disconnected** — yellow `#FCD34D` "Waiting for engine" banner takes
-   over the transcript pane; badge shows `WAIT`. Triggered by
-   `setConnectionStatus(false)`.
-2. **idle** — connected, transport stopped. Empty pane with "— no signal — /
-   armed and ready · press ● REC on your DAW". Badge `IDLE`.
-3. **recording** — RED pulse badge `REC`. All words render at the
-   spec's uniform `0.6` provisional alpha — past/active styling is
-   suppressed via `!important` overrides because incoming words are
-   provisional until playback re-evaluates them. A `#stream-cursor`
-   blinks at the end of the active line.
-4. **playback** — full 3-tier karaoke (`.past` 0.4 / `.active` 1.0 /
-   `.upcoming` 0.6) with spring-eased scroll. Badge `PLAY` (green).
-5. **correction** — overlay only. Overlay layer is composited *on top*
-   of whichever underlying state is current. `hideCorrection()` drops
-   back to the saved state.
+The last row is the upgrade nudge: it appears only after the user actually
+corrects a word, never blocks, and names no price.
 
 ---
 
-## Color tokens (from `plugin/Source/ui/public/index.html`)
+## Tokens
 
-| Token              | Hex      | Source                                              |
-|--------------------|----------|-----------------------------------------------------|
-| `--bg-primary`     | #1C1917  | `index.html` `:root`                                |
-| `--text-primary`   | #FAFAF9  | `index.html` `:root`                                |
-| `--accent-primary` | #FCD34D  | `index.html` `:root`                                |
-| `--window-bg`      | #1E1E1E  | `index.html` `:root`; `PluginEditor.cpp` paint()    |
-| `--header-bg`      | #2D2D2D  | `index.html` `:root`                                |
-| `--input-bg`       | #3A3A3A  | `index.html` `:root`                                |
-| `--border-color`   | #505050  | `index.html` `:root`                                |
-| `--submit-green`   | #4A9F4A  | `index.html` `:root`                                |
-| `--cancel-red`     | #9F4A4A  | `index.html` `:root`                                |
+| Token | Value | Job |
+|---|---|---|
+| `--bg-deep` | #0F1012 | window |
+| `--bg-pane` | #15161A | transcript |
+| `--bg-chrome` | #1B1D21 | header, transport strip, status bar |
+| `--bg-raised` | #23262B | pill, popover, sheet, Return to Live |
+| `--ink` | #F3F3F1 | text |
+| `--accent` | #FCD34D | wordmark “2”, bar/beat, WAIT, active word, Apply |
+| `--rec` | #FF4D57 | REC, stream cursor |
+| `--play` | #5CCB8A | PLAY, LIVE, corrected marker |
 
----
-
-## Layout sizing (locked)
-
-- Plugin window: **400×600**
-- Header bar: full width × **40px**, title font **16px**
-- Position display: full width × **36px** (bumped from 30 to avoid clipping),
-  font **18px bold** (dropped from 24 per sizing tweak)
-- Transcript container: fills remaining space; `.lyric-line` is **40px** tall
-- Correction overlay: **260×90px**, 6px inner padding
-- Logo mark: fixed bottom-right corner, 56×56 at 0.45 opacity, all states
+Type: chrome in system mono (`ui-monospace`, SF Mono, Menlo…); lyrics in system
+sans (SF Pro / system-ui) for legibility. No webfonts from the network.
 
 ---
+
+## Browser preview (no C++ bridge)
+
+`index.html?preview=disconnected|idle|recording|playback|scrolled|correction[&t=seconds]`
+seeds an original demo verse and, without `t`, runs a fake playhead. It never
+executes inside the plugin (`window.__JUCE__.backend` present).
 
 ## Open follow-ups
 
-1. **Logo asset.** The bottom-right mark is currently an inline SVG
-   placeholder. Drop the real PNG into `Source/ui/public/assets/` and
-   either inline it as a data URL or add it to `juce_add_binary_data`
-   alongside `index.html`. The resource provider in `WebViewEditor.cpp`
-   already covers a single URL — extend it to match by suffix once you
-   add the asset.
-
-2. **WebView2 / WKWebView availability.** `NEEDS_WEB_BROWSER TRUE` on
-   `juce_add_plugin` triggers the system check JUCE requires. The
-   provided `WebBrowserComponent::Options` request the modern WebView2
-   backend on Windows; macOS uses WKWebView automatically. CEF is *not*
-   pulled in — keeps the binary small.
-
-3. **`getSampleRate()` on the processor.** Done — `Punch2PenAudioProcessor::getSampleRate()`.
-
-4. **Streaming sample placement.** Done on main (#17) — the bridge uses
-   engine `startTime`/`endTime` rather than the old +4800 heuristic.
-
-5. **Retire the legacy components.** Done — `TranscriptView.*`,
-   `CorrectionEditor.*`, and `PositionDisplay.*` are no longer compiled
-   and the files have been deleted. Processor tests link WebView sources
-   only.
+1. **Logo asset.** `#logo-mark` is still the placeholder. Drop the real asset into
+   `Source/ui/public/assets/` and extend the resource provider.
+2. **Profile switcher.** `setActiveProfile` is the hook; the fast switcher, login,
+   and seat isolation land with the paid-profile PR.
+3. **Bar labels per line.** `data-bar` is the arrival bar from the C++ timer, not
+   the sung bar; do not surface it as a gutter number until real tempo mapping exists.
+4. **Live DAW visual verification** in Logic's WKWebView is still a human step.
