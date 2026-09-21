@@ -252,15 +252,13 @@ else
   fi
 fi
 
-if [[ -f "$P2P_HOME/corrections.csv" ]]; then
-  record pass "Corrections CSV" "$P2P_HOME/corrections.csv"
+if [[ -f "$P2P_HOME/account.json" ]]; then
+  record pass "Paid profile session" "$P2P_HOME/account.json (signed in; dictionary caches under profiles/)"
 else
-  record warn "Corrections CSV" "not present yet; it will be created after corrections are submitted"
+  record pass "Free / lite" "no account.json; corrections stay in the engine session and nothing is written"
 fi
-if compgen -G "$P2P_HOME/profile_*.json" >/dev/null; then
-  record pass "Profile JSON" "$(compgen -G "$P2P_HOME/profile_*.json" | tr '\n' ' ')"
-else
-  record warn "Profile JSON" "not present yet; it will be created on engine shutdown after profile changes"
+if [[ -f "$P2P_HOME/profile-api.json" ]]; then
+  record pass "Profile API override" "$P2P_HOME/profile-api.json"
 fi
 
 section "Configure and build"

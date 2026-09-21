@@ -12,10 +12,17 @@ enum class MessageType : uint32_t {
   Handshake = 3,
   HandshakeResponse = 4,
   Correction = 5,
-  TransportStop = 6
+  TransportStop = 6,
+  // Account / active-profile channel. Payload is `Header::length` bytes of
+  // UTF-8 JSON with no sub-header. Plugin -> engine: {"op": ...}.
+  // Engine -> plugin: {"type":"profileStatus", ...}. Either side may ignore
+  // these types, so kProtocolVersion stays at 1.
+  ProfileCommand = 7,
+  ProfileStatus = 8
 };
 
 inline constexpr uint32_t kProtocolVersion = 1;
+inline constexpr uint32_t kMaxJsonPayloadBytes = 256 * 1024;
 
 #pragma pack(push, 1)
 

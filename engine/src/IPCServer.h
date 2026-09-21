@@ -35,17 +35,27 @@ public:
   bool hasPendingCorrection() override;
   CorrectionPair popCorrection() override;
 
+  bool hasPendingProfileCommand() override;
+  std::string popProfileCommand() override;
+
   void sendResult(const std::string &text, double startTime, double endTime,
                   uint32_t captureEpoch);
+
+  // Broadcasts a ProfileStatus JSON document to every handshaken plugin so
+  // each editor's active-profile pill agrees with the engine.
+  void sendProfileStatus(const std::string &json);
 
 private:
   void acceptLoop();
   void clientHandler(int clientSocket);
   bool sendHandshakeResponse(int clientSocket, uint32_t version,
                              uint32_t accepted);
+  void sendJsonMessage(int clientSocket, uint32_t type,
+                       const std::string &json);
 
   int serverSocket = -1;
   int activeClientSocket = -1;
+  std::vector<int> handshakenClients;
   int port;
   std::atomic<bool> running{false};
   std::thread acceptThread;
@@ -66,6 +76,9 @@ private:
 
   std::mutex correctionQueueLock;
   std::vector<CorrectionPair> correctionQueue;
+
+  std::mutex profileQueueLock;
+  std::vector<std::string> profileCommandQueue;
 };
 
 } // namespace punch2pen

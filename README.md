@@ -23,7 +23,8 @@ flowchart LR
         TC["TranscriptionCoordinator"]
         T["Transcriber<br/>(whisper.cpp)"]
         OAI["OpenAICloudTranscriber<br/>(WebSocket)"]
-        DB["DatabaseManager<br/>(CSV)"]
+        ACC["AccountManager<br/>(session or profile Dictionary)"]
+        API["Profile API<br/>(cloud/, paid only)"]
     end
 
     PB -- "isRecording audio" --> RB
@@ -32,12 +33,13 @@ flowchart LR
     IPC_S --> TC
     TC --> T
     TC --> OAI
-    TC --> DB
+    TC --> ACC
+    ACC -. paid .-> API
     IPC_S -- "HandshakeResponse / TranscriptionResult" --> IPC_C
     IPC_C --> WV
     WV -- "word click / sendCorrection()" --> IPC_C
-    DB -- "vocabulary bias" --> T
-    DB -- "vocabulary bias" --> OAI
+    ACC -- "vocabulary bias" --> T
+    ACC -- "vocabulary bias" --> OAI
 ```
 
 **Plugin side:** `processBlock()` captures audio only when the DAW transport reports `isRecording == true`. Samples are written into a lock-free `AudioRingBuffer` (SPSC, in `plugin/Source/RingBuffer.h`). An `IPCClient` thread completes a protocol handshake, drains the ring buffer, and streams `AudioChunk` messages to the engine. The editor is a WebView shell (`plugin/Source/ui/public/index.html`).
@@ -50,7 +52,7 @@ flowchart LR
 |---|---|
 | **Studio Receipt WebView** | One HTML blob in `juce::WebBrowserComponent` (`plugin/Source/ui/public/index.html`); default editor size 400×600, resizable |
 | **Polymorphic transcription backend** | Local whisper.cpp (`Transcriber`) or cloud OpenAI Realtime WebSocket API (`OpenAICloudTranscriber`), switchable via CLI `--cloud --api-key=` |
-| **Correction feedback loop** | User corrections stored in CSV at `~/.punch2pen/corrections.csv`; vocabulary extracted to bias future transcriptions via `initial_prompt` |
+| **Correction feedback loop** | **Free / lite:** corrections live in a session `Dictionary` (case-sensitive word map + `initial_prompt` bias) and reset when the engine restarts; nothing is written and nothing leaves the machine. **Paid / pro:** sign in inside the plugin; corrections write the active profile's dictionary (`~/.punch2pen/profiles/<id>.json`, synced through `cloud/`). Workspace seats keep each artist's dictionary isolated. See `cloud/README.md`. No prices are set. |
 | **Record-state gating** | Audio only captured when DAW transport reports `isRecording == true` |
 | **Living Transcript** | WebView highlights the word under the playhead using engine `startTime`/`endTime` |
 | **Click-to-correct UI** | Word click opens the Direction C correction overlay; corrections are submitted via IPC to the engine |
@@ -157,11 +159,12 @@ npx wrangler deploy
 | Path | Description |
 |---|---|
 | `engine/` | Background transcription daemon (whisper.cpp, OpenAI Realtime, IPC server, coordinator loop) |
-| `engine/tests/` | Unit tests for coordinator, database manager, profile manager, protocol serialization, OpenAI JSON |
+| `engine/tests/` | Unit tests for coordinator, dictionary, account manager, profile API client, protocol serialization, OpenAI JSON |
 | `plugin/` | JUCE DAW plugin — audio capture, IPC client, Studio Receipt WebView |
 | `plugin/Source/` | C++ plugin sources (`PluginProcessor`, `PluginEditor`, `WebViewEditor`, `IPCClient`, `RingBuffer`) |
 | `plugin/tests/` | Unit tests for RingBuffer, IPCClient, and PluginProcessor state persistence |
 | `shared/` | Protocol definitions shared between plugin and engine (`Protocol.h`) |
+| `cloud/` | Paid profile API (Convex): login, portable dictionaries, workspace seats, static seat dashboard |
 | `scripts/` | Model download, engine smoke, vocal golden-file, DAW readiness helpers |
 | `fixtures/vocals/` | Drop-in dry WAV + expected words (audio gitignored; see README there) |
 | `site/` | punch2pen.com landing page (Cloudflare Worker + static assets) |
@@ -189,7 +192,8 @@ Green unit CI is not a Logic punch. Layers:
 
 | Layer | Command | Needs |
 |---|---|---|
-| Engine unit tests | `databaseManagerTest` … `transcriptTimingTest` (CI `engine-tests`) | CMake |
+| Engine unit tests | `dictionaryTest`, `accountManagerTest`, `cloudProfileClientTest` … `transcriptTimingTest` (CI `engine-tests`) | CMake |
+| Profile API typecheck | `cd cloud && npm run typecheck` (CI `cloud-typecheck`) | Node 22 |
 | Plugin unit tests | `ringBufferTest`, `ipcClientTest`, `pluginProcessorStateTest`, `pluginProcessorCaptureTest` (CI `plugin-tests`) | macOS + JUCE |
 | Engine smoke (no Logic) | `./scripts/engine_smoke.sh` (CI `engine-smoke`) | whisper `ggml-base.bin`; isolated `PUNCH2PEN_HOME` |
 | Vocal golden file | `python3 scripts/verify_engine.py vocals` | Your dry WAV in `fixtures/vocals/` — **SKIP** if missing |
@@ -206,7 +210,7 @@ The following items are **planned but not yet implemented**:
 
 **Recently completed:**
 
-- ~~ProfileManager persistence~~ — per-user JSON profile loading/saving is implemented and wired into the engine startup/shutdown path.
+- ~~Paid profile path~~ — `AccountManager` + `cloud/` (Convex) give login, a portable per-artist dictionary, and isolated workspace seats. The plugin bridge feeds `window.setActiveProfile({name, kind, detail})`; sign-in UI lands with the Living Transcript WebView.
 - ~~Expanded test coverage~~ — plugin-side tests now exist for `AudioRingBuffer`, `IPCClient`, and `PluginProcessor` state round-trip (see `plugin/tests/`)
 - ~~CI/CD pipeline~~ — GitHub Actions CI runs engine tests and plugin tests as parallel jobs
 

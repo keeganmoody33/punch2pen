@@ -255,19 +255,18 @@ send_correction() {
 
 cmd_drive_correction() {
   cmd_doctor >/dev/null
-  local run_id inst evid logf home_iso csv
+  local run_id inst evid logf home_iso
   run_id="$(run_id_from_env_or_current)"
   inst="$(instance_dir "$run_id")"
   evid="$(evidence_dir "$run_id")"
   logf="$inst/engine.log"
   home_iso="$inst/home"
-  csv="$home_iso/.punch2pen/corrections.csv"
   mkdir -p "$evid"
 
   local original="punch 2 pen"
   local corrected="Punch2Pen"
-  if [[ -f "$csv" ]] && grep -qxF "${original},${corrected}" "$csv"; then
-    die "fixture pair already in $csv; cleanup/relaunch for a fresh isolated HOME"
+  if grep -q "Received Correction: '${original}' -> '${corrected}'" "$logf" 2>/dev/null; then
+    die "fixture pair already applied in this engine session; cleanup/relaunch for a fresh isolated HOME"
   fi
 
   local send_out="$evid/correction-send.txt"
@@ -288,13 +287,18 @@ cmd_drive_correction() {
     die "engine log missing Received/Applied correction lines"
   }
 
-  [[ -f "$csv" ]] || die "missing $csv after correction"
-  grep -qxF "${original},${corrected}" "$csv" || die "CSV missing line ${original},${corrected}"
+  # Free/lite keeps the correction in the engine's session dictionary. Prove
+  # it via ProfileStatus over IPC and prove nothing leaked to disk.
+  local status_out="$evid/profile-status.json"
+  python3 "$REPO/scripts/verify_engine.py" profile --port "$PORT" \
+    --expect-tier free --min-entries 1 | tee "$status_out"
+  grep -q '^profile: PASS' "$status_out" || die "profile status check did not pass"
+  [[ ! -f "$home_iso/.punch2pen/corrections.csv" ]] || die "free tier wrote corrections.csv"
+  [[ ! -f "$home_iso/.punch2pen/account.json" ]] || die "free tier wrote account.json"
 
-  cp "$csv" "$evid/corrections.csv"
-  grep -E "Client connected!|Received Correction:|Applied correction." "$logf" > "$evid/correction-engine.log" || true
+  grep -E "Client connected!|Received Correction:|Applied correction.|Profile: " "$logf" > "$evid/correction-engine.log" || true
   printf 'correction-ipc\ndrive correction\n' > "$evid/feature-id.txt"
-  log "drive correction: PASS csv=$csv evidence=$evid"
+  log "drive correction: PASS status=$status_out evidence=$evid"
 }
 
 cmd_drive_identity() {

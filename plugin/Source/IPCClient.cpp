@@ -100,6 +100,21 @@ void IPCClient::run() {
                                            resultHeader.captureEpoch);
             }
           }
+        } else if (header.type == protocol::MessageType::ProfileStatus &&
+                   header.length > 0 &&
+                   header.length <= protocol::kMaxJsonPayloadBytes) {
+          std::string json(header.length, '\0');
+          if (readExact(socket, json.data(), (int)header.length)) {
+            {
+              juce::ScopedLock lock(profileStatusLock);
+              lastProfileStatusJson = json;
+            }
+            juce::ScopedLock lock(listenerLock);
+            for (auto *l : listeners)
+              l->onProfileStatus(json);
+          } else {
+            connected = false;
+          }
         } else {
           if (header.length > 0) {
             juce::MemoryBlock skip(header.length);
@@ -196,10 +211,15 @@ void IPCClient::attemptConnection() {
     }
     connected = true;
 
-    juce::ScopedLock lock(listenerLock);
-    for (auto *l : listeners) {
-      l->onStatusChanged(true);
+    {
+      juce::ScopedLock lock(listenerLock);
+      for (auto *l : listeners) {
+        l->onStatusChanged(true);
+      }
     }
+    // Ask the engine who is signed in so the active-profile pill is right
+    // from the first frame; the engine answers with a ProfileStatus.
+    sendProfileCommand(R"({"op":"status"})");
   } else {
     if (autoLaunchEngine)
       launchEngine();
@@ -614,6 +634,29 @@ void IPCClient::sendCorrection(const std::string &original,
     connected = false;
     return;
   }
+}
+
+void IPCClient::sendProfileCommand(const std::string &json) {
+  if (!connected || json.empty() ||
+      json.size() > protocol::kMaxJsonPayloadBytes)
+    return;
+
+  protocol::Header header;
+  header.type = protocol::MessageType::ProfileCommand;
+  header.length = (uint32_t)json.size();
+
+  if (socket.write(&header, sizeof(header)) != sizeof(header)) {
+    connected = false;
+    return;
+  }
+  if (socket.write(json.data(), (int)json.size()) != (int)json.size()) {
+    connected = false;
+  }
+}
+
+std::string IPCClient::lastProfileStatus() const {
+  juce::ScopedLock lock(profileStatusLock);
+  return lastProfileStatusJson;
 }
 
 void IPCClient::setTranscriptionMode(TranscriptionMode mode) {

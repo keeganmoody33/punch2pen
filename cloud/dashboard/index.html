@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>punch2pen · seats</title>
+  <!--
+    Lightweight seat dashboard for studio / label buyers.
+
+    One static file, no framework, no build. Talks to the same HTTP API the
+    plugin engine uses (cloud/convex/http.ts) with a bearer session token
+    kept in sessionStorage. Serve it from anywhere (punch2pen.com, a file://
+    URL while testing) and point it at the deployment's .convex.site URL.
+
+    Flow: sign in with the owner email → pick a workspace → add a seat with
+    the artist's email and display name → hand the artist that email. The
+    artist signs in inside the plugin; the seat binds on first login and
+    their dictionary stays their own.
+  -->
+  <style>
+    :root {
+      --bg: #1E1E1E; --panel: #2D2D2D; --pane: #1C1917; --ink: #FAFAF9;
+      --ink-mid: rgba(250,250,249,0.55); --ink-dim: rgba(250,250,249,0.30);
+      --rule: rgba(250,250,249,0.10); --accent: #FCD34D; --green: #4A9F4A;
+      --red: #9F4A4A; --input: #3A3A3A; --border: #505050;
+      --mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
+      font-family: var(--mono); font-size: 13px; line-height: 1.5;
+      display: flex; flex-direction: column; align-items: center; padding: 32px 16px 64px;
+    }
+    header { width: 100%; max-width: 720px; display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+    header h1 { margin: 0; font-size: 16px; letter-spacing: 0.04em; }
+    header h1 .accent { color: var(--accent); font-size: 19px; }
+    header .who { margin-left: auto; color: var(--ink-mid); font-size: 11px; }
+    main { width: 100%; max-width: 720px; display: grid; gap: 16px; }
+    section { background: var(--panel); border: 1px solid var(--border); padding: 16px; }
+    h2 { margin: 0 0 10px; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-mid); }
+    p { margin: 0 0 10px; color: var(--ink-mid); }
+    p.msg { color: var(--accent); }
+    p.err { color: #ff8a8f; }
+    label { display: block; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); margin: 8px 0 4px; }
+    input, select {
+      width: 100%; height: 30px; padding: 4px 8px; background: var(--input); color: var(--ink);
+      border: 1px solid var(--border); font-family: var(--mono); font-size: 13px; outline: none;
+    }
+    input:focus, select:focus { border-color: var(--accent); }
+    .row { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+    .row > * { flex: 1 1 160px; }
+    button {
+      height: 30px; padding: 0 14px; border: 1px solid var(--border); cursor: pointer;
+      background: var(--input); color: var(--ink); font-family: var(--mono);
+      font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; font-size: 10px;
+    }
+    button.primary { background: var(--green); border-color: transparent; }
+    button.danger { background: transparent; border-color: var(--red); color: #ff8a8f; }
+    button.quiet { background: transparent; color: var(--ink-mid); }
+    button:disabled { opacity: 0.5; cursor: default; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+    th { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); font-weight: 400; }
+    td .dim { color: var(--ink-mid); font-size: 11px; }
+    .pill { display: inline-block; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--border); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-mid); }
+    .pill.claimed { border-color: var(--green); color: var(--ink); }
+    .pill.revoked { text-decoration: line-through; }
+    .hidden { display: none !important; }
+    footer { width: 100%; max-width: 720px; margin-top: 24px; color: var(--ink-dim); font-size: 10px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>[ PUNCH<span class="accent">2</span>PEN ] · seats</h1>
+    <span class="who" id="who"></span>
+  </header>
+
+  <main>
+    <section id="api-section">
+      <h2>Profile API</h2>
+      <p>The deployment's <code>.convex.site</code> URL. Same one compiled into the plugin engine.</p>
+      <label for="api-url">API base URL</label>
+      <input id="api-url" type="url" placeholder="https://your-deployment.convex.site" spellcheck="false" />
+    </section>
+
+    <section id="signin-section">
+      <h2>Sign in</h2>
+      <p>Workspace owners sign in with the email an operator provisioned. Artists do not use this page; they sign in inside the plugin.</p>
+      <div id="signin-email-step">
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="email" spellcheck="false" />
+        <div class="row"><button id="send-code" class="primary" type="button">Send code</button></div>
+      </div>
+      <div id="signin-code-step" class="hidden">
+        <label for="code">Six-digit code</label>
+        <input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="7" />
+        <div class="row">
+          <button id="back" class="quiet" type="button">Back</button>
+          <button id="verify" class="primary" type="button">Sign in</button>
+        </div>
+      </div>
+      <p id="signin-msg"></p>
+    </section>
+
+    <section id="workspaces-section" class="hidden">
+      <h2>Workspaces</h2>
+      <div class="row">
+        <select id="workspace-select"></select>
+        <button id="refresh" class="quiet" type="button">Refresh</button>
+        <button id="signout" class="quiet" type="button">Sign out</button>
+      </div>
+      <div class="row" id="create-workspace-row">
+        <input id="new-workspace" type="text" placeholder="New workspace name" />
+        <button id="create-workspace" type="button">Create workspace</button>
+      </div>
+      <p id="workspaces-msg"></p>
+    </section>
+
+    <section id="seats-section" class="hidden">
+      <h2>Seats · <span id="workspace-name"></span></h2>
+      <p>Each seat is one artist with an isolated dictionary. Add the artist's email and a display name, then hand them that email. Revoking hides the seat from the plugin; the dictionary rows are kept.</p>
+      <div class="row">
+        <input id="seat-email" type="email" placeholder="artist@email.com" autocomplete="off" spellcheck="false" />
+        <input id="seat-name" type="text" placeholder="Display name in the plugin" />
+        <button id="add-seat" class="primary" type="button">Add seat</button>
+      </div>
+      <p id="seats-msg"></p>
+      <table>
+        <thead><tr><th>Profile</th><th>Email</th><th>Status</th><th>Dictionary</th><th></th></tr></thead>
+        <tbody id="seat-rows"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer>No prices or plans live here. Entitlement is the workspace status an operator sets.</footer>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const state = {
+      api: '',
+      token: sessionStorage.getItem('p2p.token') || '',
+      email: sessionStorage.getItem('p2p.email') || '',
+      workspaces: [],
+      workspaceId: '',
+    };
+
+    const params = new URLSearchParams(location.search);
+    state.api = (params.get('api') || localStorage.getItem('p2p.api') || '').replace(/\/+$/, '');
+    $('api-url').value = state.api;
+    $('api-url').addEventListener('change', () => {
+      state.api = $('api-url').value.trim().replace(/\/+$/, '');
+      localStorage.setItem('p2p.api', state.api);
+    });
+
+    function show(id, visible) { $(id).classList.toggle('hidden', !visible); }
+    function setMsg(id, text, kind) {
+      const node = $(id);
+      node.textContent = text || '';
+      node.className = kind || '';
+    }
+
+    async function call(method, path, body) {
+      if (!state.api) throw new Error('Enter the profile API URL first');
+      const headers = { Accept: 'application/json' };
+      if (body !== undefined) headers['Content-Type'] = 'application/json';
+      if (state.token) headers.Authorization = 'Bearer ' + state.token;
+      const res = await fetch(state.api + path, {
+        method, headers, body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      let data = {};
+      try { data = await res.json(); } catch (e) { /* empty body */ }
+      if (res.status === 401) { signOutLocal(); throw new Error('Session expired. Sign in again.'); }
+      if (!res.ok || data.ok === false) throw new Error(data.message || ('HTTP ' + res.status));
+      return data;
+    }
+
+    function signOutLocal() {
+      state.token = ''; state.email = ''; state.workspaces = []; state.workspaceId = '';
+      sessionStorage.removeItem('p2p.token'); sessionStorage.removeItem('p2p.email');
+      render();
+    }
+
+    function render() {
+      const signedIn = Boolean(state.token);
+      $('who').textContent = signedIn ? state.email : '';
+      show('signin-section', !signedIn);
+      show('workspaces-section', signedIn);
+      show('seats-section', signedIn && Boolean(state.workspaceId));
+      if (signedIn) {
+        const select = $('workspace-select');
+        select.textContent = '';
+        state.workspaces.forEach((ws) => {
+          const opt = document.createElement('option');
+          opt.value = ws.id;
+          opt.textContent = ws.name + ' · ' + ws.seatCount + ' seat' + (ws.seatCount === 1 ? '' : 's') +
+            (ws.status !== 'active' ? ' · ' + ws.status : '');
+          select.appendChild(opt);
+        });
+        if (state.workspaceId) select.value = state.workspaceId;
+        const current = state.workspaces.find((w) => w.id === state.workspaceId);
+        $('workspace-name').textContent = current ? current.name : '';
+      }
+    }
+
+    // ── sign in ────────────────────────────────────────────────
+    $('send-code').addEventListener('click', async () => {
+      const email = $('email').value.trim();
+      if (!email) return;
+      setMsg('signin-msg', 'Sending…');
+      try {
+        const data = await call('POST', '/v1/auth/start', { email });
+        state.email = email;
+        show('signin-email-step', false); show('signin-code-step', true);
+        if (data.delivery === 'echo' && data.code) {
+          $('code').value = data.code;
+          setMsg('signin-msg', 'Development deployment echoed the code.', 'msg');
+        } else {
+          setMsg('signin-msg', 'Check your email for a six-digit code.', 'msg');
+        }
+        $('code').focus();
+      } catch (e) { setMsg('signin-msg', e.message, 'err'); }
+    });
+    $('back').addEventListener('click', () => {
+      show('signin-email-step', true); show('signin-code-step', false); setMsg('signin-msg', '');
+    });
+    $('verify').addEventListener('click', async () => {
+      const code = $('code').value.replace(/\s+/g, '');
+      if (code.length < 6) return;
+      setMsg('signin-msg', 'Verifying…');
+      try {
+        const data = await call('POST', '/v1/auth/verify', {
+          email: state.email, code, device: { name: 'seat dashboard', platform: 'web' },
+        });
+        state.token = data.token;
+        sessionStorage.setItem('p2p.token', state.token);
+        sessionStorage.setItem('p2p.email', state.email);
+        setMsg('signin-msg', '');
+        show('signin-email-step', true); show('signin-code-step', false);
+        await loadWorkspaces();
+      } catch (e) { setMsg('signin-msg', e.message, 'err'); }
+    });
+    ['email', 'code'].forEach((id) => $(id).addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); (id === 'email' ? $('send-code') : $('verify')).click(); }
+    }));
+
+    // ── workspaces ─────────────────────────────────────────────
+    async function loadWorkspaces() {
+      try {
+        const data = await call('GET', '/v1/workspaces');
+        state.workspaces = data.workspaces || [];
+        if (!state.workspaces.find((w) => w.id === state.workspaceId)) {
+          state.workspaceId = state.workspaces.length ? state.workspaces[0].id : '';
+        }
+        setMsg('workspaces-msg', state.workspaces.length ? '' : 'You do not own a workspace yet.', 'msg');
+        render();
+        if (state.workspaceId) await loadSeats();
+      } catch (e) { setMsg('workspaces-msg', e.message, 'err'); render(); }
+    }
+    $('workspace-select').addEventListener('change', async () => {
+      state.workspaceId = $('workspace-select').value; render(); await loadSeats();
+    });
+    $('refresh').addEventListener('click', loadWorkspaces);
+    $('signout').addEventListener('click', async () => {
+      try { await call('POST', '/v1/auth/logout', {}); } catch (e) { /* local sign-out regardless */ }
+      signOutLocal();
+    });
+    $('create-workspace').addEventListener('click', async () => {
+      const name = $('new-workspace').value.trim();
+      if (!name) return;
+      try {
+        const data = await call('POST', '/v1/workspaces', { name });
+        $('new-workspace').value = '';
+        state.workspaceId = data.workspaceId;
+        await loadWorkspaces();
+      } catch (e) { setMsg('workspaces-msg', e.message, 'err'); }
+    });
+
+    // ── seats ──────────────────────────────────────────────────
+    async function loadSeats() {
+      if (!state.workspaceId) return;
+      try {
+        const data = await call('GET', '/v1/workspaces/' + state.workspaceId + '/seats');
+        renderSeats(data.seats || []);
+        setMsg('seats-msg', '');
+      } catch (e) { setMsg('seats-msg', e.message, 'err'); }
+    }
+    function renderSeats(seats) {
+      const rows = $('seat-rows');
+      rows.textContent = '';
+      seats.forEach((seat) => {
+        const tr = document.createElement('tr');
+        const name = document.createElement('td'); name.textContent = seat.profileName;
+        const email = document.createElement('td'); email.textContent = seat.email;
+        const status = document.createElement('td');
+        const pill = document.createElement('span');
+        pill.className = 'pill ' + (seat.status === 'revoked' ? 'revoked' : (seat.claimed ? 'claimed' : ''));
+        pill.textContent = seat.status === 'revoked' ? 'revoked' : (seat.claimed ? 'signed in' : 'invited');
+        status.appendChild(pill);
+        const dict = document.createElement('td');
+        dict.className = 'dim';
+        dict.textContent = 'v' + seat.dictionaryVersion;
+        const actions = document.createElement('td');
+        if (seat.status === 'active') {
+          const revoke = document.createElement('button');
+          revoke.type = 'button'; revoke.className = 'danger'; revoke.textContent = 'Revoke';
+          revoke.addEventListener('click', async () => {
+            if (!confirm('Revoke the seat for ' + seat.email + '? Their dictionary rows are kept.')) return;
+            try {
+              await call('DELETE', '/v1/workspaces/' + state.workspaceId + '/seats/' + seat.id);
+              await loadWorkspaces();
+            } catch (e) { setMsg('seats-msg', e.message, 'err'); }
+          });
+          actions.appendChild(revoke);
+        }
+        tr.append(name, email, status, dict, actions);
+        rows.appendChild(tr);
+      });
+    }
+    $('add-seat').addEventListener('click', async () => {
+      const email = $('seat-email').value.trim();
+      const profileName = $('seat-name').value.trim();
+      if (!email || !profileName) { setMsg('seats-msg', 'Email and display name are both required.', 'err'); return; }
+      try {
+        await call('POST', '/v1/workspaces/' + state.workspaceId + '/seats', { email, profileName });
+        $('seat-email').value = ''; $('seat-name').value = '';
+        await loadWorkspaces();
+      } catch (e) { setMsg('seats-msg', e.message, 'err'); }
+    });
+
+    render();
+    if (state.token) loadWorkspaces();
+  </script>
+</body>
+</html>

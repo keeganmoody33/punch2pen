@@ -17,7 +17,8 @@ usage() {
 Usage: $(basename "$0") [options]
 
 Start punch2penEngine with an isolated PUNCH2PEN_HOME, prove handshake +
-correction IPC, then run the vocal golden-file check (skip if no WAV).
+correction IPC + free-tier ProfileStatus (session dictionary, no cloud),
+then run the vocal golden-file check (skip if no WAV).
 
 Options:
   --skip-build       Use an existing \$PUNCH2PEN_BUILD_DIR/bin/punch2penEngine
@@ -228,10 +229,15 @@ done
   die "engine log missing Received/Applied correction"
 }
 
-CSV="$ISOLATED/.punch2pen/corrections.csv"
-[[ -f "$CSV" ]] || die "missing $CSV after correction"
-grep -qxF "punch 2 pen,Punch2Pen" "$CSV" || die "CSV missing punch 2 pen,Punch2Pen"
-log "engine_smoke: correction CSV ok"
+# Free/lite: the correction lives in the engine's session dictionary only.
+# Nothing is written to disk and the engine never signs in or calls out.
+python3 "$ROOT/scripts/verify_engine.py" profile --port "$PORT" \
+  --expect-tier free --min-entries 1
+[[ ! -f "$ISOLATED/.punch2pen/corrections.csv" ]] || die "free tier wrote corrections.csv"
+[[ ! -f "$ISOLATED/.punch2pen/account.json" ]] || die "free tier wrote account.json"
+[[ ! -d "$ISOLATED/.punch2pen/profiles" ]] || die "free tier wrote a profile cache"
+log_has "Profile: free" || die "engine log missing 'Profile: free'"
+log "engine_smoke: free tier session dictionary ok (no cloud, nothing persisted)"
 
 if [[ "$RUN_VOCALS" -eq 1 ]]; then
   VOCAL_ARGS=(

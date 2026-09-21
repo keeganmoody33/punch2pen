@@ -3,6 +3,7 @@
 
 Subcommands:
   smoke     Handshake + one correction (engine must already be running)
+  profile   Request a ProfileStatus and assert tier / dictionary counts
   vocals    Send a real-vocal WAV and score against expected-words.txt
   selftest  Protocol struct sizes only
 
@@ -13,6 +14,7 @@ A 440 Hz sine is not vocals; do not treat smoke as a transcription proof.
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import struct
 import sys
@@ -76,6 +78,45 @@ def cmd_smoke(args: argparse.Namespace) -> int:
             sock.close()
     print(f"Sent Correction: '{original}' -> '{corrected}'")
     print("smoke: PASS handshake + correction send")
+    return 0
+
+
+def cmd_profile(args: argparse.Namespace) -> int:
+    """Ask the engine for its ProfileStatus over IPC.
+
+    Free/lite must report tier=free with a session-scoped dictionary and no
+    sign-in. After `smoke`, the session dictionary holds that correction.
+    """
+    sock = None
+    try:
+        sock = proto.connect(port=args.port, timeout=args.timeout)
+        proto.complete_handshake(sock)
+        proto.send_profile_command(sock, {"op": "status"})
+        status = proto.wait_for_profile_status(sock, timeout=args.timeout)
+    except ConnectionRefusedError:
+        die(f"could not connect to 127.0.0.1:{args.port} — is punch2penEngine running?")
+    except Exception as exc:
+        die(str(exc))
+    finally:
+        if sock is not None:
+            sock.close()
+
+    print(json.dumps(status, indent=2, sort_keys=True))
+    tier = status.get("tier")
+    dictionary = status.get("dictionary") or {}
+    entries = int(dictionary.get("entries", 0))
+    if args.expect_tier and tier != args.expect_tier:
+        die(f"expected tier {args.expect_tier!r}, engine reports {tier!r}")
+    if entries < args.min_entries:
+        die(f"expected at least {args.min_entries} dictionary entries, got {entries}")
+    if tier == "free":
+        if status.get("signedIn"):
+            die("free tier must not report signedIn")
+        if dictionary.get("scope") != "session":
+            die("free tier dictionary must be session-scoped")
+        if status.get("sync") != "local":
+            die("free tier must report sync=local (no cloud)")
+    print(f"profile: PASS tier={tier} entries={entries} scope={dictionary.get('scope')}")
     return 0
 
 
@@ -211,6 +252,15 @@ def build_parser() -> argparse.ArgumentParser:
     smoke.add_argument("--original", default="punch 2 pen")
     smoke.add_argument("--corrected", default="Punch2Pen")
     smoke.set_defaults(func=cmd_smoke)
+
+    profile = sub.add_parser(
+        "profile", parents=[common], help="Request and check a ProfileStatus"
+    )
+    profile.add_argument(
+        "--expect-tier", choices=("free", "paid"), default=None
+    )
+    profile.add_argument("--min-entries", type=int, default=0)
+    profile.set_defaults(func=cmd_profile)
 
     vocals = sub.add_parser(
         "vocals",

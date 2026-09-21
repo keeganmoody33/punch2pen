@@ -1,24 +1,31 @@
-#include "DatabaseManager.h"
+#include "AccountManager.h"
+#include "CloudProfileClient.h"
 #include "IPCServer.h"
+#include "IxHttpTransport.h"
 #include "OpenAICloudTranscriber.h"
-#include "ProfileManager.h"
 #include "Transcriber.h"
 #include "TranscriberInterface.h"
 #include "TranscriptionCoordinator.h"
 #include "UserHome.h"
+
+#include <nlohmann/json.hpp>
 
 #include <csignal>
 #include <cstdint>
 #include <cstdlib>
 #include <fcntl.h>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <string>
 #include <sys/stat.h>
-#include <unordered_set>
 #include <unistd.h>
 #include <vector>
+
+#ifndef PUNCH2PEN_PROFILE_API_URL_DEFAULT
+#define PUNCH2PEN_PROFILE_API_URL_DEFAULT ""
+#endif
 
 volatile std::sig_atomic_t g_shutdownRequested = 0;
 static punch2pen::TranscriptionCoordinator *g_coordinator = nullptr;
@@ -34,20 +41,70 @@ void signalHandler(int signum) {
 class EngineTranscriberListener
     : public punch2pen::TranscriberInterface::Listener {
 public:
-  explicit EngineTranscriberListener(punch2pen::IPCServer &serverRef)
-      : server(serverRef) {}
+  EngineTranscriberListener(punch2pen::IPCServer &serverRef,
+                            punch2pen::AccountManager &accountRef)
+      : server(serverRef), account(accountRef) {}
 
   void onTranscriptUpdated(const std::string &text, bool isProvisional,
                            double startTime, double endTime,
                            uint32_t captureEpoch) override {
     (void)isProvisional;
-    std::cout << "Transcription: " << text << std::endl;
-    server.sendResult(text, startTime, endTime, captureEpoch);
+    // Case-sensitive dictionary map on the raw word, before anything
+    // downstream summarises or displays it.
+    const std::string mapped = account.mapWord(text);
+    std::cout << "Transcription: " << mapped << std::endl;
+    server.sendResult(mapped, startTime, endTime, captureEpoch);
   }
 
 private:
   punch2pen::IPCServer &server;
+  punch2pen::AccountManager &account;
 };
+
+// Where the paid profile API lives. Free/lite never contacts it; with no URL
+// the plugin's sign-in is unavailable and everything stays local.
+//   1. PUNCH2PEN_PROFILE_API env (Terminal, verify skill, CI)
+//   2. <dataDir>/profile-api.json {"url": "..."} (Mac install without rebuild)
+//   3. -DPUNCH2PEN_PROFILE_API_URL compiled default (release builds)
+static std::string resolveProfileApiUrl(const std::string &dataDir) {
+  if (const char *env = std::getenv("PUNCH2PEN_PROFILE_API")) {
+    if (env[0] != '\0')
+      return env;
+  }
+  std::ifstream in(dataDir + "/profile-api.json");
+  if (in.is_open()) {
+    try {
+      nlohmann::json doc;
+      in >> doc;
+      if (doc.is_object()) {
+        const std::string url = doc.value("url", std::string{});
+        if (!url.empty())
+          return url;
+      }
+    } catch (const std::exception &e) {
+      std::cerr << "Ignoring malformed profile-api.json: " << e.what()
+                << std::endl;
+    }
+  }
+  return PUNCH2PEN_PROFILE_API_URL_DEFAULT;
+}
+
+static std::string hostName() {
+  char buf[256] = {0};
+  if (gethostname(buf, sizeof(buf) - 1) == 0 && buf[0] != '\0')
+    return buf;
+  return "punch2pen engine";
+}
+
+static const char *platformName() {
+#if defined(__APPLE__)
+  return "macos";
+#elif defined(_WIN32)
+  return "windows";
+#else
+  return "linux";
+#endif
+}
 
 static bool fdIsDevNull(int fd) {
   struct stat fdStat {};
@@ -111,20 +168,29 @@ int main(int argc, char *argv[]) {
   }
 
   punch2pen::IPCServer server(7483);
-  // Bind before CSV/profile/whisper so a freshly launched helper can
-  // complete Handshake while those open. Logic otherwise sits on WAIT.
+  // Bind before account/whisper so a freshly launched helper can complete
+  // Handshake while those open. Logic otherwise sits on WAIT.
   // Audio queued during that window is consumed after Transcriber is ready.
   if (!server.start()) {
     std::cerr << "Engine cannot listen on 127.0.0.1:7483" << std::endl;
     return 1;
   }
 
-  punch2pen::DatabaseManager db;
-  db.initialize(dataDir + "/corrections.csv");
-
-  punch2pen::ProfileManager profileManager;
-  profileManager.setDataDirectory(dataDir);
-  profileManager.loadProfile("default");
+  punch2pen::AccountConfig accountConfig;
+  accountConfig.dataDir = dataDir;
+  accountConfig.profileApiUrl = resolveProfileApiUrl(dataDir);
+  accountConfig.deviceName = hostName();
+  accountConfig.platform = platformName();
+  std::unique_ptr<punch2pen::CloudProfileClient> profileApi;
+  if (!accountConfig.profileApiUrl.empty()) {
+    profileApi = std::make_unique<punch2pen::HttpCloudProfileClient>(
+        accountConfig.profileApiUrl,
+        std::make_unique<punch2pen::IxHttpTransport>());
+    std::cout << "Profile API: " << accountConfig.profileApiUrl << std::endl;
+  } else {
+    std::cout << "Profile API: none (free/lite only, no cloud)" << std::endl;
+  }
+  punch2pen::AccountManager account(accountConfig, std::move(profileApi));
 
   punch2pen::TranscriberInterface *activeTranscriber = nullptr;
   std::unique_ptr<punch2pen::TranscriberInterface> cloudTranscriber;
@@ -147,20 +213,19 @@ int main(int argc, char *argv[]) {
     activeTranscriber = localTranscriber.get();
   }
 
-  auto dbVocab = db.getVocabulary();
-  auto profileVocab = profileManager.getVocabulary();
-  std::unordered_set<std::string> merged(dbVocab.begin(), dbVocab.end());
-  merged.insert(profileVocab.begin(), profileVocab.end());
-  std::vector<std::string> initialVocab(merged.begin(), merged.end());
-  activeTranscriber->setVocabularyBias(initialVocab);
+  account.setStatusSink(
+      [&server](const std::string &json) { server.sendProfileStatus(json); });
+  // Loads any saved session + cached dictionary; the coordinator applies the
+  // vocabulary bias on its first pass via dictionaryRevision().
+  account.start();
 
-  EngineTranscriberListener transcriberListener(server);
+  EngineTranscriberListener transcriberListener(server, account);
   activeTranscriber->addListener(&transcriberListener);
 
   std::cout << "Engine ready." << std::endl;
 
-  punch2pen::TranscriptionCoordinator coordinator(server, *activeTranscriber, db,
-                                                  profileManager);
+  punch2pen::TranscriptionCoordinator coordinator(server, *activeTranscriber,
+                                                  account);
   g_coordinator = &coordinator;
 
   std::signal(SIGINT, signalHandler);
@@ -168,7 +233,7 @@ int main(int argc, char *argv[]) {
 
   coordinator.run();
 
-  profileManager.saveProfile();
+  account.stop();
   server.stop();
 
   return 0;

@@ -71,15 +71,31 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -DPUNCH2PEN_BUILD_PLUGIN=OFF
       - name: Build test targets
-        run: cmake --build build --target databaseManagerTest profileManagerTest protocolSerializationTest openAIJsonTest transcriptionCoordinatorTest transcriptTimingTest -j4
+        run: cmake --build build --target dictionaryTest accountManagerTest cloudProfileClientTest protocolSerializationTest openAIJsonTest transcriptionCoordinatorTest transcriptTimingTest -j4
       - name: Run tests
         run: |
-          ./build/bin/databaseManagerTest
-          ./build/bin/profileManagerTest
+          ./build/bin/dictionaryTest
+          ./build/bin/accountManagerTest
+          ./build/bin/cloudProfileClientTest
           ./build/bin/protocolSerializationTest
           ./build/bin/openAIJsonTest
           ./build/bin/transcriptionCoordinatorTest
           ./build/bin/transcriptTimingTest
+
+  cloud-typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloud
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        run: npm ci
+      - name: Typecheck Convex functions
+        run: npm run typecheck
 
   plugin-tests:
     needs: native-changes
@@ -106,14 +122,14 @@ jobs:
           from pathlib import Path
           text = Path("engine/src/main.cpp").read_text()
           bind = text.index("IPCServer server(7483)")
-          db = text.index("DatabaseManager db")
           start = text.index("server.start()")
+          account = text.index("AccountManager account(")
           whisper = text.index("make_unique<punch2pen::Transcriber>")
-          if not bind < db < whisper:
-              raise SystemExit("engine must construct IPCServer before DatabaseManager")
-          if not start < whisper:
-              raise SystemExit("engine must bind before constructing Transcriber")
-          print("[PASS] engine binds 7483 before db/whisper")
+          if not bind < start < account:
+              raise SystemExit("engine must bind 7483 before constructing AccountManager")
+          if not account < whisper:
+              raise SystemExit("engine must construct AccountManager before Transcriber")
+          print("[PASS] engine binds 7483 before account/whisper")
           PY
       - name: Build AU, VST3, and engine
         run: cmake --build build --config Release --target punch2penEngine punch2pen_plugin_AU punch2pen_plugin_VST3 -j4
