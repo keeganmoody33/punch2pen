@@ -148,11 +148,15 @@ Wait for the **macOS Release** workflow. Download `Punch2Pen-1.0.0-macOS-unsigne
 
 Static landing page + Cloudflare Worker in `site/`. Copy: punch-in problem, Mac pkg from GitHub Release, free/lite vs paid/pro with **no prices**. PostHog events are wired (`download_click`, `interest_would_pay`, `waitlist_submit`); set `POSTHOG_KEY` as a Wrangler secret to actually send them.
 
+Deploy from the Cloudflare account that already lists **punch2pen.com** (nameservers `irma.ns.cloudflare.com` / `jonah.ns.cloudflare.com`). Custom domains in `site/wrangler.jsonc` create apex + www records; do not edit DNS by hand.
+
 ```bash
 cd site
 npm install
 npx wrangler deploy
 ```
+
+CI (no Wrangler browser login): paste repo Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` for that zone account, then **Actions → Deploy site → Run workflow**, or push to `main` under `site/**`. That workflow is not macOS plugin CI.
 
 ## Repository Structure
 
