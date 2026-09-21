@@ -52,6 +52,10 @@ def cmd_selftest(_args: argparse.Namespace) -> int:
     if err:
         die(err)
     print("selftest: PASS protocol header sizes")
+    err = proto.wait_deadline_ok()
+    if err:
+        die(err)
+    print("selftest: PASS STT wait wall-clock deadline")
     return 0
 
 
