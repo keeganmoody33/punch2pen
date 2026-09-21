@@ -1,4 +1,5 @@
 #include "IPCClient.h"
+#include "EngineLaunchPaths.h"
 #include "RingBuffer.h"
 #include "UserHome.h"
 
@@ -261,20 +262,7 @@ juce::File thisPluginImageFile() {
 }
 
 juce::File pluginContentsDir() {
-  juce::File cursor = thisPluginImageFile();
-  for (int i = 0; i < 12 && cursor != cursor.getParentDirectory(); ++i) {
-    if (cursor.hasFileExtension("component") ||
-        cursor.hasFileExtension("vst3"))
-      return cursor.getChildFile("Contents");
-    if (cursor.getFileName() == "Contents" &&
-        cursor.getChildFile("MacOS").isDirectory())
-      return cursor;
-    cursor = cursor.getParentDirectory();
-  }
-  const juce::File image = thisPluginImageFile();
-  if (image.getParentDirectory().getFileName() == "MacOS")
-    return image.getParentDirectory().getParentDirectory();
-  return image.getParentDirectory();
+  return pluginBundleContentsDir(thisPluginImageFile());
 }
 
 void considerApp(std::vector<juce::File> &apps, const juce::File &app) {
@@ -300,12 +288,12 @@ void considerBinary(std::vector<juce::File> &bins, const juce::File &bin) {
 #if JUCE_MAC
 bool openEngineApp(const juce::File &app) {
   const std::string path = app.getFullPathName().toStdString();
-  const char *argv[] = {"/usr/bin/open", "-g", path.c_str(), nullptr};
+  const char *argv[] = {"/usr/bin/open", "-g", "-n", path.c_str(), nullptr};
   pid_t pid = 0;
   const int rc = posix_spawn(&pid, "/usr/bin/open", nullptr, nullptr,
                              const_cast<char **>(argv), environ);
   if (rc != 0) {
-    pluginIpcLog("open -g " + app.getFullPathName() +
+    pluginIpcLog("open -g -n " + app.getFullPathName() +
                  " spawn_rc=" + juce::String(rc));
     return false;
   }
@@ -313,7 +301,7 @@ bool openEngineApp(const juce::File &app) {
   const pid_t waited = waitpid(pid, &status, 0);
   const bool ok =
       waited == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0;
-  pluginIpcLog("open -g " + app.getFullPathName() +
+  pluginIpcLog("open -g -n " + app.getFullPathName() +
                " wait=" + juce::String((int)waited) +
                " status=" + juce::String(status) + (ok ? " ok" : " fail"));
   return ok;
@@ -379,14 +367,16 @@ juce::File IPCClient::resolveEngineApp() const {
       return fromEnv;
   }
 
-  const juce::File nested =
-      pluginContentsDir().getChildFile("Helpers/punch2penEngine.app");
-  if (nested.isDirectory())
-    return nested;
-
-  const juce::File systemApp("/Applications/Punch2Pen/punch2penEngine.app");
+  // /Applications is what Launch Services will actually start after a pkg
+  // install. Nested Contents/Helpers is the fallback when the system app
+  // is missing (COPY_PLUGIN_AFTER_BUILD without sudo).
+  const juce::File systemApp = punch2pen::systemEngineApp();
   if (systemApp.isDirectory())
     return systemApp;
+
+  const juce::File nested = punch2pen::nestedEngineApp(pluginContentsDir());
+  if (nested.isDirectory())
+    return nested;
 
   return {};
 }
@@ -397,31 +387,27 @@ juce::File IPCClient::resolveEngineBinary() const {
     if (fromEnv.existsAsFile())
       return fromEnv;
     if (fromEnv.isDirectory() && fromEnv.hasFileExtension("app")) {
-      const juce::File inner =
-          fromEnv.getChildFile("Contents/MacOS/punch2penEngine");
+      const juce::File inner = punch2pen::engineAppInnerBinary(fromEnv);
       if (inner.existsAsFile())
         return inner;
     }
   }
 
-  const juce::File nested =
-      pluginContentsDir().getChildFile("Helpers/punch2penEngine.app");
-  if (nested.isDirectory()) {
-    const juce::File inner =
-        nested.getChildFile("Contents/MacOS/punch2penEngine");
-    if (inner.existsAsFile())
-      return inner;
-  }
-
-  const juce::File systemApp("/Applications/Punch2Pen/punch2penEngine.app");
+  const juce::File systemApp = punch2pen::systemEngineApp();
   if (systemApp.isDirectory()) {
-    const juce::File inner =
-        systemApp.getChildFile("Contents/MacOS/punch2penEngine");
+    const juce::File inner = punch2pen::engineAppInnerBinary(systemApp);
     if (inner.existsAsFile())
       return inner;
   }
 
-  const juce::File systemBin("/Applications/Punch2Pen/punch2penEngine");
+  const juce::File nested = punch2pen::nestedEngineApp(pluginContentsDir());
+  if (nested.isDirectory()) {
+    const juce::File inner = punch2pen::engineAppInnerBinary(nested);
+    if (inner.existsAsFile())
+      return inner;
+  }
+
+  const juce::File systemBin = punch2pen::systemEngineCli();
   if (systemBin.existsAsFile())
     return systemBin;
 
@@ -444,18 +430,19 @@ void IPCClient::launchEngine() {
     considerApp(apps, fromEnv);
     considerBinary(bins, fromEnv);
     if (fromEnv.isDirectory() && fromEnv.hasFileExtension("app"))
-      considerBinary(bins,
-                     fromEnv.getChildFile("Contents/MacOS/punch2penEngine"));
+      considerBinary(bins, punch2pen::engineAppInnerBinary(fromEnv));
   }
 
-  considerApp(apps,
-              pluginContentsDir().getChildFile("Helpers/punch2penEngine.app"));
-  considerApp(apps, juce::File("/Applications/Punch2Pen/punch2penEngine.app"));
-  considerBinary(bins, juce::File("/Applications/Punch2Pen/punch2penEngine"));
+  const juce::File nestedApp =
+      punch2pen::nestedEngineApp(pluginContentsDir());
+  considerApp(apps, punch2pen::systemEngineApp());
+  considerApp(apps, nestedApp);
+  considerBinary(bins, punch2pen::engineAppInnerBinary(punch2pen::systemEngineApp()));
+  considerBinary(bins, punch2pen::systemEngineCli());
+  considerBinary(bins, punch2pen::engineAppInnerBinary(nestedApp));
 
   const juce::File leftoverHome =
-      juce::File(juce::String(realUserHome()))
-          .getChildFile("punch2pen/bin/punch2penEngine");
+      punch2pen::leftoverDevEngine(juce::String(realUserHome()));
   if (leftoverHome.existsAsFile())
     pluginIpcLog("ignoring leftover " + leftoverHome.getFullPathName() +
                  "; packaged engine is preferred");
@@ -467,11 +454,11 @@ void IPCClient::launchEngine() {
   for (const auto &bin : bins)
     candidates.emplace_back(bin, false);
 
+  pluginIpcLog("plugin image=" + thisPluginImageFile().getFullPathName() +
+               " contents=" + pluginContentsDir().getFullPathName());
   pluginIpcLog("launchEngine apps=" + juce::String((int)apps.size()) +
-               " bins=" + juce::String((int)bins.size()) + " nested=" +
-               pluginContentsDir()
-                   .getChildFile("Helpers/punch2penEngine.app")
-                   .getFullPathName());
+               " bins=" + juce::String((int)bins.size()) +
+               " nested=" + nestedApp.getFullPathName());
 
   if (candidates.empty()) {
     pluginIpcLog("launchEngine: no engine helper launched");
@@ -480,13 +467,25 @@ void IPCClient::launchEngine() {
 
   // Rotate so a Gatekeeper-rejected nested app does not starve /Applications
   // forever. Immediate fallbacks still run when `open` itself exits non-zero.
+  // `open -g -n` starts a new instance; if that still fails, posix_spawn the
+  // matching Contents/MacOS binary before walking to the next candidate.
   const size_t start =
       static_cast<size_t>(nextLaunchCandidate.fetch_add(1)) %
       candidates.size();
   for (size_t n = 0; n < candidates.size(); ++n) {
     const auto &candidate = candidates[(start + n) % candidates.size()];
-    const bool ok = candidate.second ? openEngineApp(candidate.first)
-                                     : spawnBareEngine(candidate.first);
+    bool ok = false;
+    if (candidate.second) {
+      ok = openEngineApp(candidate.first);
+      if (!ok) {
+        const juce::File inner =
+            punch2pen::engineAppInnerBinary(candidate.first);
+        if (inner.existsAsFile())
+          ok = spawnBareEngine(inner);
+      }
+    } else {
+      ok = spawnBareEngine(candidate.first);
+    }
     if (ok)
       return;
   }

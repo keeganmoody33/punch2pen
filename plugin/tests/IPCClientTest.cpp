@@ -1,4 +1,5 @@
 #include "../Source/IPCClient.h"
+#include "../Source/EngineLaunchPaths.h"
 #include "../Source/RingBuffer.h"
 #include "../../shared/Protocol.h"
 
@@ -1024,6 +1025,56 @@ void testRejectedHandshakeDoesNotConnect() {
   std::cout << "[PASS] testRejectedHandshakeDoesNotConnect" << std::endl;
 }
 
+void testPluginBundleContentsDirFindsNestedHelper() {
+  const juce::File root =
+      juce::File::getSpecialLocation(juce::File::tempDirectory)
+          .getChildFile("p2p-launch-paths-test");
+  root.deleteRecursively();
+
+  const juce::File component = root.getChildFile("punch2pen.component");
+  const juce::File auBinary =
+      component.getChildFile("Contents/MacOS/punch2pen");
+  const juce::File auHelper = component.getChildFile(
+      "Contents/Helpers/punch2penEngine.app/Contents/MacOS/punch2penEngine");
+  auBinary.getParentDirectory().createDirectory();
+  auHelper.getParentDirectory().createDirectory();
+  auBinary.replaceWithText("fake-au");
+  auHelper.replaceWithText("fake-engine");
+
+  const juce::File fromBinary =
+      Punch2Pen::pluginBundleContentsDir(auBinary);
+  assert(fromBinary == component.getChildFile("Contents"));
+  assert(Punch2Pen::nestedEngineApp(fromBinary).getFileName() ==
+         "punch2penEngine.app");
+  assert(Punch2Pen::engineAppInnerBinary(
+             Punch2Pen::nestedEngineApp(fromBinary))
+             .existsAsFile());
+
+  const juce::File fromBundle =
+      Punch2Pen::pluginBundleContentsDir(component);
+  assert(fromBundle == component.getChildFile("Contents"));
+
+  const juce::File vst3 = root.getChildFile("punch2pen.vst3");
+  const juce::File vst3Binary = vst3.getChildFile("Contents/MacOS/punch2pen");
+  vst3Binary.getParentDirectory().createDirectory();
+  vst3Binary.replaceWithText("fake-vst3");
+  const juce::File fromVst3 = Punch2Pen::pluginBundleContentsDir(vst3Binary);
+  assert(fromVst3 == vst3.getChildFile("Contents"));
+
+  const juce::File leftover =
+      Punch2Pen::leftoverDevEngine("/tmp/p2p-home");
+  assert(leftover ==
+         juce::File("/tmp/p2p-home/punch2pen/bin/punch2penEngine"));
+  assert(Punch2Pen::systemEngineApp() ==
+         juce::File("/Applications/Punch2Pen/punch2penEngine.app"));
+  assert(Punch2Pen::systemEngineCli() ==
+         juce::File("/Applications/Punch2Pen/punch2penEngine"));
+
+  root.deleteRecursively();
+  std::cout << "[PASS] testPluginBundleContentsDirFindsNestedHelper"
+            << std::endl;
+}
+
 int main() {
   // RAII initializer for JUCE Thread internals. JUCE only ships the _GUI
   // variant; per its own header docs, it's the recommended initializer for
@@ -1043,6 +1094,7 @@ int main() {
   testQueuedStopsDrainEachEpoch();
   testHandshakeIsFirstMessage();
   testRejectedHandshakeDoesNotConnect();
+  testPluginBundleContentsDirFindsNestedHelper();
   testTransportStop();
   testCorrection();
   testDisconnectDetection();

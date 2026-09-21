@@ -110,21 +110,21 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  punch2pen::IPCServer server(7483);
+  // Bind before CSV/profile/whisper so a freshly launched helper can
+  // complete Handshake while those open. Logic otherwise sits on WAIT.
+  // Audio queued during that window is consumed after Transcriber is ready.
+  if (!server.start()) {
+    std::cerr << "Engine cannot listen on 127.0.0.1:7483" << std::endl;
+    return 1;
+  }
+
   punch2pen::DatabaseManager db;
   db.initialize(dataDir + "/corrections.csv");
 
   punch2pen::ProfileManager profileManager;
   profileManager.setDataDirectory(dataDir);
   profileManager.loadProfile("default");
-
-  punch2pen::IPCServer server(7483);
-  // Bind before loading whisper so the plugin can handshake while the model
-  // is still opening. Logic otherwise sits on WAIT for the entire load.
-  // Audio queued during that window is consumed after Transcriber is ready.
-  if (!server.start()) {
-    std::cerr << "Engine cannot listen on 127.0.0.1:7483" << std::endl;
-    return 1;
-  }
 
   punch2pen::TranscriberInterface *activeTranscriber = nullptr;
   std::unique_ptr<punch2pen::TranscriberInterface> cloudTranscriber;

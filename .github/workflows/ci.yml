@@ -97,6 +97,24 @@ jobs:
           ./build/plugin/ipcClientTest_artefacts/Release/ipcClientTest
           ./build/plugin/pluginProcessorStateTest_artefacts/Release/pluginProcessorStateTest
           ./build/plugin/pluginProcessorCaptureTest_artefacts/Release/pluginProcessorCaptureTest
+      - name: Installer postinstall self-test
+        run: |
+          chmod +x installer/macos/scripts/postinstall scripts/check_installer_layout.sh
+          ./installer/macos/scripts/postinstall --self-test
+          ./scripts/check_installer_layout.sh --self-test
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path("engine/src/main.cpp").read_text()
+          bind = text.index("IPCServer server(7483)")
+          db = text.index("DatabaseManager db")
+          start = text.index("server.start()")
+          whisper = text.index("make_unique<punch2pen::Transcriber>")
+          if not bind < db < whisper:
+              raise SystemExit("engine must construct IPCServer before DatabaseManager")
+          if not start < whisper:
+              raise SystemExit("engine must bind before constructing Transcriber")
+          print("[PASS] engine binds 7483 before db/whisper")
+          PY
       - name: Build AU, VST3, and engine
         run: cmake --build build --config Release --target punch2penEngine punch2pen_plugin_AU punch2pen_plugin_VST3 -j4
       - name: Check engine rpath is relocatable
