@@ -5,17 +5,66 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   site-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Site copy gates (no karaoke, no invented prices)
+      - name: Site copy gates
         run: |
           chmod +x site/check.sh
           ./site/check.sh
 
+  # macos jobs skip unless engine/plugin/installer (or related native) paths
+  # change. site/**, README, gitignore, and site-check-only CI edits stay on
+  # ubuntu so a leftover engine-smoke process cannot fail a site PR.
+  native-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      native: ${{ steps.detect.outputs.native }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect native source changes
+        id: detect
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          BEFORE: ${{ github.event.before }}
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          native_re='^(engine|plugin|installer|scripts|shared|fixtures)/|^CMakeLists\.txt$|^verify_setup\.sh$'
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            changed="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --jq '.[].filename')"
+          else
+            if [[ -z "${BEFORE:-}" || "$BEFORE" =~ ^0+$ ]]; then
+              echo "native=true" >> "$GITHUB_OUTPUT"
+              echo "No compare base; running macos jobs."
+              exit 0
+            fi
+            git fetch --no-tags origin "$BEFORE" 2>/dev/null || true
+            changed="$(git diff --name-only "$BEFORE" "$GITHUB_SHA")"
+          fi
+          echo "Changed files:"
+          echo "$changed"
+          if grep -E -q "$native_re" <<<"$changed"; then
+            echo "native=true" >> "$GITHUB_OUTPUT"
+            echo "Native paths changed; macos jobs will run."
+          else
+            echo "native=false" >> "$GITHUB_OUTPUT"
+            echo "Site/docs/CI-only change; skipping macos jobs."
+          fi
+
   engine-tests:
+    needs: native-changes
+    if: needs.native-changes.outputs.native == 'true'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,6 +82,8 @@ jobs:
           ./build/bin/transcriptTimingTest
 
   plugin-tests:
+    needs: native-changes
+    if: needs.native-changes.outputs.native == 'true'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -60,6 +111,8 @@ jobs:
           echo "After install on a Mac: auval -strict -v aufx P2pn Dcta"
 
   engine-smoke:
+    needs: native-changes
+    if: needs.native-changes.outputs.native == 'true'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
