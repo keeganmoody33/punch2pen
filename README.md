@@ -134,7 +134,19 @@ Cut a downloadable installer:
 
 2. After this workflow is on `main`, you can also use **Actions → macOS Release → Run workflow** and enter tag `v1.0.0`.
 
-Wait for the **macOS Release** workflow. Download `Punch2Pen-1.0.0-macOS-unsigned.pkg` from [Releases](https://github.com/keeganmoody33/punch2pen/releases). The package is unsigned; Gatekeeper will warn. Place `ggml-base.bin` at `~/.punch2pen/models/ggml-base.bin`.
+Wait for the **macOS Release** workflow. Download `Punch2Pen-1.0.0-macOS-unsigned.pkg` from [Releases](https://github.com/keeganmoody33/punch2pen/releases). The package is unsigned; Gatekeeper will warn. Place `ggml-base.bin` at `~/.punch2pen/models/ggml-base.bin`. The public download page is [punch2pen.com](https://punch2pen.com) (`site/` in this repo).
+
+## Public site
+
+Static landing page + Cloudflare Worker in `site/`. Copy: punch-in problem, Mac pkg from GitHub Release, free/lite vs paid/pro with **no prices**. PostHog events are wired (`download_click`, `interest_would_pay`, `waitlist_submit`); set `POSTHOG_KEY` as a Wrangler secret to actually send them.
+
+```bash
+cd site
+npm install
+npx wrangler deploy
+```
+
+## Repository Structure
 
 ## Repository Structure
 
@@ -148,6 +160,7 @@ Wait for the **macOS Release** workflow. Download `Punch2Pen-1.0.0-macOS-unsigne
 | `shared/` | Protocol definitions shared between plugin and engine (`Protocol.h`) |
 | `scripts/` | Model download, engine smoke, vocal golden-file, DAW readiness helpers |
 | `fixtures/vocals/` | Drop-in dry WAV + expected words (audio gitignored; see README there) |
+| `site/` | punch2pen.com landing page (Cloudflare Worker + static assets) |
 | `installer/` | macOS distribution packaging (`installer/macos/build_pkg.sh`) |
 
 ## DAW Integration Readiness

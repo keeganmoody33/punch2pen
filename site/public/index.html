@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Punch2Pen — stop rewriting lyrics after punch-ins</title>
+  <meta name="description" content="Mac DAW plugin that transcribes vocals in the session. Living Transcript in the plugin. Free local lite, paid portable profile. No prices yet." />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/site.css" />
+  <script src="/env.js"></script>
+</head>
+<body>
+  <header class="top">
+    <a class="mark" href="/">Punch2Pen</a>
+    <nav>
+      <a href="#problem">The punch</a>
+      <a href="#download">Download</a>
+      <a href="#plans">Free / paid</a>
+      <a href="https://github.com/keeganmoody33/punch2pen">GitHub</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <section class="hero" id="top">
+      <p class="eyebrow">Mac AU + VST3 · in the DAW</p>
+      <h1>You punched the line.<br />Don’t rewrite it by ear.</h1>
+      <p class="lede">Punch2Pen transcribes vocals <strong>inside the session</strong>. After a punch-in, the take is already written — word under the playhead, active line as the title. Click a mis-hear. Keep recording.</p>
+      <p class="live-line" aria-hidden="true"><span class="past">keep the pocket</span> · <em>punch that bar again</em> · <span class="next">leave the tag</span></p>
+      <div class="actions">
+        <a class="btn primary" id="download-btn" href="#download">Download for Mac</a>
+        <a class="btn ghost" href="#plans">Free lite vs paid pro</a>
+      </div>
+      <p class="fine">Unsigned pkg from GitHub Release. Gatekeeper will warn. No Windows build yet.</p>
+    </section>
+
+    <section id="problem">
+      <p class="eyebrow">The mess</p>
+      <h2>Punch-in, then the lyric is gone.</h2>
+      <p class="lede">You drop in on bar 17. The vocal is right. Ten minutes later you are typing what you think you said, or bouncing stems so someone else can guess. DAWs will ship speech-to-text. Punch2Pen is lighter: written text linked to timecode, in the plugin, while you still have the headphones on.</p>
+      <div class="grid-2" style="margin-top:1.2rem">
+        <article class="card">
+          <h3>Living Transcript</h3>
+          <p>Highlight the word under the playhead. Treat the active line as a title. Past / active / upcoming sit in a temporal hierarchy. Return to live when you scroll. Click a word to correct it.</p>
+        </article>
+        <article class="card">
+          <h3>Local first</h3>
+          <p>Free / lite talks to an engine on the Mac. Generic speech-to-text. No account. No cloud. Corrections in that session. Paid is the portable dictionary and login — not a vendor lock.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="download">
+      <p class="eyebrow">Mac download</p>
+      <h2>Install the plugin. Punch. Read it back.</h2>
+      <p class="lede">AU + VST3 + local engine in one unsigned pkg. Bundle codes stay <strong>Dcta / P2pn / aufx</strong>. Whisper model is not in the installer; the repo documents where it goes.</p>
+      <label class="field">
+        <span>Which DAW are you punching in? (optional, for interest)</span>
+        <select id="daw" name="daw">
+          <option value="">Prefer not to say</option>
+          <option value="logic">Logic</option>
+          <option value="ableton">Ableton</option>
+          <option value="reaper">REAPER</option>
+          <option value="pro-tools">Pro Tools</option>
+          <option value="other">Other</option>
+        </select>
+      </label>
+      <div class="actions">
+        <a class="btn primary" id="mac-download" href="https://github.com/keeganmoody33/punch2pen/releases/latest">Download Mac pkg</a>
+        <a class="btn" href="https://github.com/keeganmoody33/punch2pen/releases">All GitHub Releases</a>
+      </div>
+      <p class="note" id="download-status">Looking up the latest GitHub Release…</p>
+    </section>
+
+    <section id="plans">
+      <p class="eyebrow">Free / lite vs paid / pro</p>
+      <h2>Prices are not set. The split is.</h2>
+      <table class="tiers">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Free / lite</th>
+            <th>Paid / pro (and seats)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>STT</td>
+            <td>Local generic model</td>
+            <td>Same engine family, plus profile context</td>
+          </tr>
+          <tr>
+            <td>Learning</td>
+            <td>Session-only corrections; reset</td>
+            <td>Correction loop writes a personal dictionary</td>
+          </tr>
+          <tr>
+            <td>Sync</td>
+            <td>None</td>
+            <td>Cloud profile — lyrics + timecode follow you across DAWs and rooms</td>
+          </tr>
+          <tr>
+            <td>Identity</td>
+            <td>No account</td>
+            <td>Login; active profile always visible in the plugin</td>
+          </tr>
+          <tr>
+            <td>Studio</td>
+            <td>—</td>
+            <td>Seats: each artist isolated. Buyer hands out logins from a light dashboard.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="fine" style="margin-top:0.9rem">Upgrade nudge in the plugin is after you actually correct words — not a blocking modal, and not a dollar amount.</p>
+    </section>
+
+    <section id="interest">
+      <p class="eyebrow">Interest</p>
+      <h2>Would you pay for the portable dictionary?</h2>
+      <p class="lede">No SKU. No invented number. If the local punch already saved a session, say so — that is the gate before ads.</p>
+      <div class="actions">
+        <button type="button" class="btn primary" id="would-pay">I would pay for portable lyrics</button>
+        <button type="button" class="btn" id="just-looking">Just looking</button>
+      </div>
+      <form id="waitlist" style="margin-top:1rem">
+        <label class="field">
+          <span>Waitlist email (optional)</span>
+          <input type="email" id="email" name="email" autocomplete="email" placeholder="you@studio.example" />
+        </label>
+        <button type="submit" class="btn">Notify me when paid / pro exists</button>
+      </form>
+      <p class="note" id="interest-status"></p>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>Punch2Pen · Mac first · never a browser engine</span>
+    <span>
+      <a href="/privacy">Privacy</a>
+      ·
+      <a href="https://github.com/keeganmoody33/punch2pen">Source</a>
+    </span>
+  </footer>
+
+  <script src="/site.js"></script>
+</body>
+</html>
