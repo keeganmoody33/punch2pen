@@ -1,17 +1,30 @@
 cmake_minimum_required(VERSION 3.22)
 
+# Paid profile API (Convex HTTP actions under cloud/). Empty means the build
+# has no sign-in: the plugin stays free/lite and the engine never opens a
+# socket to anything but 127.0.0.1:7483. Release builds pass the deployed
+# `.convex.site` URL; a Mac install can also drop ~/.punch2pen/profile-api.json.
+set(PUNCH2PEN_PROFILE_API_URL "" CACHE STRING
+    "Base URL of the punch2pen profile API compiled into punch2penEngine")
+
 add_executable(punch2penEngine
     src/main.cpp
     src/IPCServer.cpp
     src/OpenAICloudTranscriber.cpp
     src/TranscriptionCoordinator.cpp
     src/Transcriber.cpp
-    src/DatabaseManager.cpp
-    src/ProfileManager.cpp
+    src/Dictionary.cpp
+    src/CloudProfileClient.cpp
+    src/IxHttpTransport.cpp
+    src/AccountManager.cpp
 )
 
 target_include_directories(punch2penEngine
     PRIVATE ../shared
+)
+
+target_compile_definitions(punch2penEngine PRIVATE
+    PUNCH2PEN_PROFILE_API_URL_DEFAULT="${PUNCH2PEN_PROFILE_API_URL}"
 )
 
 # whisper.cpp defaults BUILD_SHARED_LIBS ON (non-MINGW). That produced
@@ -97,8 +110,9 @@ endif()
 add_executable(transcriptionCoordinatorTest
     tests/TranscriptionCoordinatorTest.cpp
     src/TranscriptionCoordinator.cpp
-    src/DatabaseManager.cpp
-    src/ProfileManager.cpp
+    src/Dictionary.cpp
+    src/CloudProfileClient.cpp
+    src/AccountManager.cpp
 )
 
 target_include_directories(transcriptionCoordinatorTest
@@ -113,33 +127,58 @@ set_target_properties(transcriptionCoordinatorTest PROPERTIES
     CXX_STANDARD_REQUIRED ON
 )
 
-add_executable(databaseManagerTest
-    tests/DatabaseManagerTest.cpp
-    src/DatabaseManager.cpp
+add_executable(dictionaryTest
+    tests/DictionaryTest.cpp
+    src/Dictionary.cpp
 )
 
-target_include_directories(databaseManagerTest
+target_include_directories(dictionaryTest
     PRIVATE src
 )
 
-set_target_properties(databaseManagerTest PROPERTIES
+target_link_libraries(dictionaryTest PRIVATE nlohmann_json::nlohmann_json)
+
+set_target_properties(dictionaryTest PROPERTIES
     CXX_STANDARD 20
     CXX_STANDARD_REQUIRED ON
 )
 
-add_executable(profileManagerTest
-    tests/ProfileManagerTest.cpp
-    src/ProfileManager.cpp
+# Free stays local, login flips to paid, corrections write the profile
+# dictionary, seats stay isolated. Mock profile API, no network.
+add_executable(accountManagerTest
+    tests/AccountManagerTest.cpp
+    src/AccountManager.cpp
+    src/Dictionary.cpp
+    src/CloudProfileClient.cpp
 )
 
-target_include_directories(profileManagerTest
+target_include_directories(accountManagerTest
     PRIVATE src
     PRIVATE ../shared
 )
 
-target_link_libraries(profileManagerTest PRIVATE nlohmann_json::nlohmann_json)
+target_link_libraries(accountManagerTest PRIVATE nlohmann_json::nlohmann_json)
 
-set_target_properties(profileManagerTest PROPERTIES
+set_target_properties(accountManagerTest PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+)
+
+# HTTP contract against cloud/convex/http.ts with a fake transport.
+add_executable(cloudProfileClientTest
+    tests/CloudProfileClientTest.cpp
+    src/CloudProfileClient.cpp
+    src/Dictionary.cpp
+)
+
+target_include_directories(cloudProfileClientTest
+    PRIVATE src
+    PRIVATE ../shared
+)
+
+target_link_libraries(cloudProfileClientTest PRIVATE nlohmann_json::nlohmann_json)
+
+set_target_properties(cloudProfileClientTest PROPERTIES
     CXX_STANDARD 20
     CXX_STANDARD_REQUIRED ON
 )

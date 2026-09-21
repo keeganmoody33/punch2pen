@@ -1,5 +1,6 @@
 #include "IPCServer.h"
 #include "../../shared/Protocol.h"
+#include <algorithm>
 #include <cerrno>
 #include <cstring>
 #include <iostream>
@@ -170,6 +171,20 @@ IPCServer::CorrectionPair IPCServer::popCorrection() {
   return c;
 }
 
+bool IPCServer::hasPendingProfileCommand() {
+  std::lock_guard<std::mutex> lock(profileQueueLock);
+  return !profileCommandQueue.empty();
+}
+
+std::string IPCServer::popProfileCommand() {
+  std::lock_guard<std::mutex> lock(profileQueueLock);
+  if (profileCommandQueue.empty())
+    return {};
+  std::string command = std::move(profileCommandQueue.front());
+  profileCommandQueue.erase(profileCommandQueue.begin());
+  return command;
+}
+
 bool IPCServer::transportStateChangedToStop() {
   std::lock_guard<std::mutex> lock(audioQueueLock);
   if (eventQueue.empty() || !eventQueue.front().isStop)
@@ -234,6 +249,10 @@ void IPCServer::clientHandler(int clientSocket) {
       if (accepted == 0)
         break;
       handshook = true;
+      {
+        std::lock_guard<std::mutex> lock(clientLock);
+        handshakenClients.push_back(clientSocket);
+      }
       continue;
     }
 
@@ -300,6 +319,17 @@ void IPCServer::clientHandler(int clientSocket) {
       std::lock_guard<std::mutex> lock(audioQueueLock);
       eventQueue.push_back(
           {true, {}, 0.0, 0.0, stopHeader.captureEpoch});
+    } else if (header.type == protocol::MessageType::ProfileCommand) {
+      if (header.length == 0 || header.length > protocol::kMaxJsonPayloadBytes) {
+        std::cerr << "Rejecting ProfileCommand of " << header.length
+                  << " bytes" << std::endl;
+        break;
+      }
+      std::string payload(header.length, '\0');
+      if (!recvExact(clientSocket, payload.data(), header.length))
+        break;
+      std::lock_guard<std::mutex> lock(profileQueueLock);
+      profileCommandQueue.push_back(std::move(payload));
     } else {
       if (header.length > 0) {
         std::vector<char> trash(header.length);
@@ -312,8 +342,31 @@ void IPCServer::clientHandler(int clientSocket) {
     std::lock_guard<std::mutex> lock(clientLock);
     if (activeClientSocket == clientSocket)
       activeClientSocket = -1;
+    handshakenClients.erase(std::remove(handshakenClients.begin(),
+                                        handshakenClients.end(), clientSocket),
+                            handshakenClients.end());
   }
   close(clientSocket);
+}
+
+void IPCServer::sendJsonMessage(int clientSocket, uint32_t type,
+                                const std::string &json) {
+  protocol::Header header{};
+  header.type = static_cast<protocol::MessageType>(type);
+  header.length = static_cast<uint32_t>(json.size());
+  if (!sendExact(clientSocket, &header, sizeof(header)))
+    return;
+  sendExact(clientSocket, json.data(), json.size());
+}
+
+void IPCServer::sendProfileStatus(const std::string &json) {
+  if (json.empty() || json.size() > protocol::kMaxJsonPayloadBytes)
+    return;
+  std::lock_guard<std::mutex> lock(clientLock);
+  for (const int clientSocket : handshakenClients)
+    sendJsonMessage(clientSocket,
+                    static_cast<uint32_t>(protocol::MessageType::ProfileStatus),
+                    json);
 }
 
 void IPCServer::sendResult(const std::string &text, double startTime,

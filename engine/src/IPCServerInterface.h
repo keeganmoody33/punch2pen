@@ -24,6 +24,10 @@ public:
 
   virtual bool hasPendingCorrection() = 0;
   virtual CorrectionPair popCorrection() = 0;
+
+  // JSON ProfileCommand payloads from plugins (see shared/Protocol.h).
+  virtual bool hasPendingProfileCommand() = 0;
+  virtual std::string popProfileCommand() = 0;
 };
 
 } // namespace punch2pen
