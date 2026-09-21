@@ -69,3 +69,8 @@ fixtures/vocals/expected-words.txt
 # Python
 __pycache__/
 *.py[cod]
+
+# Cloudflare / Wrangler (site/)
+.wrangler/
+.dev.vars
+.dev.vars.*

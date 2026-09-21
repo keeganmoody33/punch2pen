@@ -6,6 +6,15 @@ on:
     branches: [main]
 
 jobs:
+  site-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Site copy gates (no karaoke, no invented prices)
+        run: |
+          chmod +x site/check.sh
+          ./site/check.sh
+
   engine-tests:
     runs-on: macos-latest
     steps:
