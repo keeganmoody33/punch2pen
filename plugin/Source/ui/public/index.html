@@ -5,635 +5,1577 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>punch2pen</title>
   <!--
-    punch2pen WebView UI.
+    punch2pen — Living Transcript.
 
-    This single file is the entire plugin face. It is loaded by
-    WebViewEditor and driven over a tiny JS API:
+    This single file is the entire plugin face. WebViewEditor loads it into
+    juce::WebBrowserComponent and drives it over a tiny JS API. The window
+    opens at 400×600 (C++ setSize) and is resizable; everything here is fluid.
 
-      C++ → JS (call via evaluateJavascript):
+      C++ → JS (evaluateJavascript):
         appendWord(text, startSample, endSample, barNumber)
         updatePlayhead(currentDAWSample)
         setConnectionStatus(connected)        // boolean
         updatePosition(bar, beat)             // ints
         setState(stateName)                   // disconnected|idle|recording|playback|correction
-        resetTranscript()                     // clears all words (e.g. new take)
-        showCorrection(originalWord, x, y)    // opens the popup at a position
+        resetTranscript()                     // clears all words (new take)
+        showCorrection(originalWord, x, y)    // opens the correction sheet
         hideCorrection()
+        setActiveProfile(profile)             // pill: { name, kind: 'local'|'pro'|'seat', detail }
+        setProfileStatus(json)                // engine ProfileStatus (string or object):
+                                              //   { tier, cloudAvailable, signedIn, email,
+                                              //     activeProfile, profiles[], dictionary,
+                                              //     sync, login{stage,email,echoedCode,message},
+                                              //     message }
 
-      JS → C++ (registered as native functions on window.punch2pen):
+      JS → C++ (native functions on window.punch2pen):
         onWordClicked(word, x, y)
         submitCorrection(original, corrected)
         onCorrectionCancelled()
+        onReady()
+        profileCommand(json)                  // {op:'status'|'login_start'{email}|
+                                              //     'login_verify'{email,code}|'set_active'{profileId}|
+                                              //     'logout'|'refresh'}
 
-    Element IDs that the bridge / DAW side may bind to:
-      #header-bar  #app-title  #status-badge
-      #position-display  #position-text
+    Element IDs the bridge / verify harness bind to:
+      #header-bar  #app-title  #profile-pill  #status-badge
+      #position-display  #position-text  (.bar-num .beat-num)
       #connection-banner
-      #transcript-container
+      #transcript-container  #transcript-scroll  #transcript-inner
+      #return-to-live
       #correction-overlay  #correction-original
       #correction-input  #correction-submit  #correction-cancel
-      #logo-mark
+      #status-bar  #status-text  #logo-mark
+
+    body[data-state]  = disconnected|idle|recording|playback|correction (contract)
+    body[data-mode]   = the underlying transport state while a correction is open
+
+    Browser-only preview (no C++ bridge):
+      index.html?preview=disconnected|idle|recording|playback|scrolled|correction[&t=seconds]
+      index.html?preview=signin[&stage=email|code|seats]   (fake engine; echo code 482910)
   -->
   <style>
-    /* ──────────────────────────────────────────────────────────
-       Tokens — taken from the existing JUCE codebase:
-         TranscriptView.h         lines 65–67
-         CorrectionEditor.cpp     lines 16–28
-         PluginEditor.cpp paint() line 61
-       ────────────────────────────────────────────────────────── */
     :root {
-      --bg-primary:      #1C1917;
-      --text-primary:    #FAFAF9;
-      --accent-primary:  #FCD34D;
-      --window-bg:       #1E1E1E;
-      --header-bg:       #2D2D2D;
-      --input-bg:        #3A3A3A;
-      --border-color:    #505050;
-      --submit-green:    #4A9F4A;
-      --cancel-red:      #9F4A4A;
+      /* Open — dark, DAW-native. */
+      --bg-deep:     #0F1012;
+      --bg-pane:     #15161A;
+      --bg-chrome:   #1B1D21;
+      --bg-raised:   #23262B;
+      --line:        rgba(255, 255, 255, 0.08);
+      --line-strong: rgba(255, 255, 255, 0.16);
 
-      /* Derived */
-      --ink-mid:         rgba(250, 250, 249, 0.55);
-      --ink-dim:         rgba(250, 250, 249, 0.30);
-      --rule:            rgba(250, 250, 249, 0.10);
-      --past:            0.4;     /* per spec — past-word alpha */
-      --upcoming:        0.6;
-      --active:          1.0;
+      --ink:         #F3F3F1;
+      --ink-2:       rgba(243, 243, 241, 0.70);
+      --ink-3:       rgba(243, 243, 241, 0.44);
+      --ink-4:       rgba(243, 243, 241, 0.26);
 
-      --mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+      --accent:      #FCD34D;
+      --accent-ink:  #151515;
+      --rec:         #FF4D57;
+      --play:        #5CCB8A;
+
+      /* Temporal Hierarchy */
+      --past:        0.34;
+      --upcoming:    0.66;
+      --active:      1.0;
+
+      --lyric-size:  15px;
+      --title-size:  22px;
+      --lyric-lh:    1.45;
+
+      --mono: ui-monospace, "SF Mono", Menlo, "JetBrains Mono", "IBM Plex Mono", Consolas, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Inter, system-ui, sans-serif;
     }
 
     * { box-sizing: border-box; }
     html, body {
       margin: 0; padding: 0;
       width: 100%; height: 100%;
-      background: var(--window-bg);
-      color: var(--text-primary);
+      background: var(--bg-deep);
+      color: var(--ink);
       font-family: var(--mono);
-      font-size: 13px;
+      font-size: 12px;
       overflow: hidden;
       -webkit-font-smoothing: antialiased;
-      user-select: none;
+      -webkit-user-select: none; user-select: none;
     }
     body {
       position: relative;
       display: flex;
       flex-direction: column;
     }
+    button { font: inherit; color: inherit; }
+    button:focus-visible, input:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
 
     /* ── HEADER ─────────────────────────────────────────────── */
     #header-bar {
-      height: 40px;
+      height: 44px;
       flex-shrink: 0;
-      background: var(--header-bg);
       display: flex; align-items: center; gap: 10px;
       padding: 0 12px;
-      border-bottom: 1px solid var(--rule);
+      background: var(--bg-chrome);
+      border-bottom: 1px solid var(--line);
       position: relative;
-      z-index: 2;
+      z-index: 6;
     }
     #app-title {
       font-weight: 700;
-      letter-spacing: 0.04em;
-      font-size: 16px;
-      color: var(--text-primary);
+      font-size: 12px;
+      letter-spacing: 0.10em;
+      color: var(--ink-2);
+      white-space: nowrap;
     }
-    #app-title .accent { color: var(--accent-primary); font-size: 19px; }
+    #app-title .accent { color: var(--accent); }
+
+    #profile-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 24px;
+      padding: 0 9px 0 8px;
+      border-radius: 999px;
+      background: var(--bg-raised);
+      border: 1px solid var(--line);
+      color: var(--ink-2);
+      font-weight: 600; font-size: 10.5px; letter-spacing: 0.06em;
+      cursor: pointer;
+      max-width: 46%;
+      transition: border-color 120ms ease, color 120ms ease;
+    }
+    #profile-pill:hover, #profile-pill[aria-expanded="true"] { border-color: var(--line-strong); color: var(--ink); }
+    #profile-pill .pill-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--ink-3); flex-shrink: 0;
+    }
+    body[data-profile-kind="pro"]  #profile-pill .pill-dot,
+    body[data-profile-kind="seat"] #profile-pill .pill-dot { background: var(--play); }
+    #profile-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #profile-pill .pill-caret { width: 10px; height: 10px; color: var(--ink-4); flex-shrink: 0; }
+
     #status-badge {
       margin-left: auto;
-      font-weight: 700;
-      letter-spacing: 0.18em;
-      font-size: 10px;
-      text-transform: uppercase;
       display: inline-flex; align-items: center; gap: 6px;
-      color: var(--ink-mid);
+      font-weight: 700; font-size: 10px; letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      white-space: nowrap;
     }
     #status-badge::before {
-      content: ""; width: 8px; height: 8px; border-radius: 50%;
+      content: ""; width: 7px; height: 7px; border-radius: 50%;
       background: currentColor;
     }
-    /* State → badge */
-    body[data-state="disconnected"] #status-badge { color: var(--accent-primary); }
-    body[data-state="idle"]         #status-badge { color: var(--ink-mid); }
-    body[data-state="recording"]    #status-badge { color: #ff4d57; }
-    body[data-state="playback"]     #status-badge { color: var(--submit-green); }
-    body[data-state="recording"] #status-badge::before {
-      animation: p2p-pulse 1.3s ease-out infinite;
-    }
+    body[data-mode="disconnected"] #status-badge { color: var(--accent); }
+    body[data-mode="idle"]         #status-badge { color: var(--ink-3); }
+    body[data-mode="recording"]    #status-badge { color: var(--rec); }
+    body[data-mode="playback"]     #status-badge { color: var(--play); }
+    body[data-mode="recording"] #status-badge::before { animation: p2p-pulse 1.3s ease-out infinite; }
     @keyframes p2p-pulse {
-      0%   { box-shadow: 0 0 0 0   #ff4d57aa; }
-      70%  { box-shadow: 0 0 0 10px transparent; }
-      100% { box-shadow: 0 0 0 0   transparent; }
+      0%   { box-shadow: 0 0 0 0 rgba(255, 77, 87, 0.65); }
+      70%  { box-shadow: 0 0 0 9px transparent; }
+      100% { box-shadow: 0 0 0 0 transparent; }
     }
 
-    /* ── POSITION DISPLAY ───────────────────────────────────── */
+    /* ── PROFILE POPOVER (placeholder for the paid/login PR) ── */
+    #profile-popover {
+      position: absolute;
+      top: 50px; left: 12px;
+      width: min(320px, calc(100% - 24px));
+      background: var(--bg-raised);
+      border: 1px solid var(--line-strong);
+      border-radius: 10px;
+      padding: 12px;
+      z-index: 20;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+      animation: p2p-pop 140ms ease-out;
+    }
+    #profile-popover[hidden] { display: none; }
+    .pop-eyebrow {
+      font-size: 9.5px; font-weight: 700; letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--ink-3);
+      margin-bottom: 8px;
+    }
+    .profile-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 8px;
+      border-radius: 7px;
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .profile-row .pill-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); flex-shrink: 0; }
+    body[data-profile-kind="pro"]  .profile-row .pill-dot,
+    body[data-profile-kind="seat"] .profile-row .pill-dot { background: var(--play); }
+    .profile-row .who { flex: 1; min-width: 0; }
+    .profile-row .who b { display: block; font-size: 12px; color: var(--ink); font-weight: 700; }
+    .profile-row .who span { display: block; font-size: 10.5px; color: var(--ink-3); margin-top: 2px; }
+    .profile-row .check { color: var(--accent); font-size: 12px; }
+    .pop-copy {
+      font-family: var(--sans);
+      font-size: 12px; line-height: 1.45;
+      color: var(--ink-2);
+      margin: 10px 2px 10px;
+    }
+    .pop-form { display: flex; gap: 6px; }
+    .pop-form[hidden] { display: none; }
+    .pop-input {
+      flex: 1 1 auto; min-width: 0;
+      height: 28px; padding: 0 9px;
+      background: var(--bg-deep);
+      color: var(--ink);
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      font-family: var(--sans); font-size: 12.5px;
+      outline: none; caret-color: var(--accent);
+      -webkit-user-select: text; user-select: text;
+    }
+    .pop-input:focus { border-color: var(--accent); }
+    .pop-input::placeholder { color: var(--ink-4); }
+    .pop-input.code {
+      flex: 0 0 118px;
+      font-family: var(--mono); font-size: 15px; font-weight: 700;
+      letter-spacing: 0.32em; text-align: center;
+    }
+    .pop-btn {
+      height: 28px; padding: 0 11px;
+      border-radius: 6px;
+      border: 1px solid var(--line-strong);
+      background: transparent; color: var(--ink-2);
+      font-weight: 700; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase;
+      cursor: pointer; white-space: nowrap; flex-shrink: 0;
+    }
+    .pop-btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+    .pop-btn:disabled { opacity: 0.55; cursor: default; }
+    .linkish {
+      background: none; border: none; padding: 0;
+      color: var(--ink-3); font-size: 10.5px; letter-spacing: 0.02em;
+      text-decoration: underline; text-underline-offset: 2px;
+      cursor: pointer;
+    }
+    .linkish:hover { color: var(--ink); }
+    .linkish:disabled { opacity: 0.5; cursor: default; }
+    .pop-note {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin-top: 8px;
+      font-family: var(--sans); font-size: 11.5px; color: var(--ink-3);
+    }
+    .pop-note[hidden] { display: none; }
+    .pop-note b { color: var(--ink-2); font-weight: 600; }
+    .pop-note code { font-family: var(--mono); color: var(--accent); letter-spacing: 0.2em; }
+    .pop-msg {
+      margin-top: 8px;
+      font-family: var(--sans); font-size: 11.5px; line-height: 1.4;
+      color: var(--ink-2);
+    }
+    .pop-msg.error { color: #FF8A90; }
+    .pop-msg[hidden] { display: none; }
+    .account-line {
+      display: flex; align-items: center; gap: 10px;
+      padding: 2px 2px 10px;
+      font-size: 11px; color: var(--ink-2);
+    }
+    .account-line #account-email { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pop-eyebrow.seats { margin-bottom: 4px; }
+    #seat-list { display: flex; flex-direction: column; gap: 2px; max-height: 190px; overflow-y: auto; }
+    .seat-row {
+      display: flex; align-items: center; gap: 10px;
+      width: 100%; text-align: left;
+      padding: 7px 8px;
+      border-radius: 7px;
+      border: 1px solid transparent;
+      background: transparent;
+      cursor: pointer;
+    }
+    .seat-row:hover { border-color: var(--line); }
+    .seat-row[aria-selected="true"] { background: rgba(255, 255, 255, 0.04); cursor: default; }
+    .seat-row .seat-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-4); flex-shrink: 0; }
+    .seat-row[aria-selected="true"] .seat-dot { background: var(--play); }
+    .seat-row .who { flex: 1; min-width: 0; }
+    .seat-row .who b { display: block; font-size: 12px; color: var(--ink); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .seat-row .who span { display: block; font-size: 10.5px; line-height: 1.35; color: var(--ink-3); margin-top: 2px; }
+    .seat-row .check { color: var(--accent); font-size: 12px; }
+    .seat-row.suspended { opacity: 0.5; }
+    .seat-row[aria-busy="true"] { opacity: 0.6; }
+    .seat-empty { font-family: var(--sans); font-size: 11.5px; color: var(--ink-3); padding: 6px 2px; }
+
+    /* ── TRANSPORT STRIP ────────────────────────────────────── */
     #position-display {
-      height: 36px;                           /* bumped from 30 per spec */
+      height: 30px;
       flex-shrink: 0;
-      display: flex; align-items: center;
+      display: flex; align-items: center; gap: 12px;
       padding: 0 14px;
-      border-bottom: 1px solid var(--rule);
-      background: var(--bg-primary);
+      background: var(--bg-chrome);
+      border-bottom: 1px solid var(--line);
     }
     #position-text {
-      font-size: 18px;                        /* dropped from 24 per spec */
-      font-weight: 700;
-      letter-spacing: 0.04em;
+      font-weight: 700; font-size: 11.5px; letter-spacing: 0.12em;
+      color: var(--ink-3);
       font-variant-numeric: tabular-nums;
+      white-space: nowrap;
     }
-    #position-text .bar-num,
-    #position-text .beat-num { color: var(--accent-primary); }
+    #position-text .bar-num, #position-text .beat-num { color: var(--accent); }
+    #sync-indicator {
+      margin-left: auto;
+      display: none; align-items: center; gap: 6px;
+      font-weight: 700; font-size: 9.5px; letter-spacing: 0.18em;
+      color: var(--ink-3);
+      white-space: nowrap;
+    }
+    #sync-indicator::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    body.has-words[data-mode="playback"]  #sync-indicator,
+    body.has-words[data-mode="recording"] #sync-indicator { display: inline-flex; color: var(--play); }
+    body.has-words[data-mode="recording"] #sync-indicator { color: var(--rec); }
+    body.has-words.scrolled-away #sync-indicator { display: inline-flex; color: var(--ink-3); }
 
-    /* ── CONNECTION BANNER ──────────────────────────────────── */
+    /* ── CONNECTION BANNER (disconnected only) ──────────────── */
     #connection-banner {
-      display: none;                          /* shown only in disconnected */
+      display: none;
       flex-shrink: 0;
-      padding: 14px 16px;
-      font-size: 13px; font-weight: 700;
-      letter-spacing: 0.12em; text-transform: uppercase;
-      color: var(--accent-primary);
-      background:
-        linear-gradient(180deg,
-          rgba(252,211,77,0.10),
-          rgba(252,211,77,0.02));
-      border-bottom: 1px dashed rgba(252,211,77,0.4);
+      align-items: center; gap: 9px;
+      padding: 8px 14px;
+      font-weight: 700; font-size: 10.5px; letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: rgba(252, 211, 77, 0.07);
+      border-bottom: 1px solid rgba(252, 211, 77, 0.25);
     }
-    body[data-state="disconnected"] #connection-banner { display: block; }
+    #connection-banner::before {
+      content: ""; width: 7px; height: 7px; border-radius: 50%;
+      background: currentColor;
+      animation: p2p-blink 1.2s steps(2) infinite;
+    }
+    body[data-mode="disconnected"] #connection-banner { display: flex; }
 
     /* ── TRANSCRIPT ─────────────────────────────────────────── */
     #transcript-container {
       position: relative;
-      background: var(--bg-primary);
       flex: 1 1 auto;
       min-height: 0;
-      overflow: hidden;
+      background: var(--bg-pane);
+      container-type: inline-size;
     }
+    #transcript-scroll {
+      position: absolute; inset: 0;
+      overflow-y: auto; overflow-x: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+    }
+    #transcript-scroll::-webkit-scrollbar { width: 8px; }
+    #transcript-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14); border-radius: 4px; }
+    #transcript-scroll::-webkit-scrollbar-track { background: transparent; }
     #transcript-inner {
-      position: absolute; left: 0; right: 0; top: 50%;
-      will-change: transform;
-      transform: translateY(0);               /* updated by RAF spring */
-      transition: none;
+      padding: var(--pad-top, 200px) 22px var(--pad-bot, 200px) 22px;
     }
+
+    /* Temporal Hierarchy: past / active line as title / upcoming */
     .lyric-line {
-      height: 40px;
-      display: flex; align-items: center; gap: 6px;
-      padding: 0 22px;
-      font-size: 16px;
-      white-space: nowrap;
+      display: flex; flex-wrap: wrap; align-items: baseline;
+      column-gap: 0.32em; row-gap: 2px;
+      padding: 6px 0;
+      font-family: var(--sans);
+      font-weight: 500;
+      font-size: var(--lyric-size);
+      line-height: var(--lyric-lh);
+      color: var(--ink);
+      opacity: var(--upcoming);
+      transition: opacity 180ms ease, font-size 180ms ease, padding 180ms ease;
     }
+    .lyric-line.line-past   { opacity: var(--past); }
+    .lyric-line.line-active {
+      opacity: var(--active);
+      font-size: var(--title-size);
+      font-weight: 700;
+      letter-spacing: -0.012em;
+      line-height: 1.3;
+      padding: 10px 0;
+    }
+    @supports (font-size: 1cqi) {
+      .lyric-line             { font-size: clamp(14px, 3.9cqi, 20px); }
+      .lyric-line.line-active { font-size: clamp(20px, 5.6cqi, 32px); }
+    }
+
     .lyric-word {
       cursor: pointer;
-      padding: 2px 4px;
-      border-radius: 2px;
-      transition: background 140ms ease, color 140ms ease, opacity 140ms ease;
-      opacity: 0.6;                            /* default = upcoming */
+      border-radius: 4px;
+      padding: 0 0.16em;
+      margin: 0 -0.16em;
+      transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
     }
-    .lyric-word:hover { background: rgba(255,255,255,0.06); }
+    .lyric-word:hover {
+      text-decoration: underline;
+      text-decoration-color: var(--ink-3);
+      text-underline-offset: 0.16em;
+    }
+    .lyric-line.line-active .lyric-word.past { opacity: 0.55; }
     .lyric-word.active {
-      opacity: 1.0;
-      color: var(--bg-primary);
-      background: var(--text-primary);
-      font-weight: 700;
+      background: var(--accent);
+      color: var(--accent-ink);
+      opacity: 1;
     }
-    .lyric-word.past { opacity: 0.4; }
-    .lyric-word.upcoming { opacity: 0.6; }
+    .lyric-word.correcting { outline: 1px dashed var(--accent); outline-offset: 2px; }
+    .lyric-word.corrected  { border-bottom: 1px dotted var(--play); }
 
-    /* Recording state: uniform "provisional" alpha, no active hot word */
-    body[data-state="recording"] .lyric-word {
-      opacity: 0.6 !important;
-      color: var(--text-primary) !important;
-      background: transparent !important;
-      font-weight: 400 !important;
+    /* Recording: words are provisional until playback re-evaluates them. */
+    body[data-mode="recording"] .lyric-line.line-active .lyric-word { opacity: 0.92; background: transparent; color: var(--ink); }
+    #stream-cursor {
+      display: none;
+      width: 0.45em; height: 1em;
+      background: var(--rec);
+      border-radius: 1px;
+      align-self: center;
+      animation: p2p-blink 1s steps(2) infinite;
     }
-    body[data-state="recording"] .lyric-word:last-of-type {
-      opacity: 0.85 !important;                /* newest word slight emphasis */
-    }
+    body[data-mode="recording"] #stream-cursor { display: inline-block; }
+    @keyframes p2p-blink { 50% { opacity: 0; } }
 
-    /* Idle empty-state hint */
-    #idle-hint, #connecting-hint {
+    /* Empty states */
+    .pane-hint {
       display: none;
       position: absolute; inset: 0;
       align-items: center; justify-content: center;
-      flex-direction: column; gap: 6px;
-      color: var(--ink-mid); font-size: 11px;
-      letter-spacing: 0.22em; text-transform: uppercase;
+      flex-direction: column; gap: 8px;
+      padding: 0 32px;
       text-align: center;
       pointer-events: none;
+      z-index: 1;
     }
-    #idle-hint .sub {
-      letter-spacing: 0;
-      text-transform: none;
-      color: var(--ink-dim); font-size: 11px;
-      margin-top: 4px;
+    .pane-hint .hint-title {
+      font-family: var(--sans);
+      font-size: 15px; font-weight: 600;
+      color: var(--ink-2);
     }
-    body[data-state="idle"]:not(.has-words) #transcript-container #idle-hint { display: flex; }
+    .pane-hint .hint-sub {
+      font-family: var(--sans);
+      font-size: 12px; line-height: 1.5;
+      color: var(--ink-3);
+      max-width: 300px;
+    }
+    .pane-hint .hint-key {
+      display: inline-block;
+      padding: 1px 5px; border-radius: 3px;
+      font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+      color: var(--rec);
+      border: 1px solid rgba(255, 77, 87, 0.35);
+      vertical-align: 1px;
+    }
+    body[data-mode="idle"]:not(.has-words)         #idle-hint         { display: flex; }
+    body[data-mode="disconnected"]:not(.has-words) #disconnected-hint { display: flex; }
 
-    /* Streaming cursor at the very end of the transcript during recording */
-    #stream-cursor {
-      display: none;
-      width: 8px; height: 16px;
-      background: #ff4d57;
-      animation: p2p-blink 1s steps(2) infinite;
-      vertical-align: middle;
-    }
-    body[data-state="recording"] #stream-cursor { display: inline-block; }
-    @keyframes p2p-blink { 50% { opacity: 0; } }
-
-    /* Top/bottom fade so the karaoke scroll feels physical */
+    /* Depth fades so the transcript feels physical */
     .fade-top, .fade-bot {
-      position: absolute; left: 0; right: 0; height: 50px;
-      pointer-events: none; z-index: 1;
+      position: absolute; left: 0; right: 8px; height: 56px;
+      pointer-events: none; z-index: 2;
     }
-    .fade-top { top: 0;    background: linear-gradient(var(--bg-primary), transparent); }
-    .fade-bot { bottom: 0; background: linear-gradient(transparent, var(--bg-primary)); }
+    .fade-top { top: 0;    background: linear-gradient(var(--bg-pane), transparent); }
+    .fade-bot { bottom: 0; background: linear-gradient(transparent, var(--bg-pane)); }
 
-    /* ── CORRECTION OVERLAY (260×90, 6px padding per spec) ──── */
+    /* Return to Live — only while the user has scrolled away */
+    #return-to-live {
+      position: absolute; right: 14px; bottom: 14px;
+      display: none; align-items: center; gap: 7px;
+      height: 30px; padding: 0 12px 0 10px;
+      border-radius: 999px;
+      background: var(--bg-raised);
+      border: 1px solid var(--line-strong);
+      color: var(--ink);
+      font-weight: 700; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase;
+      box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+      cursor: pointer;
+      z-index: 4;
+    }
+    #return-to-live svg { width: 12px; height: 12px; }
+    #return-to-live:hover { border-color: var(--accent); }
+    body.has-words.scrolled-away #return-to-live { display: inline-flex; animation: p2p-rise 160ms ease-out; }
+    body.correction-open #return-to-live { bottom: 108px; }
+    @keyframes p2p-rise {
+      from { transform: translateY(6px); opacity: 0; }
+      to   { transform: translateY(0);   opacity: 1; }
+    }
+
+    /* ── CORRECTION SHEET (docked, sits over the transcript) ── */
     #correction-overlay {
       display: none;
-      position: absolute;
-      width: 260px; height: 90px;
-      background: var(--header-bg);
-      border: 1px solid var(--border-color);
-      padding: 6px;
-      box-shadow: 0 12px 28px rgba(0,0,0,0.55);
-      z-index: 10;
-      font-family: var(--mono);
+      position: absolute; left: 0; right: 0; bottom: 0;
+      padding: 10px 14px 12px;
+      background: var(--bg-raised);
+      border-top: 1px solid var(--line-strong);
+      box-shadow: 0 -14px 30px rgba(0, 0, 0, 0.45);
+      z-index: 5;
       animation: p2p-pop 140ms ease-out;
     }
-    body[data-state="correction"] #correction-overlay { display: block; }
+    body.correction-open #correction-overlay { display: block; }
     @keyframes p2p-pop {
-      from { transform: translateY(-4px) scale(0.96); opacity: 0; }
-      to   { transform: translateY(0) scale(1);       opacity: 1; }
+      from { transform: translateY(6px); opacity: 0; }
+      to   { transform: translateY(0);   opacity: 1; }
+    }
+    .sheet-row { display: flex; align-items: center; gap: 8px; }
+    .sheet-row + .sheet-row { margin-top: 8px; }
+    .sheet-eyebrow {
+      font-size: 9.5px; font-weight: 700; letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--ink-3);
+      flex-shrink: 0;
     }
     #correction-original {
-      display: block;
-      font-size: 12px; font-weight: 700;
-      color: var(--text-primary);
-      height: 22px; line-height: 22px;
+      font-family: var(--sans);
+      font-size: 13px; font-weight: 600;
+      color: var(--ink-2);
+      text-decoration: line-through;
+      text-decoration-color: var(--rec);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      min-width: 0;
     }
-    #correction-original::before {
-      content: "Original: ";
-      font-weight: 400;
-      color: var(--ink-mid);
-    }
-    #correction-original .strike { text-decoration: line-through; text-decoration-color: var(--cancel-red); }
+    .sheet-hint { margin-left: auto; font-size: 9.5px; letter-spacing: 0.06em; color: var(--ink-4); white-space: nowrap; }
     #correction-input {
-      display: block;
-      width: 100%; height: 24px;
-      margin-top: 4px;
-      padding: 2px 6px;
-      background: var(--input-bg);
-      color: var(--text-primary);
-      border: 1px solid var(--border-color);
-      font-family: var(--mono); font-size: 13px; font-weight: 600;
+      flex: 1 1 auto; min-width: 0;
+      height: 30px;
+      padding: 0 10px;
+      background: var(--bg-deep);
+      color: var(--ink);
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      font-family: var(--sans); font-size: 14px; font-weight: 600;
       outline: none;
-      caret-color: var(--accent-primary);
+      caret-color: var(--accent);
+      -webkit-user-select: text; user-select: text;
     }
-    #correction-input:focus { border-color: var(--accent-primary); }
-    .button-row { display: flex; gap: 4px; margin-top: 4px; }
+    #correction-input:focus { border-color: var(--accent); }
     #correction-submit, #correction-cancel {
-      flex: 1; height: 24px;
-      border: none; cursor: pointer;
-      color: #fff; font-family: var(--mono);
-      font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
-      font-size: 10px;
+      height: 30px; padding: 0 12px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      font-weight: 700; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+      cursor: pointer;
+      flex-shrink: 0;
     }
-    #correction-submit { background: var(--submit-green); }
-    #correction-cancel { background: var(--cancel-red); }
+    #correction-submit { background: var(--accent); color: var(--accent-ink); }
+    #correction-submit:hover { filter: brightness(1.06); }
+    #correction-cancel { background: transparent; color: var(--ink-2); border-color: var(--line-strong); }
+    #correction-cancel:hover { color: var(--ink); }
 
-    /* ── LOGO MARK (bottom-right, all states) ───────────────── */
+    /* ── STATUS BAR ─────────────────────────────────────────── */
+    #status-bar {
+      height: 30px;
+      flex-shrink: 0;
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 12px;
+      background: var(--bg-chrome);
+      border-top: 1px solid var(--line);
+    }
+    #status-text {
+      flex: 1 1 auto; min-width: 0;
+      font-family: var(--sans);
+      font-size: 11px;
+      color: var(--ink-3);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #status-text.nudge { color: var(--ink-2); }
     #logo-mark {
-      position: fixed;
-      right: 12px; bottom: 12px;
-      width: 56px; height: 56px;
+      width: 18px; height: 18px;
       opacity: 0.45;
-      pointer-events: none;
-      z-index: 0;
-      color: var(--text-primary);
+      color: var(--ink);
+      flex-shrink: 0;
     }
     #logo-mark svg { width: 100%; height: 100%; display: block; }
+
+    /* Frozen browser previews skip entrance motion so screenshots are honest. */
+    body.no-motion #return-to-live,
+    body.no-motion #correction-overlay,
+    body.no-motion #profile-popover { animation: none; }
   </style>
 </head>
-<body data-state="disconnected">
+<body data-state="disconnected" data-mode="disconnected" data-profile-kind="local">
 
   <!-- HEADER ─────────────────────────────────────────────── -->
-  <div id="header-bar">
+  <header id="header-bar">
     <span id="app-title">[ PUNCH<span class="accent">2</span>PEN ]</span>
+    <button id="profile-pill" type="button" aria-haspopup="dialog" aria-expanded="false"
+            title="Active profile">
+      <span class="pill-dot"></span>
+      <span id="profile-name">Local</span>
+      <svg class="pill-caret" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4 5 6.5 7.5 4" /></svg>
+    </button>
     <span id="status-badge">WAIT</span>
+  </header>
+
+  <div id="profile-popover" role="dialog" aria-label="Active profile" hidden>
+    <div class="pop-eyebrow">Active profile</div>
+
+    <!-- Signed out: the local profile plus email + six-digit code sign-in -->
+    <section id="pop-signin">
+      <div class="profile-row">
+        <span class="pill-dot"></span>
+        <span class="who">
+          <b id="profile-row-name">Local</b>
+          <span id="profile-row-detail">This Mac · no account</span>
+        </span>
+        <span class="check">✓</span>
+      </div>
+      <p class="pop-copy">
+        Corrections stay in this session. A signed-in profile keeps lyrics, timecode,
+        and your own dictionary with you across DAWs and rooms — each artist’s
+        dictionary stays separate.
+      </p>
+      <form id="login-email-form" class="pop-form" novalidate>
+        <input id="login-email" class="pop-input" type="email" placeholder="you@studio.com"
+               autocomplete="email" autocapitalize="off" spellcheck="false" aria-label="Email" />
+        <button id="login-send" class="pop-btn primary" type="submit">Send code</button>
+      </form>
+      <form id="login-code-form" class="pop-form" novalidate hidden>
+        <input id="login-code" class="pop-input code" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+               autocomplete="one-time-code" placeholder="······" aria-label="Six-digit code" />
+        <button id="login-verify" class="pop-btn primary" type="submit">Sign in</button>
+      </form>
+      <div id="login-note" class="pop-note" hidden>
+        Code sent to <b id="login-code-email"></b>
+        <button id="login-change-email" type="button" class="linkish">Change email</button>
+      </div>
+      <div id="login-echo" class="pop-note" hidden>Dev deployment echoed the code: <code id="login-echo-code"></code></div>
+      <div id="login-message" class="pop-msg" hidden></div>
+      <div id="signin-unavailable" class="pop-note" hidden>Sign-in isn’t available in this build.</div>
+    </section>
+
+    <!-- Signed in: account line and the seats this login holds -->
+    <section id="pop-account" hidden>
+      <div class="account-line">
+        <span id="account-email"></span>
+        <button id="account-refresh" type="button" class="linkish">Refresh</button>
+        <button id="account-logout" type="button" class="linkish">Sign out</button>
+      </div>
+      <div class="pop-eyebrow seats">Seats</div>
+      <div id="seat-list" role="listbox" aria-label="Seats"></div>
+      <div id="account-message" class="pop-msg" hidden></div>
+    </section>
   </div>
 
-  <!-- POSITION ───────────────────────────────────────────── -->
+  <!-- TRANSPORT ──────────────────────────────────────────── -->
   <div id="position-display">
     <span id="position-text">
-      Bar <span class="bar-num">1</span>&nbsp;|&nbsp;Beat <span class="beat-num">1</span>
+      BAR <span class="bar-num">1</span> · BEAT <span class="beat-num">1</span>
     </span>
+    <span id="sync-indicator">LIVE</span>
   </div>
 
-  <!-- CONNECTION BANNER (only Disconnected) ───────────────── -->
+  <!-- CONNECTION BANNER (disconnected only) ────────────────── -->
   <div id="connection-banner">Waiting for engine connection…</div>
 
   <!-- TRANSCRIPT ─────────────────────────────────────────── -->
-  <div id="transcript-container">
+  <main id="transcript-container">
+    <div id="disconnected-hint" class="pane-hint">
+      <div class="hint-title">Waiting for the local engine</div>
+      <div class="hint-sub">punch2pen starts its engine beside the plugin. Transcription runs on this Mac.</div>
+    </div>
+    <div id="idle-hint" class="pane-hint">
+      <div class="hint-title">Arm the track and record</div>
+      <div class="hint-sub">Press <span class="hint-key">● REC</span> in your DAW. The transcript lands here as you punch. Click any word to correct it.</div>
+    </div>
+    <div id="transcript-scroll">
+      <div id="transcript-inner"></div>
+    </div>
     <div class="fade-top"></div>
-    <div id="idle-hint">
-      — no signal —
-      <span class="sub">armed and ready · press ● REC on your DAW</span>
-    </div>
-    <div id="transcript-inner"></div>
     <div class="fade-bot"></div>
-  </div>
+    <button id="return-to-live" type="button">
+      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M6 1.5v7M3 5.8 6 8.8l3-3M2 10.7h8" />
+      </svg>
+      Return to Live
+    </button>
 
-  <!-- CORRECTION OVERLAY ─────────────────────────────────── -->
-  <div id="correction-overlay">
-    <span id="correction-original"></span>
-    <input id="correction-input" type="text" spellcheck="false" autocomplete="off" />
-    <div class="button-row">
-      <button id="correction-submit">Apply ↵</button>
-      <button id="correction-cancel">Cancel</button>
-    </div>
-  </div>
+    <!-- CORRECTION SHEET (docked to the bottom of the transcript) ── -->
+    <section id="correction-overlay" role="dialog" aria-label="Correct word">
+      <div class="sheet-row">
+        <span class="sheet-eyebrow">Correct</span>
+        <span id="correction-original"></span>
+        <span class="sheet-hint">↵ apply · esc cancel</span>
+      </div>
+      <div class="sheet-row">
+        <input id="correction-input" type="text" spellcheck="false" autocomplete="off" autocapitalize="off" />
+        <button id="correction-submit" type="button">Apply</button>
+        <button id="correction-cancel" type="button">Cancel</button>
+      </div>
+    </section>
+  </main>
 
-  <!-- LOGO MARK ──────────────────────────────────────────── -->
-  <div id="logo-mark" aria-hidden="true">
-    <!-- Minimal fist+bolt placeholder. Replace with the real
-         binary-embedded PNG once it's wired into the resource provider. -->
-    <svg viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="2.5"
-         stroke-linecap="round" stroke-linejoin="round">
-      <path d="M12 22 L20 22 L20 14 L28 14 L28 22 L36 22 L36 38 L20 44 L12 38 Z" />
-      <path d="M36 16 L44 16 L40 26 L46 26 L34 44 L38 32 L32 32 Z"
-            fill="currentColor" fill-opacity="0.85" stroke="none" />
-    </svg>
-  </div>
+  <!-- STATUS BAR ─────────────────────────────────────────── -->
+  <footer id="status-bar">
+    <span id="status-text" aria-live="polite"></span>
+    <span id="logo-mark" aria-hidden="true" title="placeholder mark">
+      <!-- Placeholder mark until the real asset lands in Source/ui/public/assets/. -->
+      <svg viewBox="0 0 56 56" fill="none" stroke="currentColor" stroke-width="3"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22 L20 22 L20 14 L28 14 L28 22 L36 22 L36 38 L20 44 L12 38 Z" />
+        <path d="M36 16 L44 16 L40 26 L46 26 L34 44 L38 32 L32 32 Z"
+              fill="currentColor" fill-opacity="0.85" stroke="none" />
+      </svg>
+    </span>
+  </footer>
 
   <script>
-    // ────────────────────────────────────────────────────────────
-    // State machine + DOM helpers
-    // ────────────────────────────────────────────────────────────
-    const body         = document.body;
-    const badge        = document.getElementById('status-badge');
-    const positionBar  = document.querySelector('#position-text .bar-num');
-    const positionBeat = document.querySelector('#position-text .beat-num');
-    const transcript   = document.getElementById('transcript-inner');
-    const container    = document.getElementById('transcript-container');
-    const overlay      = document.getElementById('correction-overlay');
-    const original     = document.getElementById('correction-original');
-    const input        = document.getElementById('correction-input');
+    (function () {
+      'use strict';
 
-    const BADGE_TEXT = {
-      disconnected: 'WAIT',
-      idle:         'IDLE',
-      recording:    'REC',
-      playback:     'PLAY',
-      correction:   '—',   // preserved by setState
-    };
+      // ────────────────────────────────────────────────────────
+      // DOM
+      // ────────────────────────────────────────────────────────
+      const body        = document.body;
+      const badge       = document.getElementById('status-badge');
+      const barNum      = document.querySelector('#position-text .bar-num');
+      const beatNum     = document.querySelector('#position-text .beat-num');
+      const syncInd     = document.getElementById('sync-indicator');
+      const container   = document.getElementById('transcript-container');
+      const scroller    = document.getElementById('transcript-scroll');
+      const inner       = document.getElementById('transcript-inner');
+      const returnBtn   = document.getElementById('return-to-live');
+      const sheet       = document.getElementById('correction-overlay');
+      const original    = document.getElementById('correction-original');
+      const input       = document.getElementById('correction-input');
+      const statusText  = document.getElementById('status-text');
+      const profilePill = document.getElementById('profile-pill');
+      const profilePop  = document.getElementById('profile-popover');
 
-    let currentState = 'disconnected';
-    function setState(stateName) {
-      // 'correction' is an overlay layer — preserve the underlying state
-      // so when the popup closes we drop back to it.
-      if (stateName === 'correction') {
+      const BADGE_TEXT = { disconnected: 'WAIT', idle: 'IDLE', recording: 'REC', playback: 'PLAY' };
+      const WORDS_PER_LINE = 8;
+      const HOLD_SAMPLES = 36000;     // ≈0.75 s at 48 kHz: keep the last word lit after the take ends
+
+      // ────────────────────────────────────────────────────────
+      // Native bridge (JS → C++). No-ops in a plain browser.
+      // ────────────────────────────────────────────────────────
+      const backend = window.__JUCE__ && window.__JUCE__.backend ? window.__JUCE__.backend : null;
+      const nativeBridge = backend ? {
+        onWordClicked:         (...a) => backend.onWordClicked(...a),
+        submitCorrection:      (...a) => backend.submitCorrection(...a),
+        onCorrectionCancelled: (...a) => backend.onCorrectionCancelled(...a),
+        onReady:               (...a) => backend.onReady(...a),
+        // Profile ops travel to the engine as one JSON string:
+        //   {op:'status'|'login_start'|'login_verify'|'set_active'|'logout'|'refresh', ...}
+        profileCommand:        (...a) => backend.profileCommand(...a),
+      } : {};
+      if (!backend) console.warn('[punch2pen] window.__JUCE__.backend unavailable — native calls are no-ops');
+      window.punch2pen = nativeBridge;
+
+      // ────────────────────────────────────────────────────────
+      // Model
+      // ────────────────────────────────────────────────────────
+      let mode = 'disconnected';      // underlying transport state
+      let correctionOpen = false;
+      let playhead = 0;               // DAW samples
+      let follow = true;              // synced scroll vs user scrolled away
+      let anchorLine = -1;            // line rendered as the title
+      let activeWord = -1;
+      let corrections = 0;
+      let lastCorrection = null;      // { original, corrected, count }
+      let hierarchyDirty = false;
+
+      const lines = [];               // { el, bar, words: [wordIdx] }
+      const words = [];               // { el, start, end, line }
+      let streamCursor = null;
+      let pendingSpan = null;         // span the user clicked, awaiting showCorrection()
+      let correctingSpan = null;
+
+      // ────────────────────────────────────────────────────────
+      // State
+      // ────────────────────────────────────────────────────────
+      function setState(stateName) {
+        if (stateName === 'correction') {          // overlay layer, keeps the mode underneath
+          if (!correctionOpen) openCorrectionLayer();
+          return;
+        }
+        if (!(stateName in BADGE_TEXT)) return;
+        const entering = stateName !== mode;
+        mode = stateName;
+        body.dataset.mode = mode;
+        body.dataset.state = correctionOpen ? 'correction' : mode;
+        badge.textContent = BADGE_TEXT[mode];
+        body.classList.toggle('has-words', words.length > 0);
+        if (entering && (mode === 'recording' || mode === 'playback')) resumeFollow(false);
+        markDirty();
+        updateStatusLine();
+      }
+
+      function setConnectionStatus(connected) {
+        if (!connected) {
+          setState('disconnected');
+        } else if (mode === 'disconnected') {
+          setState(words.length > 0 ? 'playback' : 'idle');
+        }
+      }
+
+      function updatePosition(bar, beat) {
+        barNum.textContent  = String(bar);
+        beatNum.textContent = String(beat);
+      }
+
+      // ────────────────────────────────────────────────────────
+      // Transcript model — one .lyric-line per bar (max 8 words)
+      // ────────────────────────────────────────────────────────
+      function appendWord(text, startSample, endSample, barNumber) {
+        const bar = Number(barNumber);
+        let line = lines[lines.length - 1];
+        const startNewLine =
+          !line ||
+          (Number.isFinite(bar) && line.bar !== bar) ||
+          line.words.length >= WORDS_PER_LINE;
+
+        if (startNewLine) {
+          const el = document.createElement('div');
+          el.className = 'lyric-line line-upcoming';
+          el.dataset.bar = String(barNumber);
+          inner.appendChild(el);
+          line = { el, bar, words: [] };
+          lines.push(line);
+        }
+
+        const span = document.createElement('span');
+        span.className = 'lyric-word upcoming';
+        span.dataset.start = String(startSample);
+        span.dataset.end   = String(endSample);
+        span.dataset.idx   = String(words.length);
+        span.textContent   = String(text);
+        line.el.appendChild(span);
+        line.words.push(words.length);
+        words.push({ el: span, start: Number(startSample), end: Number(endSample), line: lines.length - 1 });
+
+        if (!streamCursor) {
+          streamCursor = document.createElement('i');
+          streamCursor.id = 'stream-cursor';
+        }
+        line.el.appendChild(streamCursor);
+
+        body.classList.add('has-words');
+        markDirty();
+        updateStatusLine();
+      }
+
+      function resetTranscript() {
+        inner.replaceChildren();
+        lines.length = 0;
+        words.length = 0;
+        streamCursor = null;
+        pendingSpan = null;
+        correctingSpan = null;
+        anchorLine = -1;
+        activeWord = -1;
+        playhead = 0;
+        body.classList.remove('has-words');
+        resumeFollow(false);
+        writeScrollTop(0);
+        if (correctionOpen) hideCorrection();
+        updateStatusLine();
+      }
+
+      // ────────────────────────────────────────────────────────
+      // Playhead → Temporal Hierarchy
+      // ────────────────────────────────────────────────────────
+      function updatePlayhead(currentDAWSample) {
+        playhead = Number(currentDAWSample) || 0;
+        markDirty();
+      }
+
+      function markDirty() {
+        if (hierarchyDirty) return;
+        hierarchyDirty = true;
+        requestAnimationFrame(refreshHierarchy);
+      }
+
+      function setClass(el, key, className) {
+        if (el.dataset.k === key) return;
+        el.dataset.k = key;
+        el.className = className;
+      }
+
+      function refreshHierarchy() {
+        hierarchyDirty = false;
+        if (words.length === 0) { anchorLine = -1; activeWord = -1; return; }
+
+        let nextActive = -1;
+        let nextAnchor = -1;
+
+        if (mode === 'recording') {
+          // Words arrive after they were sung; the newest line is the title.
+          nextAnchor = lines.length - 1;
+        } else {
+          let lastPast = -1;
+          for (let i = 0; i < words.length; i++) {
+            const w = words[i];
+            if (playhead >= w.start && playhead <= w.end) { nextActive = i; break; }
+            if (playhead > w.end) lastPast = i;
+          }
+          if (nextActive === -1 && lastPast !== -1) {
+            // Between words: hold the last sung word so the highlight doesn't
+            // flicker off in the gaps whisper leaves between timestamps.
+            const next = words[lastPast + 1];
+            const gap = playhead - words[lastPast].end;
+            if ((next && playhead < next.start) || gap < HOLD_SAMPLES) nextActive = lastPast;
+          }
+          if (nextActive !== -1)      nextAnchor = words[nextActive].line;
+          else if (lastPast !== -1)   nextAnchor = words[lastPast].line;
+          else                        nextAnchor = 0;
+        }
+
+        for (let li = 0; li < lines.length; li++) {
+          const rel = li < nextAnchor ? 'past' : li === nextAnchor ? 'active' : 'upcoming';
+          setClass(lines[li].el, rel, 'lyric-line line-' + rel);
+        }
+        for (let i = 0; i < words.length; i++) {
+          const w = words[i];
+          let rel;
+          if (mode === 'recording')           rel = w.line < nextAnchor ? 'past' : 'upcoming';
+          else if (i === nextActive)          rel = 'active';
+          else if (playhead > w.end)          rel = 'past';
+          else                                rel = 'upcoming';
+          const extra = (w.el.classList.contains('corrected') ? ' corrected' : '')
+                      + (w.el === correctingSpan ? ' correcting' : '');
+          setClass(w.el, rel + extra, 'lyric-word ' + rel + extra);
+        }
+
+        const anchorChanged = nextAnchor !== anchorLine;
+        anchorLine = nextAnchor;
+        activeWord = nextActive;
+        if (follow && (anchorChanged || mode === 'recording')) scrollToAnchor(true);
+      }
+
+      // ────────────────────────────────────────────────────────
+      // Synced scroll + Return to Live
+      // ────────────────────────────────────────────────────────
+      let settledTop = 0;             // scrollTop after our last programmatic write
+      let settledMax = 0;             // scroll range at that moment (detects layout-induced scrolls)
+      let lastWrite = -1e9;
+      let animTarget = 0;
+      let animating = false;
+
+      function anchorTargetTop() {
+        if (anchorLine < 0 || anchorLine >= lines.length) return 0;
+        const el = lines[anchorLine].el;
+        // While recording nothing is upcoming yet, so sit the live line lower
+        // and keep more of what was just sung on screen.
+        const focal = scroller.clientHeight * (mode === 'recording' ? 0.60 : 0.40);
+        const t = el.offsetTop + el.offsetHeight / 2 - focal;
+        const max = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+        return Math.max(0, Math.min(t, max));
+      }
+
+      function scrollToAnchor(animate) {
+        animTarget = anchorTargetTop();
+        if (!animate) {
+          animating = false;
+          writeScrollTop(animTarget);
+          return;
+        }
+        if (!animating) {
+          animating = true;
+          requestAnimationFrame(animStep);
+        }
+      }
+
+      function animStep() {
+        if (!animating) return;
+        const delta = animTarget - scroller.scrollTop;
+        if (Math.abs(delta) < 0.6) {
+          writeScrollTop(animTarget);
+          animating = false;
+          return;
+        }
+        writeScrollTop(scroller.scrollTop + delta * 0.18);
+        requestAnimationFrame(animStep);
+      }
+
+      function maxScroll() {
+        return Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+      }
+
+      function writeScrollTop(v) {
+        scroller.scrollTop = v;
+        settledTop = scroller.scrollTop;
+        settledMax = maxScroll();
+        lastWrite = performance.now();
+      }
+
+      function leaveFollow() {
+        if (!follow || words.length === 0 || anchorLine < 0) return;
+        follow = false;
+        animating = false;
+        body.classList.add('scrolled-away');
+        syncInd.textContent = 'SCROLLED';
+        updateStatusLine();
+      }
+
+      function resumeFollow(animate) {
+        follow = true;
+        body.classList.remove('scrolled-away');
+        syncInd.textContent = 'LIVE';
+        if (anchorLine >= 0) scrollToAnchor(animate);
+        updateStatusLine();
+      }
+
+      scroller.addEventListener('wheel',     leaveFollow, { passive: true });
+      scroller.addEventListener('touchmove', leaveFollow, { passive: true });
+      scroller.addEventListener('scroll', () => {
+        if (animating) return;
+        const max = maxScroll();
+        if (max !== settledMax || performance.now() - lastWrite < 120) {
+          // Content grew, the host resized us, or this is the echo of our own write.
+          settledMax = max;
+          settledTop = scroller.scrollTop;
+          return;
+        }
+        if (Math.abs(scroller.scrollTop - settledTop) > 1.5) leaveFollow();   // scrollbar drag
+      });
+      returnBtn.addEventListener('click', () => resumeFollow(true));
+
+      // Keep the focal point stable when the host resizes the editor.
+      function relayout() {
+        const h = scroller.clientHeight || 400;
+        inner.style.setProperty('--pad-top', Math.round(h * 0.42) + 'px');
+        inner.style.setProperty('--pad-bot', Math.round(h * 0.58) + 'px');
+        if (follow && anchorLine >= 0) scrollToAnchor(false);
+        else { settledTop = scroller.scrollTop; settledMax = maxScroll(); }
+      }
+      if ('ResizeObserver' in window) new ResizeObserver(relayout).observe(scroller);
+      window.addEventListener('resize', relayout);
+      relayout();
+
+      // ────────────────────────────────────────────────────────
+      // Correction sheet
+      // ────────────────────────────────────────────────────────
+      function openCorrectionLayer() {
+        correctionOpen = true;
         body.classList.add('correction-open');
         body.dataset.state = 'correction';
-        return;
-      }
-      currentState = stateName;
-      body.dataset.state = stateName;
-      if (badge) badge.textContent = BADGE_TEXT[stateName] || '';
-      // Toggle the idle empty-state class based on whether we have words
-      body.classList.toggle('has-words', transcript.children.length > 0);
-    }
-
-    // ────────────────────────────────────────────────────────────
-    // Transcript model
-    // Each .lyric-line holds .lyric-word spans with data-start/data-end
-    // (in DAW samples). updatePlayhead() walks them every frame.
-    // ────────────────────────────────────────────────────────────
-    function appendWord(text, startSample, endSample, barNumber) {
-      let line = transcript.lastElementChild;
-      // Start a new line when bar changes or the current line has 8+ words.
-      const startNewLine =
-        !line ||
-        (line.dataset.bar && Number(line.dataset.bar) !== Number(barNumber)) ||
-        line.querySelectorAll('.lyric-word').length >= 8;
-
-      if (startNewLine) {
-        line = document.createElement('div');
-        line.className = 'lyric-line';
-        line.dataset.bar = String(barNumber);
-        transcript.appendChild(line);
       }
 
-      const span = document.createElement('span');
-      span.className = 'lyric-word upcoming';
-      span.dataset.start = String(startSample);
-      span.dataset.end   = String(endSample);
-      span.textContent   = text;
-      line.appendChild(span);
+      function showCorrection(word, x, y) {
+        void x; void y; // sheet is docked, not positioned
+        const text = String(word);
+        let span = pendingSpan && pendingSpan.textContent === text ? pendingSpan : null;
+        if (!span) span = words.map(w => w.el).find(el => el.textContent === text) || null;
+        pendingSpan = null;
+        if (correctingSpan) correctingSpan.classList.remove('correcting');
+        correctingSpan = span;
+        if (span) span.classList.add('correcting');
 
-      let cursor = document.getElementById('stream-cursor');
-      if (!cursor) {
-        cursor = document.createElement('i');
-        cursor.id = 'stream-cursor';
+        original.textContent = text;
+        input.value = text;
+        sheet.dataset.original = text;
+        openCorrectionLayer();
+        setTimeout(() => { input.focus(); input.select(); }, 0);
       }
-      line.appendChild(cursor);
 
-      body.classList.add('has-words');
-    }
-
-    function resetTranscript() {
-      transcript.innerHTML = '';
-      body.classList.remove('has-words');
-      currentSamplePos = 0;
-      targetScrollY = 0;
-      currentScrollY = 0;
-      transcript.style.transform = 'translateY(0)';
-    }
-
-    // ────────────────────────────────────────────────────────────
-    // Playhead + scroll. Mirrors juce::VBlankAttachment behaviour
-    // from TranscriptView.cpp (scroll += (target - scroll) * 0.15).
-    // ────────────────────────────────────────────────────────────
-    let currentSamplePos = 0;
-    let targetScrollY    = 0;
-    let currentScrollY   = 0;
-    let springFramePending = false;
-
-    const nativeBridge = window.__JUCE__ && window.__JUCE__.backend ? {
-      onWordClicked: (...args) => window.__JUCE__.backend.onWordClicked(...args),
-      submitCorrection: (...args) => window.__JUCE__.backend.submitCorrection(...args),
-      onCorrectionCancelled: (...args) => window.__JUCE__.backend.onCorrectionCancelled(...args),
-      onReady: (...args) => window.__JUCE__.backend.onReady(...args),
-    } : (console.warn('[punch2pen] window.__JUCE__.backend unavailable — native calls are no-ops'), {});
-    window.punch2pen = nativeBridge;
-
-    function scheduleSpringLoop() {
-      if (!springFramePending) {
-        springFramePending = true;
-        requestAnimationFrame(springLoop);
+      function hideCorrection() {
+        correctionOpen = false;
+        body.classList.remove('correction-open');
+        body.dataset.state = mode;
+        if (correctingSpan) correctingSpan.classList.remove('correcting');
+        correctingSpan = null;
+        markDirty();
       }
-    }
 
-    function updatePlayhead(currentDAWSample) {
-      currentSamplePos = currentDAWSample;
-      if (currentState !== 'playback' && currentState !== 'correction') return;
-
-      const lines = transcript.querySelectorAll('.lyric-line');
-      let activeLineIdx = -1;
-
-      lines.forEach((line, li) => {
-        let lineHasActive = false;
-        line.querySelectorAll('.lyric-word').forEach((w) => {
-          const s = Number(w.dataset.start);
-          const e = Number(w.dataset.end);
-          w.classList.remove('past', 'active', 'upcoming');
-          if (currentDAWSample >= s && currentDAWSample <= e) {
-            w.classList.add('active');
-            lineHasActive = true;
-          } else if (currentDAWSample > e) {
-            w.classList.add('past');
-          } else {
-            w.classList.add('upcoming');
+      function applyLocally(orig, next) {
+        let count = 0;
+        for (const w of words) {
+          if (w.el.textContent === orig) {
+            w.el.textContent = next;
+            w.el.classList.add('corrected');
+            count++;
           }
-        });
-        if (lineHasActive) activeLineIdx = li;
-      });
-
-      if (activeLineIdx !== -1) {
-        // Center the active line. 40 = .lyric-line height.
-        const nextTargetScrollY = activeLineIdx * 40;
-        if (Math.abs(nextTargetScrollY - targetScrollY) > 0.1) {
-          targetScrollY = nextTargetScrollY;
-          scheduleSpringLoop();
         }
+        return count;
       }
-    }
 
-    // RAF spring loop — matches the 0.15 ease factor from JUCE.
-    function springLoop() {
-      springFramePending = false;
-      const delta = targetScrollY - currentScrollY;
-      if (Math.abs(delta) > 0.1) {
-        currentScrollY += delta * 0.15;
-        transcript.style.transform = `translateY(${-currentScrollY}px)`;
-        scheduleSpringLoop();
-      }
-    }
-
-    function setConnectionStatus(connected) {
-      if (!connected) {
-        setState('disconnected');
-      } else if (currentState === 'disconnected') {
-        // promote to idle on first connection unless host overrides
-        setState(body.classList.contains('has-words') ? 'playback' : 'idle');
-      }
-    }
-
-    function updatePosition(bar, beat) {
-      if (positionBar)  positionBar.textContent  = bar;
-      if (positionBeat) positionBeat.textContent = beat;
-    }
-
-    // ────────────────────────────────────────────────────────────
-    // Correction overlay
-    // ────────────────────────────────────────────────────────────
-    let savedState = 'playback';
-
-    function showCorrection(word, x, y) {
-      savedState = currentState === 'correction' ? savedState : currentState;
-      original.textContent = '';
-      const strike = document.createElement('span');
-      strike.className = 'strike';
-      strike.textContent = word;
-      original.appendChild(strike);
-      input.value = word;
-      // Clamp to the live plugin viewport (overlay is 260×90)
-      const overlayW = 260;
-      const overlayH = 90;
-      const vw = document.documentElement.clientWidth || window.innerWidth || 400;
-      const vh = document.documentElement.clientHeight || window.innerHeight || 600;
-      const clampedX = Math.max(8, Math.min(x, vw - overlayW - 8));
-      const clampedY = Math.max(50, Math.min(y, vh - overlayH - 8));
-      overlay.style.left = clampedX + 'px';
-      overlay.style.top  = clampedY + 'px';
-      overlay.dataset.original = word;
-      setState('correction');
-      // Defer focus so the overlay is laid out
-      setTimeout(() => { input.focus(); input.select(); }, 0);
-    }
-
-    function hideCorrection() {
-      setState(savedState);
-    }
-
-    function commitCorrection() {
-      const orig = overlay.dataset.original || '';
-      const next = input.value.trim();
-      if (next && next !== orig) {
-        if (window.punch2pen && window.punch2pen.submitCorrection) {
-          window.punch2pen.submitCorrection(orig, next);
-        }
-      }
-      hideCorrection();
-    }
-
-    document.getElementById('correction-submit').addEventListener('click', commitCorrection);
-    document.getElementById('correction-cancel').addEventListener('click', () => {
-      if (window.punch2pen && window.punch2pen.onCorrectionCancelled) {
-        window.punch2pen.onCorrectionCancelled();
-      }
-      hideCorrection();
-    });
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter')  { e.preventDefault(); commitCorrection(); }
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        if (window.punch2pen && window.punch2pen.onCorrectionCancelled) {
-          window.punch2pen.onCorrectionCancelled();
+      function commitCorrection() {
+        const orig = sheet.dataset.original || '';
+        const next = input.value.trim();
+        if (next && next !== orig) {
+          if (nativeBridge.submitCorrection) nativeBridge.submitCorrection(orig, next);
+          const count = applyLocally(orig, next);
+          corrections++;
+          lastCorrection = { original: orig, corrected: next, count };
         }
         hideCorrection();
+        updateStatusLine();
       }
-    });
 
-    // ────────────────────────────────────────────────────────────
-    // Word click → C++
-    // ────────────────────────────────────────────────────────────
-    container.addEventListener('click', (e) => {
-      const w = e.target.closest('.lyric-word');
-      if (!w) return;
-      const rect = w.getBoundingClientRect();
-      const x = Math.round(rect.left);
-      const y = Math.round(rect.bottom);
-      const word = w.textContent || '';
-      // Fire native callback if registered; otherwise open the popup
-      // locally so the page also works as a static preview.
-      if (window.punch2pen && window.punch2pen.onWordClicked) {
-        window.punch2pen.onWordClicked(word, x, y);
-      } else {
-        showCorrection(word, x, y);
+      function cancelCorrection() {
+        if (nativeBridge.onCorrectionCancelled) nativeBridge.onCorrectionCancelled();
+        hideCorrection();
       }
-    });
 
-    // ────────────────────────────────────────────────────────────
-    // Expose the C++ → JS API on window for evaluateJavascript().
-    // ────────────────────────────────────────────────────────────
-    window.appendWord           = appendWord;
-    window.updatePlayhead       = updatePlayhead;
-    window.setConnectionStatus  = setConnectionStatus;
-    window.updatePosition       = updatePosition;
-    window.setState             = setState;
-    window.resetTranscript      = resetTranscript;
-    window.showCorrection       = showCorrection;
-    window.hideCorrection       = hideCorrection;
+      document.getElementById('correction-submit').addEventListener('click', commitCorrection);
+      document.getElementById('correction-cancel').addEventListener('click', cancelCorrection);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter')  { e.preventDefault(); commitCorrection(); }
+        if (e.key === 'Escape') { e.preventDefault(); cancelCorrection(); }
+      });
 
-    // ────────────────────────────────────────────────────────────
-    // Initial state — disconnected until the engine reports in.
-    // ────────────────────────────────────────────────────────────
-    setState('disconnected');
+      // Word click → C++ (which calls showCorrection back) or local preview.
+      scroller.addEventListener('click', (e) => {
+        const span = e.target.closest('.lyric-word');
+        if (!span) return;
+        const rect = span.getBoundingClientRect();
+        const word = span.textContent || '';
+        pendingSpan = span;
+        if (nativeBridge.onWordClicked) {
+          nativeBridge.onWordClicked(word, Math.round(rect.left), Math.round(rect.bottom));
+        } else {
+          showCorrection(word, Math.round(rect.left), Math.round(rect.bottom));
+        }
+      });
 
-    // Notify host that the page is ready for binding.
-    if (window.punch2pen && window.punch2pen.onReady) {
-      window.punch2pen.onReady();
-    }
+      // ────────────────────────────────────────────────────────
+      // Active profile pill + sign-in / seats popover
+      //
+      // The engine owns the truth. It pushes a ProfileStatus JSON through
+      // window.setProfileStatus(json) (and folds the pill through
+      // window.setActiveProfile). The popover only renders that status and
+      // sends ops back with window.punch2pen.profileCommand(json).
+      // ────────────────────────────────────────────────────────
+      const popSignin      = document.getElementById('pop-signin');
+      const popAccount     = document.getElementById('pop-account');
+      const emailForm      = document.getElementById('login-email-form');
+      const emailInput     = document.getElementById('login-email');
+      const sendBtn        = document.getElementById('login-send');
+      const codeForm       = document.getElementById('login-code-form');
+      const codeInput      = document.getElementById('login-code');
+      const verifyBtn      = document.getElementById('login-verify');
+      const loginNote      = document.getElementById('login-note');
+      const loginCodeEmail = document.getElementById('login-code-email');
+      const loginEcho      = document.getElementById('login-echo');
+      const loginEchoCode  = document.getElementById('login-echo-code');
+      const loginMessage   = document.getElementById('login-message');
+      const signinUnavail  = document.getElementById('signin-unavailable');
+      const accountEmail   = document.getElementById('account-email');
+      const accountMessage = document.getElementById('account-message');
+      const seatList       = document.getElementById('seat-list');
+      const refreshBtn     = document.getElementById('account-refresh');
+      const logoutBtn      = document.getElementById('account-logout');
+
+      let profileStatus = null;     // last ProfileStatus from the engine
+      let statusRequested = false;
+      let pendingOp = null;         // op in flight until the next status lands
+      let codeStageReached = false; // keeps the code form up when a wrong code errors
+      let wantEmailForm = false;    // user chose "Change email"
+      let fakeEngine = null;        // browser preview only
+
+      function setActiveProfile(profile) {
+        const p = typeof profile === 'string' ? { name: profile } : (profile || {});
+        const name = String(p.name || 'Local');
+        const kind = ['local', 'pro', 'seat'].includes(p.kind) ? p.kind : 'local';
+        const detail = p.detail != null ? String(p.detail)
+                     : kind === 'local' ? 'This Mac · no account'
+                     : 'Signed in · synced profile';
+        document.getElementById('profile-name').textContent = name;
+        document.getElementById('profile-row-name').textContent = name;
+        document.getElementById('profile-row-detail').textContent = detail;
+        body.dataset.profileKind = kind;
+        profilePill.title = 'Active profile: ' + name;
+      }
+
+      function sendProfileCommand(cmd) {
+        const json = JSON.stringify(cmd);
+        if (nativeBridge.profileCommand) { nativeBridge.profileCommand(json); return true; }
+        if (fakeEngine) { fakeEngine(cmd); return true; }
+        showLoginMessage('The plugin bridge is not available in this preview.', true);
+        return false;
+      }
+
+      function setProfileStatus(status) {
+        let s = status;
+        if (typeof s === 'string') {
+          try { s = JSON.parse(s); } catch (e) { console.warn('[punch2pen] bad ProfileStatus', e); return; }
+        }
+        if (!s || typeof s !== 'object') return;
+        profileStatus = s;
+        pendingOp = null;
+        const stage = s.login && s.login.stage;
+        if (stage === 'code_sent' || stage === 'verifying') { codeStageReached = true; wantEmailForm = false; }
+        if (s.signedIn) codeStageReached = false;
+        renderProfilePopover();
+        updateStatusLine();
+      }
+
+      function showLoginMessage(text, isError) {
+        loginMessage.textContent = text || '';
+        loginMessage.hidden = !text;
+        loginMessage.classList.toggle('error', !!isError);
+      }
+
+      function setDisabled(el, on) { el.disabled = !!on; }
+
+      function renderProfilePopover() {
+        const s = profileStatus;
+        const signedIn = !!(s && s.signedIn);
+        popSignin.hidden = signedIn;
+        popAccount.hidden = !signedIn;
+
+        if (!signedIn) {
+          const login = (s && s.login) || {};
+          const stage = login.stage || '';
+          const cloudOff = !!s && s.cloudAvailable === false;
+
+          signinUnavail.hidden = !cloudOff;
+          if (cloudOff) {
+            signinUnavail.textContent = login.message || 'Sign-in isn’t available in this build: no profile API configured.';
+            emailForm.hidden = true; codeForm.hidden = true; loginNote.hidden = true; loginEcho.hidden = true;
+            showLoginMessage(s.message || '', false);
+            return;
+          }
+
+          const showCode = !wantEmailForm &&
+            (stage === 'code_sent' || stage === 'verifying' || (stage === 'error' && codeStageReached));
+          emailForm.hidden = showCode;
+          codeForm.hidden = !showCode;
+          loginNote.hidden = !showCode;
+
+          if (login.email && !emailInput.value) emailInput.value = login.email;
+          loginCodeEmail.textContent = login.email || emailInput.value || '';
+
+          const sending = stage === 'sending' || pendingOp === 'login_start';
+          const verifying = stage === 'verifying' || pendingOp === 'login_verify';
+          setDisabled(emailInput, sending);
+          setDisabled(sendBtn, sending);
+          sendBtn.textContent = sending ? 'Sending…' : 'Send code';
+          setDisabled(codeInput, verifying);
+          setDisabled(verifyBtn, verifying);
+          verifyBtn.textContent = verifying ? 'Signing in…' : 'Sign in';
+
+          loginEcho.hidden = !(showCode && login.echoedCode);
+          loginEchoCode.textContent = login.echoedCode || '';
+
+          if (stage === 'error' && login.message) showLoginMessage(login.message, true);
+          else if (showCode && login.message && !login.echoedCode) showLoginMessage(login.message, false);
+          else if (s && s.message)                 showLoginMessage(s.message, false);
+          else                                     showLoginMessage('', false);
+          return;
+        }
+
+        // Signed in: account line + seats
+        accountEmail.textContent = s.email || 'Signed in';
+        accountEmail.title = s.email || '';
+        setDisabled(logoutBtn, pendingOp === 'logout');
+        setDisabled(refreshBtn, pendingOp === 'refresh');
+        logoutBtn.textContent = pendingOp === 'logout' ? 'Signing out…' : 'Sign out';
+
+        const profiles = Array.isArray(s.profiles) ? s.profiles : [];
+        const activeId = s.activeProfile && s.activeProfile.id;
+        const dict = s.dictionary || {};
+        seatList.replaceChildren();
+        if (profiles.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'seat-empty';
+          empty.textContent = 'No seat on this sign-in yet.';
+          seatList.appendChild(empty);
+        }
+        for (const p of profiles) {
+          const isActive = p.id === activeId;
+          const suspended = p.status && p.status !== 'active';
+          const row = document.createElement('button');
+          row.type = 'button';
+          row.className = 'seat-row' + (suspended ? ' suspended' : '');
+          row.setAttribute('role', 'option');
+          row.setAttribute('aria-selected', isActive ? 'true' : 'false');
+          if (pendingOp === 'set_active:' + p.id) row.setAttribute('aria-busy', 'true');
+          row.dataset.profileId = p.id || '';
+
+          const dot = document.createElement('span'); dot.className = 'seat-dot';
+          const who = document.createElement('span'); who.className = 'who';
+          const name = document.createElement('b'); name.textContent = p.name || 'Profile';
+          const sub = document.createElement('span');
+          const role = p.role === 'owner' ? 'Owner' : 'Seat';
+          const bits = [];
+          if (p.workspaceName) bits.push(p.workspaceName);
+          bits.push(role);
+          if (suspended) bits.push(p.status);
+          if (isActive) {
+            const n = Number(dict.entries) || 0;
+            bits.push(n + (n === 1 ? ' word' : ' words') + ' in dictionary');
+            if (Number(dict.pending) > 0) bits.push(dict.pending + ' pending');
+            else if (s.sync) bits.push(s.sync);
+          }
+          sub.textContent = bits.join(' · ');
+          who.append(name, sub);
+          row.append(dot, who);
+          if (isActive) { const check = document.createElement('span'); check.className = 'check'; check.textContent = '✓'; row.appendChild(check); }
+          if (!isActive) row.addEventListener('click', () => switchSeat(p.id));
+          seatList.appendChild(row);
+        }
+
+        accountMessage.textContent = s.message || '';
+        accountMessage.hidden = !s.message;
+        accountMessage.classList.toggle('error', !!s.message && /not available|could not|failed|error/i.test(s.message));
+      }
+
+      function startLogin(e) {
+        if (e) e.preventDefault();
+        const email = emailInput.value.trim();
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          showLoginMessage('Enter the email your seat was created with.', true);
+          emailInput.focus();
+          return;
+        }
+        codeStageReached = false;
+        wantEmailForm = false;
+        codeInput.value = '';
+        showLoginMessage('', false);
+        if (sendProfileCommand({ op: 'login_start', email })) {
+          pendingOp = 'login_start';
+          renderProfilePopover();
+        }
+      }
+
+      function verifyLogin(e) {
+        if (e) e.preventDefault();
+        const code = codeInput.value.replace(/\D/g, '');
+        const email = (profileStatus && profileStatus.login && profileStatus.login.email) || emailInput.value.trim();
+        if (code.length !== 6) {
+          showLoginMessage('Enter the six-digit code from your email.', true);
+          codeInput.focus();
+          return;
+        }
+        showLoginMessage('', false);
+        if (sendProfileCommand({ op: 'login_verify', email, code })) {
+          pendingOp = 'login_verify';
+          renderProfilePopover();
+        }
+      }
+
+      function switchSeat(profileId) {
+        if (!profileId) return;
+        if (sendProfileCommand({ op: 'set_active', profileId })) {
+          pendingOp = 'set_active:' + profileId;
+          renderProfilePopover();
+        }
+      }
+
+      function logout() {
+        if (sendProfileCommand({ op: 'logout' })) {
+          pendingOp = 'logout';
+          codeStageReached = false;
+          wantEmailForm = false;
+          renderProfilePopover();
+        }
+      }
+
+      emailForm.addEventListener('submit', startLogin);
+      codeForm.addEventListener('submit', verifyLogin);
+      codeInput.addEventListener('input', () => {
+        codeInput.value = codeInput.value.replace(/\D/g, '').slice(0, 6);
+        if (codeInput.value.length === 6 && !verifyBtn.disabled) verifyLogin();
+      });
+      document.getElementById('login-change-email').addEventListener('click', () => {
+        wantEmailForm = true;
+        codeStageReached = false;
+        renderProfilePopover();
+        setTimeout(() => emailInput.focus(), 0);
+      });
+      logoutBtn.addEventListener('click', logout);
+      refreshBtn.addEventListener('click', () => {
+        if (sendProfileCommand({ op: 'refresh' })) { pendingOp = 'refresh'; renderProfilePopover(); }
+      });
+
+      function toggleProfilePopover(force) {
+        const open = force != null ? force : profilePop.hidden;
+        profilePop.hidden = !open;
+        profilePill.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) {
+          if (!profileStatus && !statusRequested && (nativeBridge.profileCommand || fakeEngine)) {
+            statusRequested = true;
+            sendProfileCommand({ op: 'status' });
+          }
+          renderProfilePopover();
+          const focusTarget = !popSignin.hidden ? (codeForm.hidden ? emailInput : codeInput) : null;
+          if (focusTarget && !focusTarget.disabled) setTimeout(() => focusTarget.focus(), 0);
+        }
+      }
+      profilePill.addEventListener('click', (e) => { e.stopPropagation(); toggleProfilePopover(); });
+      profilePop.addEventListener('click', (e) => e.stopPropagation());
+      document.addEventListener('click', () => { if (!profilePop.hidden) toggleProfilePopover(false); });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !profilePop.hidden) toggleProfilePopover(false);
+      });
+
+      // ────────────────────────────────────────────────────────
+      // Status line (non-modal; the upgrade nudge lives here)
+      // ────────────────────────────────────────────────────────
+      function updateStatusLine() {
+        let text = '';
+        let nudge = false;
+        if (mode === 'disconnected') {
+          text = 'Local engine offline · transcription runs on this Mac';
+        } else if (mode === 'recording') {
+          text = 'Transcribing the punch · words land as the engine hears them';
+        } else if (corrections > 0 && lastCorrection) {
+          const where = lastCorrection.count > 1 ? ` in ${lastCorrection.count} places` : '';
+          const paid = profileStatus && profileStatus.tier === 'paid' && profileStatus.activeProfile;
+          text = `“${lastCorrection.original}” → “${lastCorrection.corrected}”${where}`;
+          if (paid) {
+            const pending = Number(profileStatus.dictionary && profileStatus.dictionary.pending) || 0;
+            text += ` · saved to ${profileStatus.activeProfile.name || 'your'} dictionary`
+                  + (pending > 0 ? ` · ${pending} pending sync` : profileStatus.sync ? ` · ${profileStatus.sync}` : '');
+          } else {
+            text += ' · session-only on this Mac. A profile carries your dictionary between rooms.';
+            nudge = true;
+          }
+        } else if (words.length === 0) {
+          text = 'Local transcription · no account needed';
+        } else if (!follow) {
+          text = 'Scrolled away from the playhead';
+        } else if (mode === 'playback') {
+          text = 'Following the playhead · click a word to correct it';
+        } else {
+          text = `${words.length} word${words.length === 1 ? '' : 's'} in this take · click a word to correct it`;
+        }
+        statusText.textContent = text;
+        statusText.classList.toggle('nudge', nudge);
+      }
+
+      // ────────────────────────────────────────────────────────
+      // C++ → JS surface
+      // ────────────────────────────────────────────────────────
+      window.appendWord          = appendWord;
+      window.updatePlayhead      = updatePlayhead;
+      window.setConnectionStatus = setConnectionStatus;
+      window.updatePosition      = updatePosition;
+      window.setState            = setState;
+      window.resetTranscript     = resetTranscript;
+      window.showCorrection      = showCorrection;
+      window.hideCorrection      = hideCorrection;
+      window.setActiveProfile    = setActiveProfile;
+      window.setProfileStatus    = setProfileStatus;
+
+      setActiveProfile({ name: 'Local', kind: 'local' });
+      setState('disconnected');
+
+      // ────────────────────────────────────────────────────────
+      // Browser-only preview (never runs inside the plugin)
+      // ────────────────────────────────────────────────────────
+      const params = new URLSearchParams(location.search);
+      const preview = backend ? null : params.get('preview');
+      if (preview) {
+        const SR = 48000, BPM = 120, SAMPLES_PER_BAR = SR * 60 / BPM * 4;
+        const verse = [
+          'late night in the booth red light on the wall',
+          'punch it back to the top I don’t miss the call',
+          'every word I drop lands right where it should',
+          'pen it down run it back make it understood',
+          'second verse same booth the take is getting tight',
+          'one more pass on the hook and we call it a night',
+        ];
+        // One verse line per bar, words spread across the bar.
+        const totalSeconds = (verse.length + 1) * SAMPLES_PER_BAR / SR;
+        const seed = () => {
+          verse.forEach((lineText, li) => {
+            const ws = lineText.split(' ');
+            const barStart = (li + 1) * SAMPLES_PER_BAR;
+            const slot = SAMPLES_PER_BAR / ws.length;
+            ws.forEach((w, wi) => {
+              const s = Math.round(barStart + wi * slot);
+              const e = Math.round(s + slot * 0.78);
+              appendWord(w, s, e, li + 2);
+            });
+          });
+        };
+        const frozen = params.has('t') ? Number(params.get('t')) : null;
+        if (frozen != null) body.classList.add('no-motion');
+        const pos = (sec) => {
+          const bar = 1 + Math.floor(sec * SR / SAMPLES_PER_BAR);
+          const beat = 1 + Math.floor((sec * SR % SAMPLES_PER_BAR) / (SAMPLES_PER_BAR / 4));
+          updatePosition(bar, beat);
+          updatePlayhead(Math.round(sec * SR));
+        };
+        const freeze = (sec) => { pos(sec); refreshHierarchy(); scrollToAnchor(false); };
+        const runPlayhead = () => {
+          if (frozen != null) { freeze(frozen); return; }
+          const t0 = performance.now();
+          const tick = () => { pos(((performance.now() - t0) / 1000) % totalSeconds); requestAnimationFrame(tick); };
+          tick();
+        };
+        // Fake engine for the sign-in flow: same ProfileStatus shape as
+        // AccountManager::statusJsonLocked(), same pill fold as WebViewEditor.
+        const installFakeEngine = () => {
+          const ECHO = '482910';
+          const seats = [
+            { id: 'p_owner', name: 'Keegan', workspaceId: 'w1', workspaceName: 'Doctaaa Studio', role: 'owner', status: 'active', dictionaryVersion: 3 },
+            { id: 'p_seat',  name: 'Artist B', workspaceId: 'w1', workspaceName: 'Doctaaa Studio', role: 'artist', status: 'active', dictionaryVersion: 1 },
+          ];
+          const st = {
+            type: 'profileStatus', tier: 'free', cloudAvailable: true, signedIn: false, email: '',
+            activeProfile: null, profiles: [],
+            dictionary: { scope: 'session', entries: 0, biasTerms: 0, pending: 0, version: 0 },
+            sync: 'local', login: { stage: '', email: '', echoedCode: '', message: '' }, message: '',
+          };
+          const emit = () => {
+            const paid = st.tier === 'paid' && st.activeProfile;
+            const dot = ' · ';
+            setActiveProfile(paid ? {
+              name: st.activeProfile.name,
+              kind: st.activeProfile.role === 'owner' ? 'pro' : 'seat',
+              detail: st.activeProfile.workspaceName + dot + st.dictionary.entries + ' words in dictionary' + dot + st.sync,
+            } : st.signedIn ? { name: 'No seat', kind: 'local', detail: st.message || 'Signed in' + dot + 'no active seat' }
+              : { name: 'Local', kind: 'local', detail: 'This Mac' + dot + 'no account' });
+            setProfileStatus(JSON.stringify(st));
+          };
+          const later = (fn) => setTimeout(fn, frozen != null ? 0 : 500);
+          fakeEngine = (cmd) => {
+            switch (cmd.op) {
+              case 'status': emit(); break;
+              case 'login_start':
+                st.login = { stage: 'sending', email: cmd.email, echoedCode: '', message: '' }; emit();
+                later(() => { st.login.stage = 'code_sent'; st.login.echoedCode = ECHO;
+                              st.login.message = 'Development deployment echoed the code.'; emit(); });
+                break;
+              case 'login_verify':
+                st.login.stage = 'verifying'; st.login.message = ''; emit();
+                later(() => {
+                  if (cmd.code !== ECHO) { st.login.stage = 'error'; st.login.message = 'That code did not work.'; return emit(); }
+                  Object.assign(st, { tier: 'paid', signedIn: true, email: cmd.email, profiles: seats,
+                    activeProfile: seats[0], sync: 'synced',
+                    dictionary: { scope: 'profile', entries: 12, biasTerms: 12, pending: 0, version: 3 },
+                    login: { stage: '', email: '', echoedCode: '', message: '' }, message: '' });
+                  emit();
+                });
+                break;
+              case 'set_active': {
+                const p = seats.find(x => x.id === cmd.profileId);
+                if (!p) { st.message = 'That profile is not available for this sign-in.'; return emit(); }
+                st.activeProfile = p; st.sync = 'cached'; st.message = '';
+                st.dictionary = { scope: 'profile', entries: p.id === 'p_owner' ? 12 : 4, biasTerms: 4, pending: 0, version: p.dictionaryVersion };
+                emit(); later(() => { st.sync = 'synced'; emit(); });
+                break;
+              }
+              case 'logout':
+                Object.assign(st, { tier: 'free', signedIn: false, email: '', profiles: [], activeProfile: null, sync: 'local',
+                  dictionary: { scope: 'session', entries: 0, biasTerms: 0, pending: 0, version: 0 },
+                  login: { stage: '', email: '', echoedCode: '', message: '' },
+                  message: 'Signed out. Corrections now stay in this session.' });
+                emit(); break;
+              case 'refresh': st.sync = 'synced'; emit(); break;
+              default: st.message = 'Unknown profile command: ' + cmd.op; emit();
+            }
+          };
+          emit();
+        };
+
+        switch (preview) {
+          case 'signin': {
+            installFakeEngine();
+            seed(); setState('playback'); freeze(frozen != null ? frozen : 9.3);
+            body.classList.add('no-motion');
+            const stage = params.get('stage') || 'email';
+            toggleProfilePopover(true);
+            if (stage === 'code' || stage === 'seats') { emailInput.value = 'keegan@doctaaa.com'; startLogin(); }
+            if (stage === 'seats') { codeInput.value = '482910'; verifyLogin(); }
+            break;
+          }
+          case 'idle':      setState('idle'); break;
+          case 'recording': seed(); setState('recording'); pos(totalSeconds - 0.4);
+                            refreshHierarchy(); scrollToAnchor(false); break;
+          case 'playback':  seed(); setState('playback'); runPlayhead(); break;
+          case 'scrolled':  seed(); setState('playback'); freeze(frozen != null ? frozen : 9.2);
+                            leaveFollow(); writeScrollTop(0); break;
+          case 'correction':
+            seed(); setState('playback'); freeze(frozen != null ? frozen : 9.2);
+            pendingSpan = words[activeWord >= 0 ? activeWord : 0].el;
+            showCorrection(pendingSpan.textContent, 0, 0);
+            break;
+          default:          setState('disconnected');
+        }
+      }
+
+      if (nativeBridge.onReady) nativeBridge.onReady();
+    })();
   </script>
 </body>
 </html>
