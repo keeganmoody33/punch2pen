@@ -58,8 +58,27 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "asset=Punch2Pen-${VERSION}-macOS-unsigned.pkg" >> "$GITHUB_OUTPUT"
 
+      # After `cd cloud && npx convex dev`, Keegan sets the repo Actions
+      # secret PUNCH2PEN_PROFILE_API_URL to the HTTPS Convex site URL
+      # (the `.convex.site` host convex prints). That compiles paid/pro
+      # into this Release pkg without baking the URL into git. Leave the
+      # secret unset for free/lite — cmake still gets an empty
+      # -DPUNCH2PEN_PROFILE_API_URL=. Do not invent a URL, prices, or
+      # vendor keys. Do not run `npx convex deploy`.
       - name: Configure plugin + engine
-        run: cmake -S . -B build -DPUNCH2PEN_BUILD_PLUGIN=ON -DCMAKE_BUILD_TYPE=Release
+        env:
+          PUNCH2PEN_PROFILE_API_URL: ${{ secrets.PUNCH2PEN_PROFILE_API_URL }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${PUNCH2PEN_PROFILE_API_URL:-}" ]]; then
+            echo "Compiling paid/pro profile API URL from Actions secret (value not logged)."
+          else
+            echo "No PUNCH2PEN_PROFILE_API_URL secret; compiling free/lite (empty URL)."
+          fi
+          cmake -S . -B build \
+            -DPUNCH2PEN_BUILD_PLUGIN=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPUNCH2PEN_PROFILE_API_URL="${PUNCH2PEN_PROFILE_API_URL:-}"
 
       - name: Build AU, VST3, and engine
         run: cmake --build build --config Release --target punch2penEngine punch2pen_plugin_AU punch2pen_plugin_VST3 -j4
@@ -101,9 +120,12 @@ jobs:
 
           - Bundle ID: `com.doctaaa.punch2pen`
           - Manufacturer / plugin / type: **Dcta / P2pn / aufx**
+          - Living Transcript UI in the plugin editor (word under the playhead; active line as title).
+          - Nested helper so Logic leaves WAIT: engine is `punch2penEngine.app` (also nested in the AU/VST3 bundle). The pkg postinstall strips quarantine, ad-hoc signs the helper, mirrors AU/VST3 into `~/Library/Audio/Plug-Ins` (so a leftover user copy cannot hide Helpers), seeds the whisper model, registers a RunAtLoad LaunchAgent, and starts the engine. The plugin still auto-launches with `open -g -n` if 7483 is down.
+          - Free/lite is local generic STT: no account, session-only corrections, engine only binds 127.0.0.1:7483.
+          - Paid/pro (login, portable profile, dictionary, studio seats) needs the compile-time profile API URL (`-DPUNCH2PEN_PROFILE_API_URL`). This Release bakes that URL in only when the Actions secret is set; otherwise the pkg stays free/lite.
           - Not signed or notarized. Gatekeeper will warn.
           - Place the Whisper model at `~/.punch2pen/models/ggml-base.bin` if the installer could not download it.
-          - Engine helper is `punch2penEngine.app` (also nested in the AU/VST3 bundle). The pkg postinstall strips quarantine, ad-hoc signs the helper, mirrors AU/VST3 into `~/Library/Audio/Plug-Ins` (so a leftover user copy cannot hide Helpers), seeds the whisper model, registers a RunAtLoad LaunchAgent, and starts the engine so Logic is not stuck on WAIT. The plugin still auto-launches with `open -g -n` if 7483 is down.
           - whisper/ggml/ixwebsocket are statically linked when possible; remaining dylibs ship next to the engine with `@executable_path` / `@loader_path`. Leftover `~/punch2pen/bin/punch2penEngine` is not auto-launched.
           - `auval` is skipped in GitHub Actions. On a Mac after install: `auval -strict -v aufx P2pn Dcta`. Quit Logic before installing.
 
