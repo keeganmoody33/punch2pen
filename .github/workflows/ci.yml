@@ -126,9 +126,10 @@ jobs:
       - name: Build punch2penEngine
         run: cmake --build build --config Release --target punch2penEngine -j4
       - name: Engine smoke (no Logic)
+        timeout-minutes: 10
         env:
           PUNCH2PEN_MODEL_CACHE: /tmp/punch2pen-model-cache
         run: |
           chmod +x scripts/engine_smoke.sh scripts/download_model.sh
           ./scripts/engine_smoke.sh --skip-build
-        # The checked-in Cap vocal fixture makes the vocals check run instead of skip.
+        # Vocals STT is one wall-clock --stt-timeout (default 60s), not 32 serial recvs.

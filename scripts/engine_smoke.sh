@@ -182,7 +182,11 @@ grep -qxF "punch 2 pen,Punch2Pen" "$CSV" || die "CSV missing punch 2 pen,Punch2P
 log "engine_smoke: correction CSV ok"
 
 if [[ "$RUN_VOCALS" -eq 1 ]]; then
-  VOCAL_ARGS=(vocals --port "$PORT")
+  VOCAL_ARGS=(
+    vocals
+    --port "$PORT"
+    --stt-timeout "${PUNCH2PEN_STT_TIMEOUT:-60}"
+  )
   if [[ "$REQUIRE_VOCALS" -eq 1 ]]; then
     VOCAL_ARGS+=(--require)
   fi
