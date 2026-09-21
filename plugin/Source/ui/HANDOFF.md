@@ -34,7 +34,7 @@ Identity is untouched: **Dcta / P2pn / aufx**.
 
 | Region | ID | Height | Contents |
 |---|---|---|---|
-| Header | `#header-bar` | 44px | `[ PUNCH2PEN ]` wordmark (`#app-title`), **active-profile pill** (`#profile-pill`, placeholder), status badge (`#status-badge`: WAIT / IDLE / REC / PLAY) |
+| Header | `#header-bar` | 44px | `[ PUNCH2PEN ]` wordmark (`#app-title`), **active-profile pill** (`#profile-pill`; opens the sign-in / seats popover), status badge (`#status-badge`: WAIT / IDLE / REC / PLAY) |
 | Transport strip | `#position-display` | 30px | `BAR n · BEAT n` (`#position-text` with `.bar-num` / `.beat-num`), `#sync-indicator` (LIVE / SCROLLED) |
 | Connection banner | `#connection-banner` | auto | “Waiting for engine connection…” — disconnected only |
 | Transcript | `#transcript-container` | flex | `#transcript-scroll` (native scroller) → `#transcript-inner` → `.lyric-line` → `.lyric-word`; empty-state hints; fades; `#return-to-live`; docked `#correction-overlay` |
@@ -102,12 +102,14 @@ window.setState(stateName)                   // disconnected|idle|recording|play
 window.resetTranscript()                     // clears all words (new take)
 window.showCorrection(originalWord, x, y)    // x,y accepted; the sheet is docked
 window.hideCorrection()
-window.setActiveProfile({ name, kind, detail })   // placeholder for the login/profile PR
+window.setActiveProfile({ name, kind, detail })   // pill; kind ∈ local | pro | seat
+window.setProfileStatus(json)                     // engine ProfileStatus, string or object
 ```
 
-`setActiveProfile` drives `#profile-pill`; `kind` ∈ `local | pro | seat`. Until
-login ships the pill reads **Local · This Mac · no account** and its popover's
-Sign in button is disabled. No prices anywhere.
+`WebViewEditor` folds every engine `ProfileStatus` into `setActiveProfile` (pill)
+and forwards the raw JSON to `setProfileStatus` (popover). The pill reads
+**Local · This Mac · no account** on the free tier, the seat name with a green
+dot when signed in with an active seat, and **No seat** when signed in without one.
 
 ## JS → C++ API (native functions on `window.punch2pen`)
 
@@ -116,10 +118,41 @@ window.punch2pen.onWordClicked(word, x, y)
 window.punch2pen.submitCorrection(original, corrected)
 window.punch2pen.onCorrectionCancelled()
 window.punch2pen.onReady()
+window.punch2pen.profileCommand(json)        // one JSON string, see below
 ```
 
 `onReady()` is the page handshake: the bridge buffers C++→JS calls made before
 it fires and flushes them once the DOM is alive.
+
+---
+
+## Profile popover (sign-in, sign-out, seats)
+
+The popover renders the engine's `ProfileStatus` and sends ops back. It holds
+no account state of its own beyond "which form is showing".
+
+| Status | Popover shows |
+|---|---|
+| `signedIn:false`, `cloudAvailable:false` | Local row + "Sign-in isn't available in this build" (no form) |
+| `signedIn:false`, `login.stage` `''` / `sending` | Local row, copy, **email form** → `Send code` (disabled + "Sending…" while `sending`) |
+| `login.stage` `code_sent` / `verifying` | **six-digit code form** → `Sign in` (auto-submits at 6 digits), "Code sent to *email* · Change email", `login.echoedCode` when a dev deployment echoes it |
+| `login.stage` `error` | same form as before, `login.message` in red |
+| `signedIn:true` | account line (`email` · Refresh · Sign out) and a **Seats** list from `profiles[]`: name, workspace, Owner/Seat, and for the active seat `N words in dictionary · sync` (or `N pending`). Click a seat → `set_active`. Suspended seats dim. `message` shows under the list. |
+
+Ops sent through `profileCommand`:
+
+```json
+{"op":"status"}
+{"op":"login_start","email":"you@studio.com"}
+{"op":"login_verify","email":"you@studio.com","code":"482910"}
+{"op":"set_active","profileId":"…"}
+{"op":"logout"}
+{"op":"refresh"}
+```
+
+While an op is in flight the relevant control is disabled until the next status
+lands. Opening the popover with no status yet sends `{"op":"status"}` once.
+No prices, plan names, or billing copy anywhere.
 
 ---
 
@@ -133,9 +166,10 @@ it fires and flushes them once the DOM is alive.
 | recording | Transcribing the punch · words land as the engine hears them |
 | playback, following | Following the playhead · click a word to correct it |
 | scrolled away | Scrolled away from the playhead |
-| after a correction | “x” → “y” (in N places) · session-only on this Mac. A profile carries your dictionary between rooms. |
+| after a correction, free | “x” → “y” (in N places) · session-only on this Mac. A profile carries your dictionary between rooms. |
+| after a correction, paid | “x” → “y” (in N places) · saved to *Name* dictionary · synced / N pending sync |
 
-The last row is the upgrade nudge: it appears only after the user actually
+The free row is the upgrade nudge: it appears only after the user actually
 corrects a word, never blocks, and names no price.
 
 ---
@@ -161,15 +195,15 @@ sans (SF Pro / system-ui) for legibility. No webfonts from the network.
 ## Browser preview (no C++ bridge)
 
 `index.html?preview=disconnected|idle|recording|playback|scrolled|correction[&t=seconds]`
-seeds an original demo verse and, without `t`, runs a fake playhead. It never
-executes inside the plugin (`window.__JUCE__.backend` present).
+seeds an original demo verse and, without `t`, runs a fake playhead.
+`index.html?preview=signin[&stage=email|code|seats]` adds a fake engine that
+answers `profileCommand` with the real `ProfileStatus` shape (echo code `482910`).
+Neither runs inside the plugin (`window.__JUCE__.backend` present).
 
 ## Open follow-ups
 
 1. **Logo asset.** `#logo-mark` is still the placeholder. Drop the real asset into
    `Source/ui/public/assets/` and extend the resource provider.
-2. **Profile switcher.** `setActiveProfile` is the hook; the fast switcher, login,
-   and seat isolation land with the paid-profile PR.
-3. **Bar labels per line.** `data-bar` is the arrival bar from the C++ timer, not
+2. **Bar labels per line.** `data-bar` is the arrival bar from the C++ timer, not
    the sung bar; do not surface it as a gutter number until real tempo mapping exists.
-4. **Live DAW visual verification** in Logic's WKWebView is still a human step.
+3. **Live DAW visual verification** in Logic's WKWebView is still a human step.

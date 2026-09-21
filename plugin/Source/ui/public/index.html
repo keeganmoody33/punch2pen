@@ -20,14 +20,21 @@
         resetTranscript()                     // clears all words (new take)
         showCorrection(originalWord, x, y)    // opens the correction sheet
         hideCorrection()
-        setActiveProfile(profile)             // placeholder for the paid/login PR:
-                                              //   { name, kind: 'local'|'pro'|'seat', detail }
+        setActiveProfile(profile)             // pill: { name, kind: 'local'|'pro'|'seat', detail }
+        setProfileStatus(json)                // engine ProfileStatus (string or object):
+                                              //   { tier, cloudAvailable, signedIn, email,
+                                              //     activeProfile, profiles[], dictionary,
+                                              //     sync, login{stage,email,echoedCode,message},
+                                              //     message }
 
       JS → C++ (native functions on window.punch2pen):
         onWordClicked(word, x, y)
         submitCorrection(original, corrected)
         onCorrectionCancelled()
         onReady()
+        profileCommand(json)                  // {op:'status'|'login_start'{email}|
+                                              //     'login_verify'{email,code}|'set_active'{profileId}|
+                                              //     'logout'|'refresh'}
 
     Element IDs the bridge / verify harness bind to:
       #header-bar  #app-title  #profile-pill  #status-badge
@@ -44,6 +51,7 @@
 
     Browser-only preview (no C++ bridge):
       index.html?preview=disconnected|idle|recording|playback|scrolled|correction[&t=seconds]
+      index.html?preview=signin[&stage=email|code|seats]   (fake engine; echo code 482910)
   -->
   <style>
     :root {
@@ -202,17 +210,87 @@
       color: var(--ink-2);
       margin: 10px 2px 10px;
     }
-    .pop-actions { display: flex; align-items: center; gap: 10px; }
-    #profile-signin {
-      height: 26px; padding: 0 12px;
+    .pop-form { display: flex; gap: 6px; }
+    .pop-form[hidden] { display: none; }
+    .pop-input {
+      flex: 1 1 auto; min-width: 0;
+      height: 28px; padding: 0 9px;
+      background: var(--bg-deep);
+      color: var(--ink);
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      font-family: var(--sans); font-size: 12.5px;
+      outline: none; caret-color: var(--accent);
+      -webkit-user-select: text; user-select: text;
+    }
+    .pop-input:focus { border-color: var(--accent); }
+    .pop-input::placeholder { color: var(--ink-4); }
+    .pop-input.code {
+      flex: 0 0 118px;
+      font-family: var(--mono); font-size: 15px; font-weight: 700;
+      letter-spacing: 0.32em; text-align: center;
+    }
+    .pop-btn {
+      height: 28px; padding: 0 11px;
       border-radius: 6px;
       border: 1px solid var(--line-strong);
-      background: transparent;
-      color: var(--ink-3);
+      background: transparent; color: var(--ink-2);
       font-weight: 700; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase;
-      cursor: not-allowed;
+      cursor: pointer; white-space: nowrap; flex-shrink: 0;
     }
-    .pop-actions .sub { font-size: 10.5px; color: var(--ink-4); }
+    .pop-btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+    .pop-btn:disabled { opacity: 0.55; cursor: default; }
+    .linkish {
+      background: none; border: none; padding: 0;
+      color: var(--ink-3); font-size: 10.5px; letter-spacing: 0.02em;
+      text-decoration: underline; text-underline-offset: 2px;
+      cursor: pointer;
+    }
+    .linkish:hover { color: var(--ink); }
+    .linkish:disabled { opacity: 0.5; cursor: default; }
+    .pop-note {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin-top: 8px;
+      font-family: var(--sans); font-size: 11.5px; color: var(--ink-3);
+    }
+    .pop-note[hidden] { display: none; }
+    .pop-note b { color: var(--ink-2); font-weight: 600; }
+    .pop-note code { font-family: var(--mono); color: var(--accent); letter-spacing: 0.2em; }
+    .pop-msg {
+      margin-top: 8px;
+      font-family: var(--sans); font-size: 11.5px; line-height: 1.4;
+      color: var(--ink-2);
+    }
+    .pop-msg.error { color: #FF8A90; }
+    .pop-msg[hidden] { display: none; }
+    .account-line {
+      display: flex; align-items: center; gap: 10px;
+      padding: 2px 2px 10px;
+      font-size: 11px; color: var(--ink-2);
+    }
+    .account-line #account-email { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pop-eyebrow.seats { margin-bottom: 4px; }
+    #seat-list { display: flex; flex-direction: column; gap: 2px; max-height: 190px; overflow-y: auto; }
+    .seat-row {
+      display: flex; align-items: center; gap: 10px;
+      width: 100%; text-align: left;
+      padding: 7px 8px;
+      border-radius: 7px;
+      border: 1px solid transparent;
+      background: transparent;
+      cursor: pointer;
+    }
+    .seat-row:hover { border-color: var(--line); }
+    .seat-row[aria-selected="true"] { background: rgba(255, 255, 255, 0.04); cursor: default; }
+    .seat-row .seat-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-4); flex-shrink: 0; }
+    .seat-row[aria-selected="true"] .seat-dot { background: var(--play); }
+    .seat-row .who { flex: 1; min-width: 0; }
+    .seat-row .who b { display: block; font-size: 12px; color: var(--ink); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .seat-row .who span { display: block; font-size: 10.5px; line-height: 1.35; color: var(--ink-3); margin-top: 2px; }
+    .seat-row .check { color: var(--accent); font-size: 12px; }
+    .seat-row.suspended { opacity: 0.5; }
+    .seat-row[aria-busy="true"] { opacity: 0.6; }
+    .seat-empty { font-family: var(--sans); font-size: 11.5px; color: var(--ink-3); padding: 6px 2px; }
 
     /* ── TRANSPORT STRIP ────────────────────────────────────── */
     #position-display {
@@ -516,23 +594,52 @@
 
   <div id="profile-popover" role="dialog" aria-label="Active profile" hidden>
     <div class="pop-eyebrow">Active profile</div>
-    <div class="profile-row">
-      <span class="pill-dot"></span>
-      <span class="who">
-        <b id="profile-row-name">Local</b>
-        <span id="profile-row-detail">This Mac · no account</span>
-      </span>
-      <span class="check">✓</span>
-    </div>
-    <p class="pop-copy">
-      Corrections stay in this session. A signed-in profile keeps lyrics, timecode,
-      and your own dictionary with you across DAWs and rooms — and keeps each artist’s
-      dictionary separate.
-    </p>
-    <div class="pop-actions">
-      <button id="profile-signin" type="button" disabled aria-disabled="true">Sign in</button>
-      <span class="sub">Arrives with paid profiles</span>
-    </div>
+
+    <!-- Signed out: the local profile plus email + six-digit code sign-in -->
+    <section id="pop-signin">
+      <div class="profile-row">
+        <span class="pill-dot"></span>
+        <span class="who">
+          <b id="profile-row-name">Local</b>
+          <span id="profile-row-detail">This Mac · no account</span>
+        </span>
+        <span class="check">✓</span>
+      </div>
+      <p class="pop-copy">
+        Corrections stay in this session. A signed-in profile keeps lyrics, timecode,
+        and your own dictionary with you across DAWs and rooms — each artist’s
+        dictionary stays separate.
+      </p>
+      <form id="login-email-form" class="pop-form" novalidate>
+        <input id="login-email" class="pop-input" type="email" placeholder="you@studio.com"
+               autocomplete="email" autocapitalize="off" spellcheck="false" aria-label="Email" />
+        <button id="login-send" class="pop-btn primary" type="submit">Send code</button>
+      </form>
+      <form id="login-code-form" class="pop-form" novalidate hidden>
+        <input id="login-code" class="pop-input code" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+               autocomplete="one-time-code" placeholder="······" aria-label="Six-digit code" />
+        <button id="login-verify" class="pop-btn primary" type="submit">Sign in</button>
+      </form>
+      <div id="login-note" class="pop-note" hidden>
+        Code sent to <b id="login-code-email"></b>
+        <button id="login-change-email" type="button" class="linkish">Change email</button>
+      </div>
+      <div id="login-echo" class="pop-note" hidden>Dev deployment echoed the code: <code id="login-echo-code"></code></div>
+      <div id="login-message" class="pop-msg" hidden></div>
+      <div id="signin-unavailable" class="pop-note" hidden>Sign-in isn’t available in this build.</div>
+    </section>
+
+    <!-- Signed in: account line and the seats this login holds -->
+    <section id="pop-account" hidden>
+      <div class="account-line">
+        <span id="account-email"></span>
+        <button id="account-refresh" type="button" class="linkish">Refresh</button>
+        <button id="account-logout" type="button" class="linkish">Sign out</button>
+      </div>
+      <div class="pop-eyebrow seats">Seats</div>
+      <div id="seat-list" role="listbox" aria-label="Seats"></div>
+      <div id="account-message" class="pop-msg" hidden></div>
+    </section>
   </div>
 
   <!-- TRANSPORT ──────────────────────────────────────────── -->
@@ -633,6 +740,9 @@
         submitCorrection:      (...a) => backend.submitCorrection(...a),
         onCorrectionCancelled: (...a) => backend.onCorrectionCancelled(...a),
         onReady:               (...a) => backend.onReady(...a),
+        // Profile ops travel to the engine as one JSON string:
+        //   {op:'status'|'login_start'|'login_verify'|'set_active'|'logout'|'refresh', ...}
+        profileCommand:        (...a) => backend.profileCommand(...a),
       } : {};
       if (!backend) console.warn('[punch2pen] window.__JUCE__.backend unavailable — native calls are no-ops');
       window.punch2pen = nativeBridge;
@@ -1005,8 +1115,40 @@
       });
 
       // ────────────────────────────────────────────────────────
-      // Active profile pill (placeholder until login ships)
+      // Active profile pill + sign-in / seats popover
+      //
+      // The engine owns the truth. It pushes a ProfileStatus JSON through
+      // window.setProfileStatus(json) (and folds the pill through
+      // window.setActiveProfile). The popover only renders that status and
+      // sends ops back with window.punch2pen.profileCommand(json).
       // ────────────────────────────────────────────────────────
+      const popSignin      = document.getElementById('pop-signin');
+      const popAccount     = document.getElementById('pop-account');
+      const emailForm      = document.getElementById('login-email-form');
+      const emailInput     = document.getElementById('login-email');
+      const sendBtn        = document.getElementById('login-send');
+      const codeForm       = document.getElementById('login-code-form');
+      const codeInput      = document.getElementById('login-code');
+      const verifyBtn      = document.getElementById('login-verify');
+      const loginNote      = document.getElementById('login-note');
+      const loginCodeEmail = document.getElementById('login-code-email');
+      const loginEcho      = document.getElementById('login-echo');
+      const loginEchoCode  = document.getElementById('login-echo-code');
+      const loginMessage   = document.getElementById('login-message');
+      const signinUnavail  = document.getElementById('signin-unavailable');
+      const accountEmail   = document.getElementById('account-email');
+      const accountMessage = document.getElementById('account-message');
+      const seatList       = document.getElementById('seat-list');
+      const refreshBtn     = document.getElementById('account-refresh');
+      const logoutBtn      = document.getElementById('account-logout');
+
+      let profileStatus = null;     // last ProfileStatus from the engine
+      let statusRequested = false;
+      let pendingOp = null;         // op in flight until the next status lands
+      let codeStageReached = false; // keeps the code form up when a wrong code errors
+      let wantEmailForm = false;    // user chose "Change email"
+      let fakeEngine = null;        // browser preview only
+
       function setActiveProfile(profile) {
         const p = typeof profile === 'string' ? { name: profile } : (profile || {});
         const name = String(p.name || 'Local');
@@ -1021,10 +1163,221 @@
         profilePill.title = 'Active profile: ' + name;
       }
 
+      function sendProfileCommand(cmd) {
+        const json = JSON.stringify(cmd);
+        if (nativeBridge.profileCommand) { nativeBridge.profileCommand(json); return true; }
+        if (fakeEngine) { fakeEngine(cmd); return true; }
+        showLoginMessage('The plugin bridge is not available in this preview.', true);
+        return false;
+      }
+
+      function setProfileStatus(status) {
+        let s = status;
+        if (typeof s === 'string') {
+          try { s = JSON.parse(s); } catch (e) { console.warn('[punch2pen] bad ProfileStatus', e); return; }
+        }
+        if (!s || typeof s !== 'object') return;
+        profileStatus = s;
+        pendingOp = null;
+        const stage = s.login && s.login.stage;
+        if (stage === 'code_sent' || stage === 'verifying') { codeStageReached = true; wantEmailForm = false; }
+        if (s.signedIn) codeStageReached = false;
+        renderProfilePopover();
+        updateStatusLine();
+      }
+
+      function showLoginMessage(text, isError) {
+        loginMessage.textContent = text || '';
+        loginMessage.hidden = !text;
+        loginMessage.classList.toggle('error', !!isError);
+      }
+
+      function setDisabled(el, on) { el.disabled = !!on; }
+
+      function renderProfilePopover() {
+        const s = profileStatus;
+        const signedIn = !!(s && s.signedIn);
+        popSignin.hidden = signedIn;
+        popAccount.hidden = !signedIn;
+
+        if (!signedIn) {
+          const login = (s && s.login) || {};
+          const stage = login.stage || '';
+          const cloudOff = !!s && s.cloudAvailable === false;
+
+          signinUnavail.hidden = !cloudOff;
+          if (cloudOff) {
+            signinUnavail.textContent = login.message || 'Sign-in isn’t available in this build: no profile API configured.';
+            emailForm.hidden = true; codeForm.hidden = true; loginNote.hidden = true; loginEcho.hidden = true;
+            showLoginMessage(s.message || '', false);
+            return;
+          }
+
+          const showCode = !wantEmailForm &&
+            (stage === 'code_sent' || stage === 'verifying' || (stage === 'error' && codeStageReached));
+          emailForm.hidden = showCode;
+          codeForm.hidden = !showCode;
+          loginNote.hidden = !showCode;
+
+          if (login.email && !emailInput.value) emailInput.value = login.email;
+          loginCodeEmail.textContent = login.email || emailInput.value || '';
+
+          const sending = stage === 'sending' || pendingOp === 'login_start';
+          const verifying = stage === 'verifying' || pendingOp === 'login_verify';
+          setDisabled(emailInput, sending);
+          setDisabled(sendBtn, sending);
+          sendBtn.textContent = sending ? 'Sending…' : 'Send code';
+          setDisabled(codeInput, verifying);
+          setDisabled(verifyBtn, verifying);
+          verifyBtn.textContent = verifying ? 'Signing in…' : 'Sign in';
+
+          loginEcho.hidden = !(showCode && login.echoedCode);
+          loginEchoCode.textContent = login.echoedCode || '';
+
+          if (stage === 'error' && login.message) showLoginMessage(login.message, true);
+          else if (showCode && login.message && !login.echoedCode) showLoginMessage(login.message, false);
+          else if (s && s.message)                 showLoginMessage(s.message, false);
+          else                                     showLoginMessage('', false);
+          return;
+        }
+
+        // Signed in: account line + seats
+        accountEmail.textContent = s.email || 'Signed in';
+        accountEmail.title = s.email || '';
+        setDisabled(logoutBtn, pendingOp === 'logout');
+        setDisabled(refreshBtn, pendingOp === 'refresh');
+        logoutBtn.textContent = pendingOp === 'logout' ? 'Signing out…' : 'Sign out';
+
+        const profiles = Array.isArray(s.profiles) ? s.profiles : [];
+        const activeId = s.activeProfile && s.activeProfile.id;
+        const dict = s.dictionary || {};
+        seatList.replaceChildren();
+        if (profiles.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'seat-empty';
+          empty.textContent = 'No seat on this sign-in yet.';
+          seatList.appendChild(empty);
+        }
+        for (const p of profiles) {
+          const isActive = p.id === activeId;
+          const suspended = p.status && p.status !== 'active';
+          const row = document.createElement('button');
+          row.type = 'button';
+          row.className = 'seat-row' + (suspended ? ' suspended' : '');
+          row.setAttribute('role', 'option');
+          row.setAttribute('aria-selected', isActive ? 'true' : 'false');
+          if (pendingOp === 'set_active:' + p.id) row.setAttribute('aria-busy', 'true');
+          row.dataset.profileId = p.id || '';
+
+          const dot = document.createElement('span'); dot.className = 'seat-dot';
+          const who = document.createElement('span'); who.className = 'who';
+          const name = document.createElement('b'); name.textContent = p.name || 'Profile';
+          const sub = document.createElement('span');
+          const role = p.role === 'owner' ? 'Owner' : 'Seat';
+          const bits = [];
+          if (p.workspaceName) bits.push(p.workspaceName);
+          bits.push(role);
+          if (suspended) bits.push(p.status);
+          if (isActive) {
+            const n = Number(dict.entries) || 0;
+            bits.push(n + (n === 1 ? ' word' : ' words') + ' in dictionary');
+            if (Number(dict.pending) > 0) bits.push(dict.pending + ' pending');
+            else if (s.sync) bits.push(s.sync);
+          }
+          sub.textContent = bits.join(' · ');
+          who.append(name, sub);
+          row.append(dot, who);
+          if (isActive) { const check = document.createElement('span'); check.className = 'check'; check.textContent = '✓'; row.appendChild(check); }
+          if (!isActive) row.addEventListener('click', () => switchSeat(p.id));
+          seatList.appendChild(row);
+        }
+
+        accountMessage.textContent = s.message || '';
+        accountMessage.hidden = !s.message;
+        accountMessage.classList.toggle('error', !!s.message && /not available|could not|failed|error/i.test(s.message));
+      }
+
+      function startLogin(e) {
+        if (e) e.preventDefault();
+        const email = emailInput.value.trim();
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          showLoginMessage('Enter the email your seat was created with.', true);
+          emailInput.focus();
+          return;
+        }
+        codeStageReached = false;
+        wantEmailForm = false;
+        codeInput.value = '';
+        showLoginMessage('', false);
+        if (sendProfileCommand({ op: 'login_start', email })) {
+          pendingOp = 'login_start';
+          renderProfilePopover();
+        }
+      }
+
+      function verifyLogin(e) {
+        if (e) e.preventDefault();
+        const code = codeInput.value.replace(/\D/g, '');
+        const email = (profileStatus && profileStatus.login && profileStatus.login.email) || emailInput.value.trim();
+        if (code.length !== 6) {
+          showLoginMessage('Enter the six-digit code from your email.', true);
+          codeInput.focus();
+          return;
+        }
+        showLoginMessage('', false);
+        if (sendProfileCommand({ op: 'login_verify', email, code })) {
+          pendingOp = 'login_verify';
+          renderProfilePopover();
+        }
+      }
+
+      function switchSeat(profileId) {
+        if (!profileId) return;
+        if (sendProfileCommand({ op: 'set_active', profileId })) {
+          pendingOp = 'set_active:' + profileId;
+          renderProfilePopover();
+        }
+      }
+
+      function logout() {
+        if (sendProfileCommand({ op: 'logout' })) {
+          pendingOp = 'logout';
+          codeStageReached = false;
+          wantEmailForm = false;
+          renderProfilePopover();
+        }
+      }
+
+      emailForm.addEventListener('submit', startLogin);
+      codeForm.addEventListener('submit', verifyLogin);
+      codeInput.addEventListener('input', () => {
+        codeInput.value = codeInput.value.replace(/\D/g, '').slice(0, 6);
+        if (codeInput.value.length === 6 && !verifyBtn.disabled) verifyLogin();
+      });
+      document.getElementById('login-change-email').addEventListener('click', () => {
+        wantEmailForm = true;
+        codeStageReached = false;
+        renderProfilePopover();
+        setTimeout(() => emailInput.focus(), 0);
+      });
+      logoutBtn.addEventListener('click', logout);
+      refreshBtn.addEventListener('click', () => {
+        if (sendProfileCommand({ op: 'refresh' })) { pendingOp = 'refresh'; renderProfilePopover(); }
+      });
+
       function toggleProfilePopover(force) {
         const open = force != null ? force : profilePop.hidden;
         profilePop.hidden = !open;
         profilePill.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) {
+          if (!profileStatus && !statusRequested && (nativeBridge.profileCommand || fakeEngine)) {
+            statusRequested = true;
+            sendProfileCommand({ op: 'status' });
+          }
+          renderProfilePopover();
+          const focusTarget = !popSignin.hidden ? (codeForm.hidden ? emailInput : codeInput) : null;
+          if (focusTarget && !focusTarget.disabled) setTimeout(() => focusTarget.focus(), 0);
+        }
       }
       profilePill.addEventListener('click', (e) => { e.stopPropagation(); toggleProfilePopover(); });
       profilePop.addEventListener('click', (e) => e.stopPropagation());
@@ -1045,9 +1398,16 @@
           text = 'Transcribing the punch · words land as the engine hears them';
         } else if (corrections > 0 && lastCorrection) {
           const where = lastCorrection.count > 1 ? ` in ${lastCorrection.count} places` : '';
-          text = `“${lastCorrection.original}” → “${lastCorrection.corrected}”${where} · session-only on this Mac. `
-               + 'A profile carries your dictionary between rooms.';
-          nudge = true;
+          const paid = profileStatus && profileStatus.tier === 'paid' && profileStatus.activeProfile;
+          text = `“${lastCorrection.original}” → “${lastCorrection.corrected}”${where}`;
+          if (paid) {
+            const pending = Number(profileStatus.dictionary && profileStatus.dictionary.pending) || 0;
+            text += ` · saved to ${profileStatus.activeProfile.name || 'your'} dictionary`
+                  + (pending > 0 ? ` · ${pending} pending sync` : profileStatus.sync ? ` · ${profileStatus.sync}` : '');
+          } else {
+            text += ' · session-only on this Mac. A profile carries your dictionary between rooms.';
+            nudge = true;
+          }
         } else if (words.length === 0) {
           text = 'Local transcription · no account needed';
         } else if (!follow) {
@@ -1073,6 +1433,7 @@
       window.showCorrection      = showCorrection;
       window.hideCorrection      = hideCorrection;
       window.setActiveProfile    = setActiveProfile;
+      window.setProfileStatus    = setProfileStatus;
 
       setActiveProfile({ name: 'Local', kind: 'local' });
       setState('disconnected');
@@ -1121,7 +1482,83 @@
           const tick = () => { pos(((performance.now() - t0) / 1000) % totalSeconds); requestAnimationFrame(tick); };
           tick();
         };
+        // Fake engine for the sign-in flow: same ProfileStatus shape as
+        // AccountManager::statusJsonLocked(), same pill fold as WebViewEditor.
+        const installFakeEngine = () => {
+          const ECHO = '482910';
+          const seats = [
+            { id: 'p_owner', name: 'Keegan', workspaceId: 'w1', workspaceName: 'Doctaaa Studio', role: 'owner', status: 'active', dictionaryVersion: 3 },
+            { id: 'p_seat',  name: 'Artist B', workspaceId: 'w1', workspaceName: 'Doctaaa Studio', role: 'artist', status: 'active', dictionaryVersion: 1 },
+          ];
+          const st = {
+            type: 'profileStatus', tier: 'free', cloudAvailable: true, signedIn: false, email: '',
+            activeProfile: null, profiles: [],
+            dictionary: { scope: 'session', entries: 0, biasTerms: 0, pending: 0, version: 0 },
+            sync: 'local', login: { stage: '', email: '', echoedCode: '', message: '' }, message: '',
+          };
+          const emit = () => {
+            const paid = st.tier === 'paid' && st.activeProfile;
+            const dot = ' · ';
+            setActiveProfile(paid ? {
+              name: st.activeProfile.name,
+              kind: st.activeProfile.role === 'owner' ? 'pro' : 'seat',
+              detail: st.activeProfile.workspaceName + dot + st.dictionary.entries + ' words in dictionary' + dot + st.sync,
+            } : st.signedIn ? { name: 'No seat', kind: 'local', detail: st.message || 'Signed in' + dot + 'no active seat' }
+              : { name: 'Local', kind: 'local', detail: 'This Mac' + dot + 'no account' });
+            setProfileStatus(JSON.stringify(st));
+          };
+          const later = (fn) => setTimeout(fn, frozen != null ? 0 : 500);
+          fakeEngine = (cmd) => {
+            switch (cmd.op) {
+              case 'status': emit(); break;
+              case 'login_start':
+                st.login = { stage: 'sending', email: cmd.email, echoedCode: '', message: '' }; emit();
+                later(() => { st.login.stage = 'code_sent'; st.login.echoedCode = ECHO;
+                              st.login.message = 'Development deployment echoed the code.'; emit(); });
+                break;
+              case 'login_verify':
+                st.login.stage = 'verifying'; st.login.message = ''; emit();
+                later(() => {
+                  if (cmd.code !== ECHO) { st.login.stage = 'error'; st.login.message = 'That code did not work.'; return emit(); }
+                  Object.assign(st, { tier: 'paid', signedIn: true, email: cmd.email, profiles: seats,
+                    activeProfile: seats[0], sync: 'synced',
+                    dictionary: { scope: 'profile', entries: 12, biasTerms: 12, pending: 0, version: 3 },
+                    login: { stage: '', email: '', echoedCode: '', message: '' }, message: '' });
+                  emit();
+                });
+                break;
+              case 'set_active': {
+                const p = seats.find(x => x.id === cmd.profileId);
+                if (!p) { st.message = 'That profile is not available for this sign-in.'; return emit(); }
+                st.activeProfile = p; st.sync = 'cached'; st.message = '';
+                st.dictionary = { scope: 'profile', entries: p.id === 'p_owner' ? 12 : 4, biasTerms: 4, pending: 0, version: p.dictionaryVersion };
+                emit(); later(() => { st.sync = 'synced'; emit(); });
+                break;
+              }
+              case 'logout':
+                Object.assign(st, { tier: 'free', signedIn: false, email: '', profiles: [], activeProfile: null, sync: 'local',
+                  dictionary: { scope: 'session', entries: 0, biasTerms: 0, pending: 0, version: 0 },
+                  login: { stage: '', email: '', echoedCode: '', message: '' },
+                  message: 'Signed out. Corrections now stay in this session.' });
+                emit(); break;
+              case 'refresh': st.sync = 'synced'; emit(); break;
+              default: st.message = 'Unknown profile command: ' + cmd.op; emit();
+            }
+          };
+          emit();
+        };
+
         switch (preview) {
+          case 'signin': {
+            installFakeEngine();
+            seed(); setState('playback'); freeze(frozen != null ? frozen : 9.3);
+            body.classList.add('no-motion');
+            const stage = params.get('stage') || 'email';
+            toggleProfilePopover(true);
+            if (stage === 'code' || stage === 'seats') { emailInput.value = 'keegan@doctaaa.com'; startLogin(); }
+            if (stage === 'seats') { codeInput.value = '482910'; verifyLogin(); }
+            break;
+          }
           case 'idle':      setState('idle'); break;
           case 'recording': seed(); setState('recording'); pos(totalSeconds - 0.4);
                             refreshHierarchy(); scrollToAnchor(false); break;
