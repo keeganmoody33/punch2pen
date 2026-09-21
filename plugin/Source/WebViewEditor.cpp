@@ -17,8 +17,8 @@ juce::String getIndexHtml() {
   if (auto *data = BinaryData::getNamedResource("indexhtml", size))
     return juce::String::fromUTF8(data, size);
 
-  return "<html><body style='background:#1C1917;color:#FCD34D;"
-         "font-family:monospace;padding:24px'>"
+  return "<html><body style='background:#100E0C;color:#F3EBDA;"
+         "font-family:ui-monospace,Menlo,monospace;padding:24px'>"
          "<h3>punch2pen WebView</h3>"
          "<p>BinaryData resource \"index_html\"/\"indexhtml\" not found. "
          "Re-run CMake configure and verify that "

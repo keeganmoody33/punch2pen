@@ -24,7 +24,7 @@ Punch2PenAudioProcessorEditor::Punch2PenAudioProcessorEditor(
 Punch2PenAudioProcessorEditor::~Punch2PenAudioProcessorEditor() = default;
 
 void Punch2PenAudioProcessorEditor::paint(juce::Graphics &g) {
-  g.fillAll(juce::Colour(0xff1E1E1E));
+  g.fillAll(juce::Colour(0xff100E0C));
 }
 
 void Punch2PenAudioProcessorEditor::resized() {
