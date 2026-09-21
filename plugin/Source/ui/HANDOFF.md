@@ -6,8 +6,10 @@ highlights the word under the playhead, treats the active line as the title,
 renders a Temporal Hierarchy (past / active / upcoming), scrolls in sync with
 the DAW, and offers **Return to Live** when the user scrolls away.
 
-Vibe: **Open** — dark, DAW-native, not a toy. Default window **400×600**
-(C++ `setSize`), resizable; the CSS is fluid and follows the host.
+Vibe: **Open** — dark, DAW-native, not a toy. **Booth paper:** mono chrome
+(the punch), serif lyrics (the pen), stamp vermillion. Not the teal #21 restyle.
+Default window **400×600** (C++ `setSize`), resizable; the CSS is fluid and
+follows the host.
 
 The language is lyric highlighting, nothing else: Living Transcript, Temporal
 Hierarchy, highlight the word, active line as title, synced scroll, Return to
@@ -56,12 +58,12 @@ Inside `#transcript-inner` the bridge populates one line per bar (max 8 words):
 
 | Tier | Line class | Treatment |
 |---|---|---|
-| Past | `.line-past` | sans, ~15px, opacity 0.34 |
-| **Active (title)** | `.line-active` | sans **bold**, ~22px (scales with width via `cqi`), opacity 1 |
-| Upcoming | `.line-upcoming` | sans, ~15px, opacity 0.66 |
+| Past | `.line-past` | serif, ~16px, opacity 0.38 |
+| **Active (title)** | `.line-active` | serif **bold**, ~24px (scales with width via `cqi`), opacity 1 |
+| Upcoming | `.line-upcoming` | serif, ~16px, opacity 0.68 |
 
-Word under the playhead: `.lyric-word.active` — accent fill (`--accent` #FCD34D)
-with dark ink. Past words inside the active line sit at 0.55. Between two word
+Word under the playhead: `.lyric-word.active` — invert plate (paper fill, booth
+ink). Past words inside the active line sit at 0.52. Between two word
 timestamps the highlight **holds** on the last sung word (no flicker in whisper's
 gaps); after the final word it holds for ~0.75 s.
 
@@ -176,19 +178,23 @@ corrects a word, never blocks, and names no price.
 
 ## Tokens
 
+Booth paper. Same tokens as `site/public/site.css`. Not the teal #21 restyle.
+
 | Token | Value | Job |
 |---|---|---|
-| `--bg-deep` | #0F1012 | window |
-| `--bg-pane` | #15161A | transcript |
-| `--bg-chrome` | #1B1D21 | header, transport strip, status bar |
-| `--bg-raised` | #23262B | pill, popover, sheet, Return to Live |
-| `--ink` | #F3F3F1 | text |
-| `--accent` | #FCD34D | wordmark “2”, bar/beat, WAIT, active word, Apply |
-| `--rec` | #FF4D57 | REC, stream cursor |
-| `--play` | #5CCB8A | PLAY, LIVE, corrected marker |
+| `--bg-deep` | #100E0C | window / editor chrome behind the WebView |
+| `--bg-pane` | #171411 | transcript |
+| `--bg-chrome` | #1E1A16 | header, transport strip, status bar |
+| `--bg-raised` | #2A241E | pill, popover, sheet, Return to Live |
+| `--ink` | #F3EBDA | paper text |
+| `--accent` | #E4452F | stamp vermillion: wordmark “2”, Apply, checks |
+| `--wait` | #C9A36A | WAIT / engine banner (not REC, not the old gold chip) |
+| `--rec` | #E4452F | REC, stream cursor |
+| `--play` | #6FBF8A | PLAY, LIVE, corrected marker |
 
-Type: chrome in system mono (`ui-monospace`, SF Mono, Menlo…); lyrics in system
-sans (SF Pro / system-ui) for legibility. No webfonts from the network.
+Type: chrome in system mono (`ui-monospace`, SF Mono, Menlo…); lyrics and status
+copy in system serif (Iowan / Palatino / Georgia) — the pen. No webfonts from
+the network. Active word is an invert plate, not a colored fill.
 
 ---
 
