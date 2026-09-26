@@ -296,7 +296,7 @@ fi
 
 section "Unit and helper tests"
 if [[ "$RUN_TESTS" -eq 1 ]]; then
-  ENGINE_TESTS=(databaseManagerTest profileManagerTest protocolSerializationTest openAIJsonTest transcriptionCoordinatorTest transcriptTimingTest)
+  ENGINE_TESTS=(databaseManagerTest profileManagerTest protocolSerializationTest ipcServerHandshakeTest openAIJsonTest transcriptionCoordinatorTest transcriptTimingTest)
   for test_name in "${ENGINE_TESTS[@]}"; do
     test_bin="$BUILD_DIR/bin/$test_name"
     if [[ -x "$test_bin" ]]; then
