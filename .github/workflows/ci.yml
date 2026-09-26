@@ -79,6 +79,7 @@ jobs:
           ./build/bin/cloudProfileClientTest
           ./build/bin/protocolSerializationTest
           ./build/bin/ipcServerHandshakeTest
+          python3 scripts/verify_engine.py selftest
           ./build/bin/openAIJsonTest
           ./build/bin/transcriptionCoordinatorTest
           ./build/bin/transcriptTimingTest

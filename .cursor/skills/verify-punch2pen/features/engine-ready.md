@@ -35,6 +35,6 @@ Preconditions:
 - Missing `~/.punch2pen/models/ggml-base.bin` (in the **isolated** HOME) makes the process exit before `Engine ready.` Launch downloads or copies the model; do not assume the user's real home is used.
 - Port 7483 is not configurable. A leftover engine, a DAW-spawned helper, or `test_daw_integration.sh` will block launch.
 - `verify_setup.sh` only dry-runs CMake into `build_verify/`. It does not start the engine.
-- A TCP connect to 7483 is a real engine client (`Client connected!` in the log). Doctor/launch prefer `lsof` so they do not spam accepts.
+- A TCP connect to 7483 is a real engine accept (`Client connected!` in the log) and is not a finished handshake. The plugin stays on WAIT until HandshakeResponse. Doctor/launch prefer `lsof` so they do not spam accepts.
 - Linux/CI can prove this feature without AU/VST3. That is not Mac plugin proof.
 - Do not `killall punch2penEngine`. Cleanup uses the pidfile from this run.

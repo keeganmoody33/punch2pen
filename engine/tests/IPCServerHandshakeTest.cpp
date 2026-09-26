@@ -196,6 +196,238 @@ void testMessageBeforeHandshakeDoesNotDropClient() {
   std::cout << "[PASS] testMessageBeforeHandshakeDoesNotDropClient" << std::endl;
 }
 
+// Live v1.0.3: AUHosting and punch2penEngine are ESTABLISHED on 7483 and the
+// editor stays on WAIT. An open socket is not HandshakeResponse. "GET "
+// (wire type 542393671) is not a live client. A second bind must fail while
+// the first listener still holds 7483 and can still answer Handshake.
+bool pluginWouldLeaveWait(bool sawHandshakeResponse, uint32_t accepted) {
+  return sawHandshakeResponse && accepted == 1;
+}
+
+// 0x20544547, the MessageType an HTTP "GET " prefix decodes as.
+constexpr uint32_t kHttpGetWireType = 542393671u;
+
+bool socketClosed(int fd) {
+  char probe = 0;
+  const ssize_t n = ::recv(fd, &probe, 1, MSG_PEEK | MSG_DONTWAIT);
+  if (n == 0)
+    return true;
+  if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK)
+    return true;
+  return false;
+}
+
+bool socketHasFrame(int fd) {
+  char probe = 0;
+  return ::recv(fd, &probe, 1, MSG_PEEK | MSG_DONTWAIT) > 0;
+}
+
+// Accept, an early non-handshake frame, and a rejected handshake are not a
+// live client. sendResult / sendProfileStatus must not hit the socket, and
+// nothing may be queued for the coordinator.
+void assertClientNotLive(punch2pen::IPCServer &server, int fd, const char *why) {
+  const auto deadline =
+      std::chrono::steady_clock::now() + std::chrono::milliseconds(200);
+  while (std::chrono::steady_clock::now() < deadline) {
+    server.sendResult("lyric", 0.0, 1.0, 1);
+    server.sendProfileStatus(R"({"type":"profileStatus"})");
+    if (socketClosed(fd)) {
+      std::cerr << why << ": socket closed before HandshakeResponse\n";
+      assert(false);
+    }
+    if (socketHasFrame(fd)) {
+      std::cerr << why
+                << ": engine wrote a frame before HandshakeResponse; "
+                   "TCP accept is not a live client and the plugin stays "
+                   "on WAIT\n";
+      assert(false);
+    }
+    if (server.hasPendingAudio() || server.hasPendingCorrection() ||
+        server.hasPendingProfileCommand()) {
+      std::cerr << why
+                << ": engine published the socket before HandshakeResponse\n";
+      assert(false);
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+}
+
+// "GET " may reset that one TCP connection. It must not publish the client
+// or free 127.0.0.1:7483 for a second engine.
+void assertPrefixNotLive(punch2pen::IPCServer &server, int fd, const char *why) {
+  const auto deadline =
+      std::chrono::steady_clock::now() + std::chrono::milliseconds(200);
+  while (std::chrono::steady_clock::now() < deadline) {
+    server.sendResult("lyric", 0.0, 1.0, 1);
+    server.sendProfileStatus(R"({"type":"profileStatus"})");
+    if (socketHasFrame(fd)) {
+      std::cerr << why
+                << ": non-handshake prefix was treated as a live client\n";
+      assert(false);
+    }
+    if (server.hasPendingAudio() || server.hasPendingCorrection() ||
+        server.hasPendingProfileCommand()) {
+      std::cerr << why
+                << ": non-handshake prefix published the client\n";
+      assert(false);
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+}
+
+void assertPortStillHeld(int port) {
+  punch2pen::IPCServer intruder(port);
+  if (intruder.start()) {
+    intruder.stop();
+    std::cerr << "second engine bound 127.0.0.1:" << port
+              << " while the first still holds it\n";
+    assert(false);
+  }
+}
+
+bool readHandshakeResponse(int fd, uint32_t &accepted) {
+  punch2pen::protocol::Header header{};
+  std::vector<char> payload;
+  if (!readMessage(fd, header, payload)) {
+    std::cerr << "TCP accept without HandshakeResponse leaves the plugin on "
+                 "WAIT\n";
+    return false;
+  }
+  if (header.type != punch2pen::protocol::MessageType::HandshakeResponse ||
+      payload.size() != sizeof(punch2pen::protocol::HandshakeResponse)) {
+    std::cerr << "frame type " << static_cast<uint32_t>(header.type)
+              << " arrived before HandshakeResponse\n";
+    return false;
+  }
+  punch2pen::protocol::HandshakeResponse response{};
+  std::memcpy(&response, payload.data(), sizeof(response));
+  accepted = response.accepted;
+  return response.version == punch2pen::protocol::kProtocolVersion;
+}
+
+void testHandshakeResponseRequiredBeforeLiveClient() {
+  // Production port, one bind. A rejected handshake must not force the
+  // engine to listen again.
+  constexpr int kPort = 7483;
+  punch2pen::IPCServer server(kPort);
+  if (!server.start()) {
+    std::cerr << "could not bind 127.0.0.1:7483; refusing to skip the "
+                 "handshake gate\n";
+    assert(false);
+  }
+
+  assertPortStillHeld(kPort);
+
+  const int http = connectLocal(kPort);
+  assert(http >= 0);
+  // Accept happened. That alone must not count as a live client.
+  assertClientNotLive(server, http, "after TCP accept");
+
+  const char kHttpGet[] =
+      "GET / HTTP/1.1\r\nHost: 127.0.0.1:7483\r\nConnection: close\r\n\r\n";
+  uint32_t wireType = 0;
+  std::memcpy(&wireType, kHttpGet, sizeof(wireType));
+  assert(wireType == kHttpGetWireType);
+  if (!sendAll(http, kHttpGet, sizeof(kHttpGet) - 1)) {
+    std::cerr << "GET prefix closed the listener\n";
+    assert(false);
+  }
+  assertPrefixNotLive(server, http, "after HTTP GET");
+  assertPortStillHeld(kPort);
+  ::close(http);
+
+  const int fd = connectLocal(kPort);
+  if (fd < 0) {
+    std::cerr << "GET required a second bind on 127.0.0.1:7483\n";
+    assert(false);
+  }
+
+  const std::string early = R"({"op":"status"})";
+  punch2pen::protocol::Header earlyHeader{};
+  earlyHeader.type = punch2pen::protocol::MessageType::ProfileCommand;
+  earlyHeader.length = static_cast<uint32_t>(early.size());
+  if (!sendAll(fd, &earlyHeader, sizeof(earlyHeader)) ||
+      !sendAll(fd, early.data(), early.size())) {
+    std::cerr << "early non-handshake frame closed the socket\n";
+    assert(false);
+  }
+  assertClientNotLive(server, fd, "after early non-handshake frame");
+
+  if (!sendHandshake(fd, 0)) {
+    std::cerr << "early non-handshake frame closed the socket\n";
+    assert(false);
+  }
+  uint32_t accepted = 1;
+  if (!readHandshakeResponse(fd, accepted) || accepted != 0) {
+    std::cerr << "rejected handshake did not answer with HandshakeResponse "
+                 "accepted=0\n";
+    assert(false);
+  }
+  assert(!pluginWouldLeaveWait(true, accepted));
+  assertClientNotLive(server, fd, "after rejected handshake");
+
+  // Same listener. start() is not called again.
+  const int retry = connectLocal(kPort);
+  if (retry < 0) {
+    std::cerr << "failed handshake required a second bind on 127.0.0.1:7483\n";
+    assert(false);
+  }
+
+  if (!sendHandshake(fd, punch2pen::protocol::kProtocolVersion)) {
+    std::cerr << "socket closed before a completed handshake\n";
+    assert(false);
+  }
+  accepted = 0;
+  if (!readHandshakeResponse(fd, accepted) || accepted != 1 ||
+      !pluginWouldLeaveWait(true, accepted)) {
+    std::cerr << "TCP accept without HandshakeResponse leaves the plugin on "
+                 "WAIT\n";
+    assert(false);
+  }
+
+  server.sendResult("lyric", 1.25, 2.5, 7);
+  punch2pen::protocol::Header transcript{};
+  std::vector<char> transcriptPayload;
+  if (!readMessage(fd, transcript, transcriptPayload) ||
+      transcript.type != punch2pen::protocol::MessageType::TranscriptionResult) {
+    std::cerr << "transcript frame was not held until after HandshakeResponse\n";
+    assert(false);
+  }
+  punch2pen::protocol::TranscriptionResultHeader result{};
+  assert(transcriptPayload.size() >= sizeof(result));
+  std::memcpy(&result, transcriptPayload.data(), sizeof(result));
+  const std::string text(transcriptPayload.begin() + sizeof(result),
+                         transcriptPayload.end());
+  assert(result.textLength == 5);
+  assert(text == "lyric");
+
+  const std::string live = R"({"op":"status","live":1})";
+  punch2pen::protocol::Header liveHeader{};
+  liveHeader.type = punch2pen::protocol::MessageType::ProfileCommand;
+  liveHeader.length = static_cast<uint32_t>(live.size());
+  assert(sendAll(fd, &liveHeader, sizeof(liveHeader)));
+  assert(sendAll(fd, live.data(), live.size()));
+  bool gotCommand = false;
+  for (int i = 0; i < 50 && !gotCommand; ++i) {
+    gotCommand = server.hasPendingProfileCommand();
+    if (!gotCommand)
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+  assert(gotCommand);
+  assert(server.popProfileCommand() == live);
+
+  assert(sendHandshake(retry, punch2pen::protocol::kProtocolVersion));
+  uint32_t retryAccepted = 0;
+  assert(readHandshakeResponse(retry, retryAccepted));
+  assert(pluginWouldLeaveWait(true, retryAccepted));
+
+  ::close(retry);
+  ::close(fd);
+  server.stop();
+  std::cout << "[PASS] testHandshakeResponseRequiredBeforeLiveClient"
+            << std::endl;
+}
+
 void testAudioLengthMismatchDoesNotDesync() {
   constexpr int kPort = 17643;
   punch2pen::IPCServer server(kPort);
@@ -267,6 +499,7 @@ int main() {
   testEarlyTranscriptDoesNotPoisonHandshake();
   testMessageBeforeHandshakeDoesNotDropClient();
   testAudioLengthMismatchDoesNotDesync();
+  testHandshakeResponseRequiredBeforeLiveClient();
   std::cout << "All IPC handshake tests passed!" << std::endl;
   return 0;
 }
