@@ -8,6 +8,10 @@ Sample 48000*4 is 192000 samples (4 seconds at 48 kHz), not one bar.
 At 120 BPM in 4/4 a bar is 2 seconds (96000 samples), so that sample is
 the downbeat of bar 3. At 96 BPM a bar is 2.5 seconds (120000 samples),
 so the same sample is still inside bar 2.
+
+Sample 176400 at 120 BPM 4/4 is 4 seconds at 44100 Hz (bar 3). The same
+sample at 48000 Hz is about 3.675 seconds (bar 2). setHostClock must
+take that host rate or a 44.1 kHz session stamps the wrong bar.
 """
 
 from __future__ import annotations
@@ -170,7 +174,19 @@ if (barAt96 !== '2') {
   process.exit(1);
 }
 
-console.log('host-clock: PASS bpm ' + bpmText + ' time ' + timeText + ' bar120 ' + barAt120 + ' bar96 ' + barAt96);
+const sample441 = 176400;
+window.setHostClock(120, 4, 4, 0, 44100);
+window.appendWord('at-44100', sample441, sample441 + 1000, 9);
+const barAt441 = lineBar(2);
+if (barAt441 !== '3') {
+  console.error(
+    'FAIL: sample ' + sample441 + ' at 120 BPM 4/4 and 44100 Hz should be bar 3, got ' +
+    JSON.stringify(barAt441)
+  );
+  process.exit(1);
+}
+
+console.log('host-clock: PASS bpm ' + bpmText + ' time ' + timeText + ' bar120 ' + barAt120 + ' bar96 ' + barAt96 + ' bar441 ' + barAt441);
 process.exit(0);
 """
 

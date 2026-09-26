@@ -16,7 +16,7 @@
         updatePlayhead(currentDAWSample)
         setConnectionStatus(connected)        // boolean
         updatePosition(bar, beat)             // ints
-        setHostClock(bpm, numerator, denominator, seconds)
+        setHostClock(bpm, numerator, denominator, seconds, sampleRate)
         setState(stateName)                   // disconnected|idle|recording|playback|correction
         resetTranscript()                     // clears all words (new take)
         showCorrection(originalWord, x, y)    // opens the correction sheet
@@ -765,12 +765,13 @@
       const BADGE_TEXT = { disconnected: 'WAIT', idle: 'IDLE', recording: 'REC', playback: 'PLAY' };
       const WORDS_PER_LINE = 8;
       const HOLD_SAMPLES = 36000;     // ≈0.75 s at 48 kHz: keep the last word lit after the take ends
-      const HOST_SAMPLE_RATE = 48000; // word samples and the preview share this clock
+      const HOST_SAMPLE_RATE = 48000; // static preview until the host clock arrives
 
-      // Host clock. 120 is only the readout until setHostClock arrives.
+      // Host clock. 120 and 48000 are only the readout until setHostClock arrives.
       let hostBpm = 120;
       let hostSigNum = 4;
       let hostSigDenom = 4;
+      let hostSampleRate = HOST_SAMPLE_RATE;
 
       // ────────────────────────────────────────────────────────
       // Native bridge (JS → C++). The JUCE backend can appear after this
@@ -882,24 +883,29 @@
         if (hostTimeEl) hostTimeEl.textContent = formatHostTime(seconds);
       }
 
-      // Host tempo and timeline. Replaces the preview's 120 once the bridge speaks.
-      // No typed BPM, no invented frame rate: time is HH:MM:SS.mmm.
-      function setHostClock(bpm, numerator, denominator, seconds) {
+      // Host tempo, timeline, and sample rate. Replaces the preview's 120 and
+      // 48000 once the bridge speaks. A missing or non-positive rate keeps the
+      // current clock. No typed BPM, no invented frame rate: time is HH:MM:SS.mmm.
+      function setHostClock(bpm, numerator, denominator, seconds, sampleRate) {
         const nextBpm = Number(bpm);
         if (Number.isFinite(nextBpm) && nextBpm > 0) hostBpm = nextBpm;
         const num = Math.floor(Number(numerator));
         const den = Math.floor(Number(denominator));
         if (Number.isFinite(num) && num >= 1) hostSigNum = num;
         if (Number.isFinite(den) && den >= 1) hostSigDenom = den;
+        const rate = Number(sampleRate);
+        if (Number.isFinite(rate) && rate > 0) hostSampleRate = rate;
         renderHostClock(seconds);
       }
 
-      // Sung bar from this word's sample, the host BPM, and the time signature.
+      // Sung bar from this word's sample, the host BPM, the time signature,
+      // and the host sample rate. Word samples are host-rate DAW samples.
       function barForSample(sample) {
         const bpm = hostBpm > 0 ? hostBpm : 120;
         const num = hostSigNum >= 1 ? hostSigNum : 4;
         const den = hostSigDenom >= 1 ? hostSigDenom : 4;
-        const ppq = (Number(sample) / HOST_SAMPLE_RATE) * (bpm / 60);
+        const rate = hostSampleRate > 0 ? hostSampleRate : HOST_SAMPLE_RATE;
+        const ppq = (Number(sample) / rate) * (bpm / 60);
         const ppqPerBar = num * (4 / den);
         if (!(ppqPerBar > 0)) return 1;
         return Math.floor(Math.max(0, ppq) / ppqPerBar) + 1;

@@ -9,9 +9,12 @@ namespace {
 
 // Sung bar from a word's own sample position, the host BPM, and the
 // time signature. Quarter-note PPQ matches getTransportPosition().
-// Sample positions on the receipt are 48 kHz, the rate the page uses.
-int barForWordSample(double sample, double bpm, int numerator, int denominator) {
-  constexpr double sampleRate = 48000.0;
+// startSample is in host-rate DAW samples. A non-positive rate keeps
+// the 48 kHz preview clock.
+int barForWordSample(double sample, double bpm, int numerator, int denominator,
+                     double sampleRate) {
+  if (!(sampleRate > 0.0))
+    sampleRate = 48000.0;
   if (!(bpm > 0.0))
     bpm = 120.0;
   const int num = numerator > 0 ? numerator : 4;
@@ -153,7 +156,8 @@ void WebViewEditor::timerCallback() {
 
   jsUpdatePlayhead(audioProcessor.getHostDawSampleTime());
   jsSetHostClock(transport.bpm, transport.timeSigNum, transport.timeSigDenom,
-                 audioProcessor.getHostTimeSeconds());
+                 audioProcessor.getHostTimeSeconds(),
+                 audioProcessor.getSampleRate());
 
   if (transport.bar != lastBar || transport.beat != lastBeat) {
     jsUpdatePosition(transport.bar, transport.beat);
@@ -201,7 +205,8 @@ void WebViewEditor::onTranscriptionReceived(const std::string &text,
     }
     const auto clock = safeThis->audioProcessor.getTransportPosition();
     const int bar = barForWordSample(startTime, clock.bpm, clock.timeSigNum,
-                                     clock.timeSigDenom);
+                                     clock.timeSigDenom,
+                                     safeThis->audioProcessor.getSampleRate());
     safeThis->jsAppendWord(juce::String(text), startTime, endTime, bar);
   });
 }
@@ -268,13 +273,17 @@ void WebViewEditor::jsUpdatePosition(int bar, int beat) {
 }
 
 void WebViewEditor::jsSetHostClock(double bpm, int numerator, int denominator,
-                                   double seconds) {
+                                   double seconds, double sampleRate) {
   // Every timer tick. Transient: do not buffer 30 Hz clock updates.
+  // A non-positive processor rate keeps the page's 48 kHz preview clock.
+  if (!(sampleRate > 0.0))
+    sampleRate = 48000.0;
   runJs("window.setHostClock("
         + juce::String(bpm) + ","
         + juce::String(numerator) + ","
         + juce::String(denominator) + ","
-        + juce::String(seconds) + ");",
+        + juce::String(seconds) + ","
+        + juce::String(sampleRate) + ");",
         /*queueIfPending=*/false);
 }
 
