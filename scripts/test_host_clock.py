@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Logic-free host-clock test for the Studio Receipt page.
 
-The preview paints BPM 120 until the bridge speaks. setHostClock must replace
-that readout, and a word's bar must come from its sample position plus the
-host BPM and time signature — not from a bar number passed at arrival, and
-not from the preview's 120.
+Fails if setHostClock is missing (the page before the host clock landed).
+setHostClock(96, 4, 4, 10) must replace the preview BPM of 120.
+
+Sample 48000*4 is 192000 samples (4 seconds at 48 kHz), not one bar.
+At 120 BPM in 4/4 a bar is 2 seconds (96000 samples), so that sample is
+the downbeat of bar 3. At 96 BPM a bar is 2.5 seconds (120000 samples),
+so the same sample is still inside bar 2.
 """
 
 from __future__ import annotations
@@ -123,39 +126,51 @@ try {
 }
 
 if (typeof window.setHostClock !== 'function' || typeof window.appendWord !== 'function') {
-  console.error('FAIL: setHostClock or appendWord is not on the page');
+  console.error('FAIL: setHostClock does not exist on the page');
   process.exit(1);
 }
 
-// 100000 samples at 48 kHz. 120 BPM 4/4 is bar 2; 90 BPM 4/4 is bar 1.
-const sample = 100000;
-const hostBpm = 90;
-window.setHostClock(hostBpm, 4, 4, 12.5);
+const sample = 48000 * 4;
+const inner = byId('transcript-inner');
 
-const bpmText = String(byId('host-bpm').textContent || '').trim();
-if (bpmText === '120' || bpmText !== '90') {
-  console.error('FAIL: host BPM stayed at the preview 120 after setHostClock(90), got ' + JSON.stringify(bpmText));
-  process.exit(1);
+function lineBar(index) {
+  const line = inner.children[index];
+  return line && line.dataset ? String(line.dataset.bar) : '';
 }
 
-const timeText = String(byId('host-time').textContent || '').trim();
-if (timeText !== '00:00:12.500') {
-  console.error('FAIL: host time was not HH:MM:SS.mmm from host seconds, got ' + JSON.stringify(timeText));
-  process.exit(1);
-}
-
-window.appendWord('sung', sample, sample + 8000, 9);
-const line = byId('transcript-inner').children[0];
-const bar = line && line.dataset ? String(line.dataset.bar) : '';
-if (bar !== '1') {
+window.setHostClock(120, 4, 4, 0);
+window.appendWord('at-120', sample, sample + 1000, 9);
+const barAt120 = lineBar(0);
+if (barAt120 !== '3') {
   console.error(
-    'FAIL: word bar ignored host tempo ' + hostBpm +
-    ' (expected 1, preview-120 would be 2, arrival bar was 9), got ' + JSON.stringify(bar)
+    'FAIL: sample ' + sample + ' at 120 BPM 4/4 should be bar 3, got ' + JSON.stringify(barAt120)
   );
   process.exit(1);
 }
 
-console.log('host-clock: PASS bpm ' + bpmText + ' time ' + timeText + ' bar ' + bar);
+window.setHostClock(96, 4, 4, 10);
+const bpmText = String(byId('host-bpm').textContent || '').trim();
+if (bpmText === '120' || bpmText !== '96') {
+  console.error('FAIL: displayed BPM is still 120 after setHostClock(96, 4, 4, 10), got ' + JSON.stringify(bpmText));
+  process.exit(1);
+}
+const timeText = String(byId('host-time').textContent || '').trim();
+if (timeText !== '00:00:10.000') {
+  console.error('FAIL: host time was not HH:MM:SS.mmm for 10 seconds, got ' + JSON.stringify(timeText));
+  process.exit(1);
+}
+
+window.appendWord('at-96', sample, sample + 1000, 9);
+const barAt96 = lineBar(1);
+if (barAt96 !== '2') {
+  console.error(
+    'FAIL: sample ' + sample + ' at 96 BPM 4/4 should be bar 2 (a bar is longer than at 120), got ' +
+    JSON.stringify(barAt96)
+  );
+  process.exit(1);
+}
+
+console.log('host-clock: PASS bpm ' + bpmText + ' time ' + timeText + ' bar120 ' + barAt120 + ' bar96 ' + barAt96);
 process.exit(0);
 """
 
