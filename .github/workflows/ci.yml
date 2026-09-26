@@ -71,13 +71,14 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -DPUNCH2PEN_BUILD_PLUGIN=OFF
       - name: Build test targets
-        run: cmake --build build --target dictionaryTest accountManagerTest cloudProfileClientTest protocolSerializationTest openAIJsonTest transcriptionCoordinatorTest transcriptTimingTest -j4
+        run: cmake --build build --target dictionaryTest accountManagerTest cloudProfileClientTest protocolSerializationTest ipcServerHandshakeTest openAIJsonTest transcriptionCoordinatorTest transcriptTimingTest -j4
       - name: Run tests
         run: |
           ./build/bin/dictionaryTest
           ./build/bin/accountManagerTest
           ./build/bin/cloudProfileClientTest
           ./build/bin/protocolSerializationTest
+          ./build/bin/ipcServerHandshakeTest
           ./build/bin/openAIJsonTest
           ./build/bin/transcriptionCoordinatorTest
           ./build/bin/transcriptTimingTest

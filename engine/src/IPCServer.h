@@ -48,14 +48,22 @@ public:
 private:
   void acceptLoop();
   void clientHandler(int clientSocket);
+  // False only when the socket can no longer be read or written. A rejected
+  // version leaves the connection up so a later Handshake can still finish.
+  bool readAndAcknowledgeHandshake(int clientSocket, uint32_t payloadLength,
+                                   bool &handshook);
   bool sendHandshakeResponse(int clientSocket, uint32_t version,
                              uint32_t accepted);
   void sendJsonMessage(int clientSocket, uint32_t type,
                        const std::string &json);
 
   int serverSocket = -1;
+  // Latest client that finished Handshake. Transcripts must not be written
+  // here at TCP accept — that races the HandshakeResponse and the plugin
+  // stays on WAIT.
   int activeClientSocket = -1;
   std::vector<int> handshakenClients;
+  std::vector<int> liveSockets;
   int port;
   std::atomic<bool> running{false};
   std::thread acceptThread;

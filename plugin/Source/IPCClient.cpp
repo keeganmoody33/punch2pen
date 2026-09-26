@@ -77,34 +77,46 @@ void IPCClient::run() {
       }
     }
 
-    // Read loop (non-blocking if possible or short timeout)
-    if (socket.waitUntilReady(true, 10)) {
-      protocol::Header header;
-      int bytesRead = socket.read(&header, sizeof(header), false);
-
-      if (bytesRead == sizeof(header)) {
-        if (header.type == protocol::MessageType::TranscriptionResult) {
-          protocol::TranscriptionResultHeader resultHeader;
-          if (socket.read(&resultHeader, sizeof(resultHeader), false) ==
-              sizeof(resultHeader)) {
-            juce::MemoryBlock textData(resultHeader.textLength + 1);
-            if (socket.read(textData.getData(), (int)resultHeader.textLength,
-                            false) == (int)resultHeader.textLength) {
-              ((char *)textData.getData())[resultHeader.textLength] = 0;
-              std::string text((char *)textData.getData());
-
-              juce::ScopedLock lock(listenerLock);
-              for (auto *l : listeners)
-                l->onTranscriptionReceived(text, resultHeader.startTime,
-                                           resultHeader.endTime,
-                                           resultHeader.captureEpoch);
-            }
+    const int ready = socket.waitUntilReady(true, 10);
+    if (ready < 0) {
+      connected = false;
+      socket.close();
+      juce::ScopedLock lock(listenerLock);
+      for (auto *l : listeners)
+        l->onStatusChanged(false);
+    } else if (ready > 0) {
+      bool ok = true;
+      protocol::Header header{};
+      if (!readExact(socket, &header, (int)sizeof(header))) {
+        ok = false;
+      } else if (header.type == protocol::MessageType::TranscriptionResult) {
+        protocol::TranscriptionResultHeader resultHeader{};
+        if (!readExact(socket, &resultHeader, (int)sizeof(resultHeader)) ||
+            resultHeader.textLength > protocol::kMaxJsonPayloadBytes ||
+            sizeof(resultHeader) + resultHeader.textLength != header.length) {
+          ok = false;
+        } else {
+          std::string text(resultHeader.textLength, '\0');
+          if (resultHeader.textLength > 0 &&
+              !readExact(socket, text.data(), (int)resultHeader.textLength)) {
+            ok = false;
+          } else {
+            juce::ScopedLock lock(listenerLock);
+            for (auto *l : listeners)
+              l->onTranscriptionReceived(text, resultHeader.startTime,
+                                         resultHeader.endTime,
+                                         resultHeader.captureEpoch);
           }
-        } else if (header.type == protocol::MessageType::ProfileStatus &&
-                   header.length > 0 &&
-                   header.length <= protocol::kMaxJsonPayloadBytes) {
+        }
+      } else if (header.type == protocol::MessageType::ProfileStatus) {
+        if (header.length == 0 ||
+            header.length > protocol::kMaxJsonPayloadBytes) {
+          ok = false;
+        } else {
           std::string json(header.length, '\0');
-          if (readExact(socket, json.data(), (int)header.length)) {
+          if (!readExact(socket, json.data(), (int)header.length)) {
+            ok = false;
+          } else {
             {
               juce::ScopedLock lock(profileStatusLock);
               lastProfileStatusJson = json;
@@ -112,17 +124,18 @@ void IPCClient::run() {
             juce::ScopedLock lock(listenerLock);
             for (auto *l : listeners)
               l->onProfileStatus(json);
-          } else {
-            connected = false;
-          }
-        } else {
-          if (header.length > 0) {
-            juce::MemoryBlock skip(header.length);
-            socket.read(skip.getData(), (int)header.length, false);
           }
         }
-      } else if (bytesRead < 0) {
+      } else if (header.length > protocol::kMaxJsonPayloadBytes) {
+        ok = false;
+      } else if (header.length > 0) {
+        std::vector<char> skip(header.length);
+        ok = readExact(socket, skip.data(), (int)header.length);
+      }
+
+      if (!ok) {
         connected = false;
+        socket.close();
         juce::ScopedLock lock(listenerLock);
         for (auto *l : listeners)
           l->onStatusChanged(false);
@@ -203,10 +216,10 @@ void IPCClient::attemptConnection() {
                &disableSigPipe, sizeof(disableSigPipe));
 #endif
     if (!completeHandshake()) {
+      // TCP already reached the listening engine. Starting another
+      // punch2penEngine only fails to bind 7483 and leaves this editor on WAIT.
       socket.close();
       connected = false;
-      if (autoLaunchEngine)
-        launchEngine();
       return;
     }
     connected = true;
@@ -238,22 +251,45 @@ bool IPCClient::completeHandshake() {
   if (!writeExact(socket, &handshake, sizeof(handshake)))
     return false;
 
-  if (!socket.waitUntilReady(true, 2000))
-    return false;
+  const uint32_t startedAt = juce::Time::getMillisecondCounter();
+  while (!threadShouldExit()) {
+    const uint32_t elapsed = juce::Time::getMillisecondCounter() - startedAt;
+    if (elapsed >= 2000)
+      return false;
 
-  protocol::Header reply{};
-  if (!readExact(socket, &reply, sizeof(reply)))
-    return false;
-  if (reply.type != protocol::MessageType::HandshakeResponse ||
-      reply.length != (uint32_t)sizeof(protocol::HandshakeResponse))
-    return false;
+    const int ready = socket.waitUntilReady(true, (int)(2000 - elapsed));
+    if (ready <= 0)
+      return false;
 
-  protocol::HandshakeResponse response{};
-  if (!readExact(socket, &response, sizeof(response)))
-    return false;
+    protocol::Header reply{};
+    if (!readExact(socket, &reply, (int)sizeof(reply)))
+      return false;
 
-  return response.accepted != 0 &&
-         response.version == protocol::kProtocolVersion;
+    if (reply.length > protocol::kMaxJsonPayloadBytes)
+      return false;
+
+    if (reply.type == protocol::MessageType::HandshakeResponse) {
+      if (reply.length != (uint32_t)sizeof(protocol::HandshakeResponse)) {
+        if (reply.length > 0) {
+          std::vector<char> skip(reply.length);
+          readExact(socket, skip.data(), (int)reply.length);
+        }
+        return false;
+      }
+      protocol::HandshakeResponse response{};
+      if (!readExact(socket, &response, (int)sizeof(response)))
+        return false;
+      return response.accepted != 0 &&
+             response.version == protocol::kProtocolVersion;
+    }
+
+    if (reply.length > 0) {
+      std::vector<char> skip(reply.length);
+      if (!readExact(socket, skip.data(), (int)reply.length))
+        return false;
+    }
+  }
+  return false;
 }
 
 namespace {
