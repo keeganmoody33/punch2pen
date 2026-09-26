@@ -78,7 +78,7 @@ jobs:
           ./build/bin/accountManagerTest
           ./build/bin/cloudProfileClientTest
           ./build/bin/protocolSerializationTest
-          ./build/bin/ipcServerHandshakeTest
+          perl -e 'alarm 30; exec @ARGV' ./build/bin/ipcServerHandshakeTest
           python3 scripts/verify_engine.py selftest
           python3 scripts/test_page_ready.py
           python3 scripts/test_host_clock.py
