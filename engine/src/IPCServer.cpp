@@ -4,7 +4,6 @@
 #include <cerrno>
 #include <cstring>
 #include <iostream>
-#include <sys/time.h>
 
 namespace punch2pen {
 
@@ -219,11 +218,6 @@ void IPCServer::acceptLoop() {
 
     if (clientSocket >= 0) {
       suppressClientSigPipe(clientSocket);
-      timeval recvBudget{};
-      recvBudget.tv_sec = 2;
-      recvBudget.tv_usec = 0;
-      setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, &recvBudget,
-                 sizeof(recvBudget));
       std::cout << "Client connected!" << std::endl;
       std::lock_guard<std::mutex> lock(clientLock);
       liveSockets.push_back(clientSocket);
