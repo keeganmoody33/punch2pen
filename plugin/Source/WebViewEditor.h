@@ -21,6 +21,7 @@ namespace punch2pen {
       updatePlayhead(currentDAWSample)
       setConnectionStatus(connected)
       updatePosition(bar, beat)
+      setHostClock(bpm, numerator, denominator, seconds, sampleRate)
       setState(stateName)
       setActiveProfile({name, kind, detail})  // kind: 'local' | 'pro' | 'seat'
       setProfileStatus(jsonString)   // optional; raw engine ProfileStatus
@@ -68,6 +69,8 @@ private:
                     double startSample, double endSample, int bar);
   void jsUpdatePlayhead(double sample);
   void jsUpdatePosition(int bar, int beat);
+  void jsSetHostClock(double bpm, int numerator, int denominator,
+                      double seconds, double sampleRate);
   void jsSetConnectionStatus(bool connected);
   void jsSetState(const juce::String &state);
   void jsSetProfileStatus(const juce::String &json);
@@ -78,6 +81,22 @@ private:
   juce::var nativeOnCorrectionCancelled(const juce::Array<juce::var> &args);
   juce::var nativeOnReady(const juce::Array<juce::var> &args);
   juce::var nativeProfileCommand(const juce::Array<juce::var> &args);
+
+  // WebBrowserComponent::pageFinishedLoading. The document can finish
+  // before the page calls onReady; apply the live socket then too.
+  class DocumentBrowser : public juce::WebBrowserComponent {
+  public:
+    DocumentBrowser(WebViewEditor &ownerIn,
+                    juce::WebBrowserComponent::Options options)
+        : juce::WebBrowserComponent(options), owner(ownerIn) {}
+
+    void pageFinishedLoading(const juce::String &url) override;
+
+  private:
+    WebViewEditor &owner;
+  };
+
+  void pageFinishedLoading(const juce::String &url);
 
   Punch2PenAudioProcessor &audioProcessor;
   std::unique_ptr<juce::WebBrowserComponent> webView;

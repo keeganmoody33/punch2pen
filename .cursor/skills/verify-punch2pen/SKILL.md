@@ -73,7 +73,8 @@ Harness: `control-punch2pen`. Read `features/README.md`, then the feature file. 
 
 Stable handles (do not use click coordinates):
 
-- Engine stdout: `Engine ready.`, `Client connected!`, `Received Correction:`, `Applied correction. Vocabulary terms:`
+- Engine stdout: `Engine ready.`, `Received Correction:`, `Applied correction. Vocabulary terms:`
+- `Client connected!` is TCP accept only. The plugin stays on WAIT until a HandshakeResponse frame; do not treat accept as a live client. `./build/bin/ipcServerHandshakeTest` fails that case without Logic.
 - Listening port: `lsof` on `127.0.0.1:7483` (connect probes are real engine clients; avoid them for doctor)
 - Wire: Correction message type **5**, little-endian headers matching `shared/Protocol.h`
 - Files: free tier writes **nothing** (session dictionary). Paid tier: `$VERIFY_HOME/.punch2pen/account.json` (0600 session) and `profiles/<id>.json` dictionary caches

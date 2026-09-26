@@ -16,6 +16,7 @@
         updatePlayhead(currentDAWSample)
         setConnectionStatus(connected)        // boolean
         updatePosition(bar, beat)             // ints
+        setHostClock(bpm, numerator, denominator, seconds, sampleRate)
         setState(stateName)                   // disconnected|idle|recording|playback|correction
         resetTranscript()                     // clears all words (new take)
         showCorrection(originalWord, x, y)    // opens the correction sheet
@@ -39,6 +40,7 @@
     Element IDs the bridge / verify harness bind to:
       #header-bar  #app-title  #profile-pill  #status-badge
       #position-display  #position-text  (.bar-num .beat-num)
+      #host-clock  #host-bpm  #host-time
       #connection-banner
       #transcript-container  #transcript-scroll  #transcript-inner
       #return-to-live
@@ -327,6 +329,13 @@
       white-space: nowrap;
     }
     #position-text .bar-num, #position-text .beat-num { color: var(--ink); }
+    #host-clock {
+      font-weight: 700; font-size: 11px; letter-spacing: 0.08em;
+      color: var(--ink-3);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    #host-clock .host-bpm, #host-clock .host-time { color: var(--ink); }
     #sync-indicator {
       margin-left: auto;
       display: none; align-items: center; gap: 6px;
@@ -668,6 +677,10 @@
     <span id="position-text">
       BAR <span class="bar-num">1</span> · BEAT <span class="beat-num">1</span>
     </span>
+    <span id="host-clock">
+      <span id="host-bpm" class="host-bpm">120</span> BPM
+      · <span id="host-time" class="host-time">00:00:00.000</span>
+    </span>
     <span id="sync-indicator">LIVE</span>
   </div>
 
@@ -735,6 +748,8 @@
       const badge       = document.getElementById('status-badge');
       const barNum      = document.querySelector('#position-text .bar-num');
       const beatNum     = document.querySelector('#position-text .beat-num');
+      const hostBpmEl   = document.getElementById('host-bpm');
+      const hostTimeEl  = document.getElementById('host-time');
       const syncInd     = document.getElementById('sync-indicator');
       const container   = document.getElementById('transcript-container');
       const scroller    = document.getElementById('transcript-scroll');
@@ -750,21 +765,48 @@
       const BADGE_TEXT = { disconnected: 'WAIT', idle: 'IDLE', recording: 'REC', playback: 'PLAY' };
       const WORDS_PER_LINE = 8;
       const HOLD_SAMPLES = 36000;     // ≈0.75 s at 48 kHz: keep the last word lit after the take ends
+      const HOST_SAMPLE_RATE = 48000; // static preview until the host clock arrives
+
+      // Host clock. 120 and 48000 are only the readout until setHostClock arrives.
+      let hostBpm = 120;
+      let hostSigNum = 4;
+      let hostSigDenom = 4;
+      let hostSampleRate = HOST_SAMPLE_RATE;
 
       // ────────────────────────────────────────────────────────
-      // Native bridge (JS → C++). No-ops in a plain browser.
+      // Native bridge (JS → C++). The JUCE backend can appear after this
+      // script parses; read it on every call instead of capturing once.
       // ────────────────────────────────────────────────────────
-      const backend = window.__JUCE__ && window.__JUCE__.backend ? window.__JUCE__.backend : null;
-      const nativeBridge = backend ? {
-        onWordClicked:         (...a) => backend.onWordClicked(...a),
-        submitCorrection:      (...a) => backend.submitCorrection(...a),
-        onCorrectionCancelled: (...a) => backend.onCorrectionCancelled(...a),
-        onReady:               (...a) => backend.onReady(...a),
+      function juceBackend() {
+        const juce = window.__JUCE__;
+        return juce && juce.backend ? juce.backend : null;
+      }
+      const nativeBridge = {
+        get onWordClicked() {
+          const backend = juceBackend();
+          return backend ? (...a) => backend.onWordClicked(...a) : undefined;
+        },
+        get submitCorrection() {
+          const backend = juceBackend();
+          return backend ? (...a) => backend.submitCorrection(...a) : undefined;
+        },
+        get onCorrectionCancelled() {
+          const backend = juceBackend();
+          return backend ? (...a) => backend.onCorrectionCancelled(...a) : undefined;
+        },
+        get onReady() {
+          const backend = juceBackend();
+          return backend ? (...a) => backend.onReady(...a) : undefined;
+        },
         // Profile ops travel to the engine as one JSON string:
         //   {op:'status'|'login_start'|'login_verify'|'set_active'|'logout'|'refresh', ...}
-        profileCommand:        (...a) => backend.profileCommand(...a),
-      } : {};
-      if (!backend) console.warn('[punch2pen] window.__JUCE__.backend unavailable — native calls are no-ops');
+        get profileCommand() {
+          const backend = juceBackend();
+          return backend ? (...a) => backend.profileCommand(...a) : undefined;
+        },
+      };
+      if (!juceBackend())
+        console.warn('[punch2pen] window.__JUCE__.backend unavailable — retrying onReady');
       window.punch2pen = nativeBridge;
 
       // ────────────────────────────────────────────────────────
@@ -819,11 +861,62 @@
         beatNum.textContent = String(beat);
       }
 
+      function formatHostTime(seconds) {
+        const totalMs = Math.max(0, Math.round((Number(seconds) || 0) * 1000));
+        const ms = totalMs % 1000;
+        const totalSec = Math.floor(totalMs / 1000);
+        const s = totalSec % 60;
+        const m = Math.floor(totalSec / 60) % 60;
+        const h = Math.floor(totalSec / 3600);
+        const pad = (n, w) => String(n).padStart(w, '0');
+        return pad(h, 2) + ':' + pad(m, 2) + ':' + pad(s, 2) + '.' + pad(ms, 3);
+      }
+
+      function formatHostBpm(bpm) {
+        const n = Math.round(Number(bpm) * 100) / 100;
+        if (!Number.isFinite(n) || n <= 0) return '';
+        return String(n);
+      }
+
+      function renderHostClock(seconds) {
+        if (hostBpmEl) hostBpmEl.textContent = formatHostBpm(hostBpm);
+        if (hostTimeEl) hostTimeEl.textContent = formatHostTime(seconds);
+      }
+
+      // Host tempo, timeline, and sample rate. Replaces the preview's 120 and
+      // 48000 once the bridge speaks. A missing or non-positive rate keeps the
+      // current clock. No typed BPM, no invented frame rate: time is HH:MM:SS.mmm.
+      function setHostClock(bpm, numerator, denominator, seconds, sampleRate) {
+        const nextBpm = Number(bpm);
+        if (Number.isFinite(nextBpm) && nextBpm > 0) hostBpm = nextBpm;
+        const num = Math.floor(Number(numerator));
+        const den = Math.floor(Number(denominator));
+        if (Number.isFinite(num) && num >= 1) hostSigNum = num;
+        if (Number.isFinite(den) && den >= 1) hostSigDenom = den;
+        const rate = Number(sampleRate);
+        if (Number.isFinite(rate) && rate > 0) hostSampleRate = rate;
+        renderHostClock(seconds);
+      }
+
+      // Sung bar from this word's sample, the host BPM, the time signature,
+      // and the host sample rate. Word samples are host-rate DAW samples.
+      function barForSample(sample) {
+        const bpm = hostBpm > 0 ? hostBpm : 120;
+        const num = hostSigNum >= 1 ? hostSigNum : 4;
+        const den = hostSigDenom >= 1 ? hostSigDenom : 4;
+        const rate = hostSampleRate > 0 ? hostSampleRate : HOST_SAMPLE_RATE;
+        const ppq = (Number(sample) / rate) * (bpm / 60);
+        const ppqPerBar = num * (4 / den);
+        if (!(ppqPerBar > 0)) return 1;
+        return Math.floor(Math.max(0, ppq) / ppqPerBar) + 1;
+      }
+
       // ────────────────────────────────────────────────────────
       // Transcript model — one .lyric-line per bar (max 8 words)
       // ────────────────────────────────────────────────────────
       function appendWord(text, startSample, endSample, barNumber) {
-        const bar = Number(barNumber);
+        void barNumber; // arrival bar is not the sung bar
+        const bar = barForSample(startSample);
         let line = lines[lines.length - 1];
         const startNewLine =
           !line ||
@@ -833,7 +926,7 @@
         if (startNewLine) {
           const el = document.createElement('div');
           el.className = 'lyric-line line-upcoming';
-          el.dataset.bar = String(barNumber);
+          el.dataset.bar = String(bar);
           inner.appendChild(el);
           line = { el, bar, words: [] };
           lines.push(line);
@@ -1448,6 +1541,7 @@
       window.updatePlayhead      = updatePlayhead;
       window.setConnectionStatus = setConnectionStatus;
       window.updatePosition      = updatePosition;
+      window.setHostClock        = setHostClock;
       window.setState            = setState;
       window.resetTranscript     = resetTranscript;
       window.showCorrection      = showCorrection;
@@ -1462,7 +1556,7 @@
       // Browser-only preview (never runs inside the plugin)
       // ────────────────────────────────────────────────────────
       const params = new URLSearchParams(location.search);
-      const preview = backend ? null : params.get('preview');
+      const preview = juceBackend() ? null : params.get('preview');
       if (preview) {
         const SR = 48000, BPM = 120, SAMPLES_PER_BAR = SR * 60 / BPM * 4;
         const verse = [
@@ -1594,7 +1688,24 @@
         }
       }
 
-      if (nativeBridge.onReady) nativeBridge.onReady();
+      // onReady is what lets C++ push setConnectionStatus. If the backend
+      // object is missing at parse time, keep trying until it exists, then
+      // call onReady once so the receipt can leave WAIT.
+      let onReadySent = false;
+      function callOnReady() {
+        if (onReadySent) return true;
+        const backend = juceBackend();
+        if (!backend || !backend.onReady) return false;
+        onReadySent = true;
+        backend.onReady();
+        return true;
+      }
+      if (!callOnReady()) {
+        const retryOnReady = () => {
+          if (!callOnReady()) setTimeout(retryOnReady, 100);
+        };
+        setTimeout(retryOnReady, 100);
+      }
     })();
   </script>
 </body>
