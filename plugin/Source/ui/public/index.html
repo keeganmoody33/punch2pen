@@ -752,19 +752,39 @@
       const HOLD_SAMPLES = 36000;     // ≈0.75 s at 48 kHz: keep the last word lit after the take ends
 
       // ────────────────────────────────────────────────────────
-      // Native bridge (JS → C++). No-ops in a plain browser.
+      // Native bridge (JS → C++). The JUCE backend can appear after this
+      // script parses; read it on every call instead of capturing once.
       // ────────────────────────────────────────────────────────
-      const backend = window.__JUCE__ && window.__JUCE__.backend ? window.__JUCE__.backend : null;
-      const nativeBridge = backend ? {
-        onWordClicked:         (...a) => backend.onWordClicked(...a),
-        submitCorrection:      (...a) => backend.submitCorrection(...a),
-        onCorrectionCancelled: (...a) => backend.onCorrectionCancelled(...a),
-        onReady:               (...a) => backend.onReady(...a),
+      function juceBackend() {
+        const juce = window.__JUCE__;
+        return juce && juce.backend ? juce.backend : null;
+      }
+      const nativeBridge = {
+        get onWordClicked() {
+          const backend = juceBackend();
+          return backend ? (...a) => backend.onWordClicked(...a) : undefined;
+        },
+        get submitCorrection() {
+          const backend = juceBackend();
+          return backend ? (...a) => backend.submitCorrection(...a) : undefined;
+        },
+        get onCorrectionCancelled() {
+          const backend = juceBackend();
+          return backend ? (...a) => backend.onCorrectionCancelled(...a) : undefined;
+        },
+        get onReady() {
+          const backend = juceBackend();
+          return backend ? (...a) => backend.onReady(...a) : undefined;
+        },
         // Profile ops travel to the engine as one JSON string:
         //   {op:'status'|'login_start'|'login_verify'|'set_active'|'logout'|'refresh', ...}
-        profileCommand:        (...a) => backend.profileCommand(...a),
-      } : {};
-      if (!backend) console.warn('[punch2pen] window.__JUCE__.backend unavailable — native calls are no-ops');
+        get profileCommand() {
+          const backend = juceBackend();
+          return backend ? (...a) => backend.profileCommand(...a) : undefined;
+        },
+      };
+      if (!juceBackend())
+        console.warn('[punch2pen] window.__JUCE__.backend unavailable — retrying onReady');
       window.punch2pen = nativeBridge;
 
       // ────────────────────────────────────────────────────────
@@ -1462,7 +1482,7 @@
       // Browser-only preview (never runs inside the plugin)
       // ────────────────────────────────────────────────────────
       const params = new URLSearchParams(location.search);
-      const preview = backend ? null : params.get('preview');
+      const preview = juceBackend() ? null : params.get('preview');
       if (preview) {
         const SR = 48000, BPM = 120, SAMPLES_PER_BAR = SR * 60 / BPM * 4;
         const verse = [
@@ -1594,7 +1614,24 @@
         }
       }
 
-      if (nativeBridge.onReady) nativeBridge.onReady();
+      // onReady is what lets C++ push setConnectionStatus. If the backend
+      // object is missing at parse time, keep trying until it exists, then
+      // call onReady once so the receipt can leave WAIT.
+      let onReadySent = false;
+      function callOnReady() {
+        if (onReadySent) return true;
+        const backend = juceBackend();
+        if (!backend || !backend.onReady) return false;
+        onReadySent = true;
+        backend.onReady();
+        return true;
+      }
+      if (!callOnReady()) {
+        const retryOnReady = () => {
+          if (!callOnReady()) setTimeout(retryOnReady, 100);
+        };
+        setTimeout(retryOnReady, 100);
+      }
     })();
   </script>
 </body>

@@ -79,6 +79,22 @@ private:
   juce::var nativeOnReady(const juce::Array<juce::var> &args);
   juce::var nativeProfileCommand(const juce::Array<juce::var> &args);
 
+  // WebBrowserComponent::pageFinishedLoading. The document can finish
+  // before the page calls onReady; apply the live socket then too.
+  class DocumentBrowser : public juce::WebBrowserComponent {
+  public:
+    DocumentBrowser(WebViewEditor &ownerIn,
+                    juce::WebBrowserComponent::Options options)
+        : juce::WebBrowserComponent(options), owner(ownerIn) {}
+
+    void pageFinishedLoading(const juce::String &url) override;
+
+  private:
+    WebViewEditor &owner;
+  };
+
+  void pageFinishedLoading(const juce::String &url);
+
   Punch2PenAudioProcessor &audioProcessor;
   std::unique_ptr<juce::WebBrowserComponent> webView;
 

@@ -94,7 +94,7 @@ WebViewEditor::WebViewEditor(Punch2PenAudioProcessor &p)
                         .withBackgroundColour(juce::Colour(0xff1E1E1E)));
 #endif
 
-  webView = std::make_unique<juce::WebBrowserComponent>(options);
+  webView = std::make_unique<DocumentBrowser>(*this, options);
   addAndMakeVisible(*webView);
   webView->setBounds(getLocalBounds());
 
@@ -319,13 +319,37 @@ void WebViewEditor::jsSetProfileStatus(const juce::String &json) {
 }
 
 // ── Native callbacks from the page ──────────────────────────────────────────
+void WebViewEditor::DocumentBrowser::pageFinishedLoading(
+    const juce::String &url) {
+  juce::WebBrowserComponent::pageFinishedLoading(url);
+  owner.pageFinishedLoading(url);
+}
+
+void WebViewEditor::pageFinishedLoading(const juce::String &url) {
+  juce::ignoreUnused(url);
+  if (!pageReady)
+    pageReady = true;
+  for (const auto &js : queuedJs) {
+    if (webView)
+      webView->evaluateJavascript(js);
+  }
+  queuedJs.clear();
+
+  auto *client = audioProcessor.getIPCClient();
+  if (client != nullptr)
+    lastConnected = client->isConnected();
+  jsSetConnectionStatus(lastConnected);
+}
+
 juce::var WebViewEditor::nativeOnReady(const juce::Array<juce::var> &) {
   pageReady = true;
   for (const auto &js : queuedJs) {
     if (webView) webView->evaluateJavascript(js);
   }
   queuedJs.clear();
-  // Push current connection state on first ready.
+  auto *client = audioProcessor.getIPCClient();
+  if (client != nullptr)
+    lastConnected = client->isConnected();
   jsSetConnectionStatus(lastConnected);
   return {};
 }
