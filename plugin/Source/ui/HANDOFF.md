@@ -37,7 +37,7 @@ Identity is untouched: **Dcta / P2pn / aufx**.
 | Region | ID | Height | Contents |
 |---|---|---|---|
 | Header | `#header-bar` | 44px | `[ PUNCH2PEN ]` wordmark (`#app-title`), **active-profile pill** (`#profile-pill`; opens the sign-in / seats popover), status badge (`#status-badge`: WAIT / IDLE / REC / PLAY) |
-| Transport strip | `#position-display` | 30px | `BAR n · BEAT n` (`#position-text` with `.bar-num` / `.beat-num`), `#sync-indicator` (LIVE / SCROLLED) |
+| Transport strip | `#position-display` | 30px | `BAR n · BEAT n` (`#position-text` with `.bar-num` / `.beat-num`), host BPM and `HH:MM:SS.mmm` (`#host-clock`, `#host-bpm`, `#host-time`), `#sync-indicator` (LIVE / SCROLLED) |
 | Connection banner | `#connection-banner` | auto | “Waiting for engine connection…” — disconnected only |
 | Transcript | `#transcript-container` | flex | `#transcript-scroll` (native scroller) → `#transcript-inner` → `.lyric-line` → `.lyric-word`; empty-state hints; fades; `#return-to-live`; docked `#correction-overlay` |
 | Status bar | `#status-bar` | 30px | `#status-text` (state copy and the non-modal upgrade nudge), `#logo-mark` (placeholder) |
@@ -100,6 +100,7 @@ window.appendWord(text, startSample, endSample, barNumber)
 window.updatePlayhead(currentDAWSample)
 window.setConnectionStatus(connected)        // boolean
 window.updatePosition(bar, beat)             // ints
+window.setHostClock(bpm, numerator, denominator, seconds)  // host clock; time is HH:MM:SS.mmm
 window.setState(stateName)                   // disconnected|idle|recording|playback|correction
 window.resetTranscript()                     // clears all words (new take)
 window.showCorrection(originalWord, x, y)    // x,y accepted; the sheet is docked
@@ -210,6 +211,7 @@ Neither runs inside the plugin (`window.__JUCE__.backend` present).
 
 1. **Logo asset.** `#logo-mark` is still the placeholder. Drop the real asset into
    `Source/ui/public/assets/` and extend the resource provider.
-2. **Bar labels per line.** `data-bar` is the arrival bar from the C++ timer, not
-   the sung bar; do not surface it as a gutter number until real tempo mapping exists.
+2. **Bar labels per line.** `data-bar` is the sung bar: the word's sample
+   position, the host BPM, and the time signature from `setHostClock`. It is
+   not a gutter number. The readout is not a typed BPM and does not invent a frame rate.
 3. **Live DAW visual verification** in Logic's WKWebView is still a human step.

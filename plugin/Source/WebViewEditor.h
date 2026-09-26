@@ -21,6 +21,7 @@ namespace punch2pen {
       updatePlayhead(currentDAWSample)
       setConnectionStatus(connected)
       updatePosition(bar, beat)
+      setHostClock(bpm, numerator, denominator, seconds)
       setState(stateName)
       setActiveProfile({name, kind, detail})  // kind: 'local' | 'pro' | 'seat'
       setProfileStatus(jsonString)   // optional; raw engine ProfileStatus
@@ -68,6 +69,8 @@ private:
                     double startSample, double endSample, int bar);
   void jsUpdatePlayhead(double sample);
   void jsUpdatePosition(int bar, int beat);
+  void jsSetHostClock(double bpm, int numerator, int denominator,
+                      double seconds);
   void jsSetConnectionStatus(bool connected);
   void jsSetState(const juce::String &state);
   void jsSetProfileStatus(const juce::String &json);

@@ -16,6 +16,7 @@
         updatePlayhead(currentDAWSample)
         setConnectionStatus(connected)        // boolean
         updatePosition(bar, beat)             // ints
+        setHostClock(bpm, numerator, denominator, seconds)
         setState(stateName)                   // disconnected|idle|recording|playback|correction
         resetTranscript()                     // clears all words (new take)
         showCorrection(originalWord, x, y)    // opens the correction sheet
@@ -39,6 +40,7 @@
     Element IDs the bridge / verify harness bind to:
       #header-bar  #app-title  #profile-pill  #status-badge
       #position-display  #position-text  (.bar-num .beat-num)
+      #host-clock  #host-bpm  #host-time
       #connection-banner
       #transcript-container  #transcript-scroll  #transcript-inner
       #return-to-live
@@ -327,6 +329,13 @@
       white-space: nowrap;
     }
     #position-text .bar-num, #position-text .beat-num { color: var(--ink); }
+    #host-clock {
+      font-weight: 700; font-size: 11px; letter-spacing: 0.08em;
+      color: var(--ink-3);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    #host-clock .host-bpm, #host-clock .host-time { color: var(--ink); }
     #sync-indicator {
       margin-left: auto;
       display: none; align-items: center; gap: 6px;
@@ -668,6 +677,10 @@
     <span id="position-text">
       BAR <span class="bar-num">1</span> · BEAT <span class="beat-num">1</span>
     </span>
+    <span id="host-clock">
+      <span id="host-bpm" class="host-bpm">120</span> BPM
+      · <span id="host-time" class="host-time">00:00:00.000</span>
+    </span>
     <span id="sync-indicator">LIVE</span>
   </div>
 
@@ -735,6 +748,8 @@
       const badge       = document.getElementById('status-badge');
       const barNum      = document.querySelector('#position-text .bar-num');
       const beatNum     = document.querySelector('#position-text .beat-num');
+      const hostBpmEl   = document.getElementById('host-bpm');
+      const hostTimeEl  = document.getElementById('host-time');
       const syncInd     = document.getElementById('sync-indicator');
       const container   = document.getElementById('transcript-container');
       const scroller    = document.getElementById('transcript-scroll');
@@ -750,6 +765,12 @@
       const BADGE_TEXT = { disconnected: 'WAIT', idle: 'IDLE', recording: 'REC', playback: 'PLAY' };
       const WORDS_PER_LINE = 8;
       const HOLD_SAMPLES = 36000;     // ≈0.75 s at 48 kHz: keep the last word lit after the take ends
+      const HOST_SAMPLE_RATE = 48000; // word samples and the preview share this clock
+
+      // Host clock. 120 is only the readout until setHostClock arrives.
+      let hostBpm = 120;
+      let hostSigNum = 4;
+      let hostSigDenom = 4;
 
       // ────────────────────────────────────────────────────────
       // Native bridge (JS → C++). The JUCE backend can appear after this
@@ -839,11 +860,57 @@
         beatNum.textContent = String(beat);
       }
 
+      function formatHostTime(seconds) {
+        const totalMs = Math.max(0, Math.round((Number(seconds) || 0) * 1000));
+        const ms = totalMs % 1000;
+        const totalSec = Math.floor(totalMs / 1000);
+        const s = totalSec % 60;
+        const m = Math.floor(totalSec / 60) % 60;
+        const h = Math.floor(totalSec / 3600);
+        const pad = (n, w) => String(n).padStart(w, '0');
+        return pad(h, 2) + ':' + pad(m, 2) + ':' + pad(s, 2) + '.' + pad(ms, 3);
+      }
+
+      function formatHostBpm(bpm) {
+        const n = Math.round(Number(bpm) * 100) / 100;
+        if (!Number.isFinite(n) || n <= 0) return '';
+        return String(n);
+      }
+
+      function renderHostClock(seconds) {
+        if (hostBpmEl) hostBpmEl.textContent = formatHostBpm(hostBpm);
+        if (hostTimeEl) hostTimeEl.textContent = formatHostTime(seconds);
+      }
+
+      // Host tempo and timeline. Replaces the preview's 120 once the bridge speaks.
+      // No typed BPM, no invented frame rate: time is HH:MM:SS.mmm.
+      function setHostClock(bpm, numerator, denominator, seconds) {
+        const nextBpm = Number(bpm);
+        if (Number.isFinite(nextBpm) && nextBpm > 0) hostBpm = nextBpm;
+        const num = Math.floor(Number(numerator));
+        const den = Math.floor(Number(denominator));
+        if (Number.isFinite(num) && num >= 1) hostSigNum = num;
+        if (Number.isFinite(den) && den >= 1) hostSigDenom = den;
+        renderHostClock(seconds);
+      }
+
+      // Sung bar from this word's sample, the host BPM, and the time signature.
+      function barForSample(sample) {
+        const bpm = hostBpm > 0 ? hostBpm : 120;
+        const num = hostSigNum >= 1 ? hostSigNum : 4;
+        const den = hostSigDenom >= 1 ? hostSigDenom : 4;
+        const ppq = (Number(sample) / HOST_SAMPLE_RATE) * (bpm / 60);
+        const ppqPerBar = num * (4 / den);
+        if (!(ppqPerBar > 0)) return 1;
+        return Math.floor(Math.max(0, ppq) / ppqPerBar) + 1;
+      }
+
       // ────────────────────────────────────────────────────────
       // Transcript model — one .lyric-line per bar (max 8 words)
       // ────────────────────────────────────────────────────────
       function appendWord(text, startSample, endSample, barNumber) {
-        const bar = Number(barNumber);
+        void barNumber; // arrival bar is not the sung bar
+        const bar = barForSample(startSample);
         let line = lines[lines.length - 1];
         const startNewLine =
           !line ||
@@ -853,7 +920,7 @@
         if (startNewLine) {
           const el = document.createElement('div');
           el.className = 'lyric-line line-upcoming';
-          el.dataset.bar = String(barNumber);
+          el.dataset.bar = String(bar);
           inner.appendChild(el);
           line = { el, bar, words: [] };
           lines.push(line);
@@ -1468,6 +1535,7 @@
       window.updatePlayhead      = updatePlayhead;
       window.setConnectionStatus = setConnectionStatus;
       window.updatePosition      = updatePosition;
+      window.setHostClock        = setHostClock;
       window.setState            = setState;
       window.resetTranscript     = resetTranscript;
       window.showCorrection      = showCorrection;

@@ -7,6 +7,23 @@ namespace punch2pen {
 
 namespace {
 
+// Sung bar from a word's own sample position, the host BPM, and the
+// time signature. Quarter-note PPQ matches getTransportPosition().
+// Sample positions on the receipt are 48 kHz, the rate the page uses.
+int barForWordSample(double sample, double bpm, int numerator, int denominator) {
+  constexpr double sampleRate = 48000.0;
+  if (!(bpm > 0.0))
+    bpm = 120.0;
+  const int num = numerator > 0 ? numerator : 4;
+  const int den = denominator > 0 ? denominator : 4;
+  const double ppq = (sample / sampleRate) * (bpm / 60.0);
+  const double ppqPerBar =
+      static_cast<double>(num) * (4.0 / static_cast<double>(den));
+  if (!(ppqPerBar > 0.0))
+    return 1;
+  return static_cast<int>(std::floor(juce::jmax(0.0, ppq) / ppqPerBar)) + 1;
+}
+
 juce::String getIndexHtml() {
   int size = 0;
   if (auto *data = BinaryData::getNamedResource("index_html", size))
@@ -135,6 +152,8 @@ void WebViewEditor::timerCallback() {
   auto transport = audioProcessor.getTransportPosition();
 
   jsUpdatePlayhead(audioProcessor.getHostDawSampleTime());
+  jsSetHostClock(transport.bpm, transport.timeSigNum, transport.timeSigDenom,
+                 audioProcessor.getHostTimeSeconds());
 
   if (transport.bar != lastBar || transport.beat != lastBeat) {
     jsUpdatePosition(transport.bar, transport.beat);
@@ -180,7 +199,9 @@ void WebViewEditor::onTranscriptionReceived(const std::string &text,
       safeThis->displayedCaptureEpoch.store(captureEpoch);
       safeThis->runJs("window.resetTranscript();");
     }
-    int bar = juce::jmax(1, safeThis->lastBar);
+    const auto clock = safeThis->audioProcessor.getTransportPosition();
+    const int bar = barForWordSample(startTime, clock.bpm, clock.timeSigNum,
+                                     clock.timeSigDenom);
     safeThis->jsAppendWord(juce::String(text), startTime, endTime, bar);
   });
 }
@@ -243,6 +264,17 @@ void WebViewEditor::jsUpdatePosition(int bar, int beat) {
   // Changes on every beat — never buffer.
   runJs("window.updatePosition(" + juce::String(bar) + ","
         + juce::String(beat) + ");",
+        /*queueIfPending=*/false);
+}
+
+void WebViewEditor::jsSetHostClock(double bpm, int numerator, int denominator,
+                                   double seconds) {
+  // Every timer tick. Transient: do not buffer 30 Hz clock updates.
+  runJs("window.setHostClock("
+        + juce::String(bpm) + ","
+        + juce::String(numerator) + ","
+        + juce::String(denominator) + ","
+        + juce::String(seconds) + ");",
         /*queueIfPending=*/false);
 }
 
