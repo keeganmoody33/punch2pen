@@ -197,6 +197,21 @@ set_target_properties(protocolSerializationTest PROPERTIES
     CXX_STANDARD_REQUIRED ON
 )
 
+add_executable(ipcServerHandshakeTest
+    tests/IPCServerHandshakeTest.cpp
+    src/IPCServer.cpp
+)
+
+target_include_directories(ipcServerHandshakeTest
+    PRIVATE src
+    PRIVATE ../shared
+)
+
+set_target_properties(ipcServerHandshakeTest PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+)
+
 add_executable(transcriptTimingTest
     tests/TranscriptTimingTest.cpp
 )
