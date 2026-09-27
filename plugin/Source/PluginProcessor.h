@@ -57,6 +57,8 @@ public:
   TransportPosition getTransportPosition() const;
   double getSampleRate() const { return AudioProcessor::getSampleRate(); }
   double getHostDawSampleTime() const { return hostDawSampleTime.load(); }
+  // Host timeline seconds from the playhead's getTimeInSeconds, when it has one.
+  double getHostTimeSeconds() const { return hostTimeSeconds.load(); }
   uint32_t getCaptureEpoch() const { return captureEpoch.load(); }
 
   punch2pen::IPCClient *getIPCClient() const { return ipcClient.get(); }
@@ -77,6 +79,7 @@ private:
   std::atomic<bool> transportIsPlaying{false};
   std::atomic<bool> transportIsRecording{false};
   std::atomic<double> hostDawSampleTime{0.0};
+  std::atomic<double> hostTimeSeconds{0.0};
   std::atomic<uint32_t> captureEpoch{0};
 
   // Avoid heap alloc in processBlock
