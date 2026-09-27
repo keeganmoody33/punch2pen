@@ -104,27 +104,25 @@
       daw: dawValue(),
       release_tag: releaseTag,
       asset: assetName || "",
-      href: downloadUrl,
+      href: source === "hero" ? "https://github.com/keeganmoody33/punch2pen/releases/latest" : downloadUrl,
     });
     if (!assetName) {
       track("download_unavailable", { source, daw: dawValue(), release_tag: releaseTag });
     }
-    if (!sent) {
-      setNote(
-        statusDownload,
-        (statusDownload.textContent || "") + " Analytics key is not configured, so this click was not sent to PostHog.",
-        "warn"
-      );
+    if (!sent && statusDownload) {
+      const extra = " Analytics key is not configured, so this click was not sent to PostHog.";
+      const cur = statusDownload.textContent || "";
+      if (cur.indexOf("Analytics key is not configured") === -1) {
+        setNote(statusDownload, cur + extra, "warn");
+      }
     }
   }
 
-  macBtn.addEventListener("click", () => onDownloadClick("mac_pkg"));
-  heroBtn.addEventListener("click", (ev) => {
-    if (heroBtn.getAttribute("href") === "#download") return;
-    onDownloadClick("hero");
-  });
+  if (macBtn) macBtn.addEventListener("click", () => onDownloadClick("mac_pkg"));
+  if (heroBtn) heroBtn.addEventListener("click", () => onDownloadClick("hero"));
 
-  document.getElementById("would-pay").addEventListener("click", () => {
+  const wouldPay = document.getElementById("would-pay");
+  if (wouldPay) wouldPay.addEventListener("click", () => {
     const sent = track("interest_would_pay", { daw: dawValue() });
     setNote(
       statusInterest,
@@ -135,16 +133,18 @@
     );
   });
 
-  document.getElementById("just-looking").addEventListener("click", () => {
+  const justLooking = document.getElementById("just-looking");
+  if (justLooking) justLooking.addEventListener("click", () => {
     track("interest_just_looking", { daw: dawValue() });
     setNote(statusInterest, "Stay as long as you want. Download is still free / lite.", "ok");
   });
 
-  document.getElementById("waitlist").addEventListener("submit", (ev) => {
+  const waitlist = document.getElementById("waitlist");
+  if (waitlist) waitlist.addEventListener("submit", (ev) => {
     ev.preventDefault();
     const email = (document.getElementById("email").value || "").trim();
     if (!email) {
-      setNote(statusInterest, "Add an email, or just hit “I would pay” without one.", "warn");
+      setNote(statusInterest, "Add an email, or use “I would pay for the portable dictionary” without one.", "warn");
       return;
     }
     const sent = track("waitlist_submit", { daw: dawValue(), email });
@@ -160,11 +160,110 @@
     );
   });
 
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (ch) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    }[ch]));
+  }
+
+  function initReceipt() {
+    const freeBtn = document.getElementById("tier-free");
+    const paidBtn = document.getElementById("tier-paid");
+    const pill = document.getElementById("receipt-pill");
+    const status = document.getElementById("receipt-status");
+    const panel = document.getElementById("dict-panel");
+    const word = document.getElementById("receipt-word");
+    const sheet = document.getElementById("receipt-sheet");
+    const input = document.getElementById("receipt-correction");
+    const apply = document.getElementById("receipt-apply");
+    const cancel = document.getElementById("receipt-cancel");
+    const replay = document.getElementById("receipt-replay");
+    if (!freeBtn || !paidBtn || !pill || !status || !panel || !word || !sheet || !input || !apply || !cancel) {
+      return;
+    }
+
+    let tier = "free";
+    let applied = null;
+
+    function render() {
+      const paid = tier === "paid";
+      pill.textContent = paid ? "Vocal seat" : "Local";
+      pill.classList.toggle("signed", paid);
+      if (!applied) {
+        word.textContent = "topp";
+        word.classList.remove("corrected");
+        status.textContent = "Following the playhead · click a word to correct it";
+        panel.innerHTML = paid
+          ? '<p class="eyebrow">Vocal seat dictionary</p><p>Signed in. No pairs yet. Apply a correction and it is written on this seat.</p>'
+          : '<p class="eyebrow">This session</p><p>No account. Corrections stay in memory on this Mac and drop when the engine restarts. Nothing is written.</p>';
+        return;
+      }
+      word.textContent = applied.to;
+      word.classList.add("corrected");
+      const from = escapeHtml(applied.from);
+      const to = escapeHtml(applied.to);
+      const row = '<p class="pair"><span>' + from + "</span><span>→</span><span>" + to + "</span>";
+      if (paid) {
+        status.textContent = '"' + applied.from + '" → "' + applied.to + '" (in 1 place) · saved to Vocal seat dictionary · synced';
+        panel.innerHTML = '<p class="eyebrow">Vocal seat dictionary</p>' + row + '<span class="count">1</span></p><p>Saved on the seat and synced. Bar and beat stay in the plugin.</p>';
+      } else {
+        status.textContent = '"' + applied.from + '" → "' + applied.to + '" (in 1 place) · session-only on this Mac. A profile carries your dictionary between rooms.';
+        panel.innerHTML = '<p class="eyebrow">This session</p>' + row + "</p><p>Session-only. Not written to disk, not sent to the profile API. Restart drops it.</p>";
+      }
+    }
+
+    function setTier(next) {
+      tier = next;
+      freeBtn.setAttribute("aria-pressed", tier === "free" ? "true" : "false");
+      paidBtn.setAttribute("aria-pressed", tier === "paid" ? "true" : "false");
+      render();
+    }
+
+    word.addEventListener("click", () => {
+      sheet.hidden = false;
+      input.value = applied ? applied.to : "top";
+      input.focus();
+    });
+    cancel.addEventListener("click", () => {
+      sheet.hidden = true;
+    });
+    apply.addEventListener("click", () => {
+      const to = input.value.trim();
+      if (!to) return;
+      applied = { from: "topp", to: to };
+      sheet.hidden = true;
+      render();
+    });
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        apply.click();
+      } else if (ev.key === "Escape") {
+        sheet.hidden = true;
+      }
+    });
+    if (replay) {
+      replay.addEventListener("click", () => {
+        applied = null;
+        sheet.hidden = true;
+        input.value = "top";
+        render();
+      });
+    }
+    freeBtn.addEventListener("click", () => setTier("free"));
+    paidBtn.addEventListener("click", () => setTier("paid"));
+    render();
+  }
+
   loadPosthog().then((ok) => {
     if (ok) track("site_ready", { posthog: true });
   });
-  loadRelease().then(() => {
-    heroBtn.href = downloadUrl;
-    heroBtn.removeAttribute("aria-disabled");
-  });
+  if (macBtn) {
+    loadRelease();
+  }
+  initReceipt();
 })();

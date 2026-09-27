@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Creators — Punch2Pen</title>
+  <meta name="description" content="Pre-release and affiliate interest for tutorial creators and mix engineers. Applications are not open yet. Nothing is sent." />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/site.css" />
+</head>
+<body>
+  <header class="top">
+    <a class="mark" href="/">[ PUNCH<span class="accent">2</span>PEN ]</a>
+    <nav>
+      <a href="/product">Product</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/for-studios">Studios</a>
+      <a href="/creators" aria-current="page">Creators</a>
+      <a href="/docs">Docs</a>
+      <a href="/login">Sign in</a>
+    </nav>
+  </header>
+
+  <main class="wrap narrow">
+    <p class="eyebrow">Tutorial creators and mix engineers</p>
+    <h1>Applications are not open yet.</h1>
+    <p class="lede">This page is for two kinds of interest: trying the plugin before a paid plan exists, and affiliate interest later. The repo publishes no contact address for either one. No key is issued here, and there is no affiliate program.</p>
+
+    <section>
+      <h2>What you can be interested in</h2>
+      <ul class="plain">
+        <li><strong>Pre-release.</strong> You make tutorials, or you engineer mixes, and you want to know when there is something to teach or to punch on besides the free local utility.</li>
+        <li><strong>Affiliate.</strong> You might want to point people at Punch2Pen if a program exists someday. It does not exist now. There is no rate and no link to hand out.</li>
+      </ul>
+      <p>Questions about the source go to a GitHub discussion on <a href="https://github.com/keeganmoody33/punch2pen">the repo</a>. That is not an application, and it does not issue a key.</p>
+    </section>
+
+    <section>
+      <h2>Interest form</h2>
+      <p class="lede">Fill it in if you want the shape of the note in front of you. Submitting does not deliver it. This page has nowhere to send an application.</p>
+      <form id="creator-interest" action="/creators" method="post">
+        <label class="field">
+          <span>Name (optional)</span>
+          <input type="text" name="name" autocomplete="name" />
+        </label>
+        <label class="field">
+          <span>Role</span>
+          <select name="role" required>
+            <option value="">Choose one</option>
+            <option value="tutorial-creator">Tutorial creator</option>
+            <option value="mix-engineer">Mix engineer</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Interest</span>
+          <select name="interest" required>
+            <option value="">Choose one</option>
+            <option value="pre-release">Pre-release interest</option>
+            <option value="affiliate">Affiliate interest</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Note (optional, not stored)</span>
+          <textarea name="note" rows="4" class="wide"></textarea>
+        </label>
+        <button type="submit" class="btn">Submit interest</button>
+      </form>
+      <p class="note" id="creator-status">Applications are not open yet. This form is not delivered anywhere.</p>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>Punch2Pen · Mac first · never a browser engine</span>
+    <span>
+      <a href="/product">Product</a>
+      ·
+      <a href="/pricing">Pricing</a>
+      ·
+      <a href="/for-studios">Studios</a>
+      ·
+      <a href="/creators">Creators</a>
+      ·
+      <a href="/docs">Docs</a>
+      ·
+      <a href="/login">Sign in</a>
+      ·
+      <a href="/privacy">Privacy</a>
+      ·
+      <a href="https://github.com/keeganmoody33/punch2pen">Source</a>
+    </span>
+  </footer>
+  <script>
+    (function () {
+      var form = document.getElementById("creator-interest");
+      var status = document.getElementById("creator-status");
+      if (!form || !status) return;
+      form.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        status.textContent = "Applications are not open yet. This page did not send your note. No key was issued, and there is no affiliate program.";
+        status.className = "note warn";
+      });
+    })();
+  </script>
+</body>
+</html>
