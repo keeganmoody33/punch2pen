@@ -3,7 +3,7 @@
 This document outlines the core domain concepts of the `punch2pen` project.
 
 - **Engine** — The standalone background C++ process that manages the whisper.cpp model, runs transcription inference, and persists user vocabulary and corrections.
-- **Plugin** — The DAW audio plugin (built with JUCE) that runs inside the host, captures raw audio during recording, and displays the transcription.
+- **Plugin** — The DAW audio plugin (built with JUCE) that runs inside the host, captures input audio while the transport is playing or recording (passthrough, no effect latency), and displays the transcription on the host clock.
 - **Audio Chunk** — A contiguous block of audio samples captured by the Plugin and streamed to the Engine for transcription.
 - **Correction** — A user-provided pair mapping mis-transcribed text to the intended correct text (e.g., "spoke" → "corrected"). Used to update the vocabulary.
 - **Vocabulary** — The set of unique words extracted from the user's Corrections, used to dynamically bias the transcription engine.

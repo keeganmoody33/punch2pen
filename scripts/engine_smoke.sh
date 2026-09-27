@@ -243,6 +243,7 @@ if [[ "$RUN_VOCALS" -eq 1 ]]; then
   VOCAL_ARGS=(
     vocals
     --port "$PORT"
+    --playback
     --stt-timeout "${PUNCH2PEN_STT_TIMEOUT:-60}"
   )
   if [[ "$REQUIRE_VOCALS" -eq 1 ]]; then

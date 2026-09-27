@@ -4,7 +4,9 @@
 Subcommands:
   smoke     Handshake + one correction (engine must already be running)
   profile   Request a ProfileStatus and assert tier / dictionary counts
-  vocals    Send a real-vocal WAV and score against expected-words.txt
+  vocals    Send a real-vocal WAV and score against expected-words.txt.
+            --playback places that WAV on a host playhead (not record-armed)
+            and requires the words to land on that clock.
   selftest  Protocol struct sizes only
 
 Vocals skip with exit 0 when the WAV is missing unless --require is set.
@@ -167,6 +169,36 @@ def load_wav_mono_float(path: Path) -> tuple[List[float], float]:
     return mono, float(rate)
 
 
+def assert_words_on_host_timeline(
+    results: Sequence[tuple], origin: float, n_samples: int
+) -> int:
+    """Words from a playback pass must sit on the host playhead.
+
+    A private 0-based clock (karaoke from the start of the buffer) fails this.
+    `origin` is the host sample time of the first sample sent.
+    """
+    horizon = origin + float(n_samples) + 1.0
+    timed = 0
+    for text, start, end, _epoch in results:
+        if not str(text).strip():
+            continue
+        timed += 1
+        if float(start) + 1.0 < origin or float(start) > horizon:
+            die(
+                f"word {text!r} start {start} is off the host playhead "
+                f"(origin {origin:.0f}, horizon {horizon:.0f})"
+            )
+        if float(end) + 1.0 < float(start):
+            die(f"word {text!r} ends before it starts ({start} -> {end})")
+    if timed < 1:
+        die("playback produced no words")
+    print(
+        f"playback: {timed} words on host timeline "
+        f"starting at sample {origin:.0f}"
+    )
+    return timed
+
+
 def cmd_vocals(args: argparse.Namespace) -> int:
     wav_path = Path(args.wav)
     expected_path = Path(args.expected)
@@ -194,12 +226,20 @@ def cmd_vocals(args: argparse.Namespace) -> int:
         die(f"{expected_path} has no words")
 
     samples, rate = load_wav_mono_float(wav_path)
+    playback = bool(getattr(args, "playback", False))
+    if getattr(args, "daw_origin", None) is not None:
+        daw_origin = float(args.daw_origin)
+    elif playback:
+        # Press play ten seconds into a session that is already on the timeline.
+        daw_origin = 10.0 * rate
+    else:
+        daw_origin = 0.0
     sock = None
     try:
         sock = proto.connect(port=args.port, timeout=args.timeout)
         proto.complete_handshake(sock)
         chunk = max(int(rate), 16000)
-        daw = 0.0
+        daw = daw_origin
         offset = 0
         while offset < len(samples):
             piece = samples[offset : offset + chunk]
@@ -228,6 +268,12 @@ def cmd_vocals(args: argparse.Namespace) -> int:
         die(
             "token overlap below threshold. Check the WAV is dry speech you own, "
             "not a mix, and that expected-words.txt matches what you said."
+        )
+    if playback:
+        assert_words_on_host_timeline(results, daw_origin, len(samples))
+        print(
+            "playback: PASS non-recording host playhead "
+            "(audio already on the timeline still produces words)"
         )
     print("vocals: PASS")
     return 0
@@ -276,6 +322,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     vocals.add_argument("--min-overlap", type=float, default=0.5)
     vocals.add_argument("--stt-timeout", type=float, default=60.0)
+    vocals.add_argument(
+        "--playback",
+        action="store_true",
+        help=(
+            "Send the fixture as non-recording playback on a host playhead "
+            "(default: 10s into the session) and require word times on that clock"
+        ),
+    )
+    vocals.add_argument(
+        "--daw-origin",
+        type=float,
+        default=None,
+        help="Host sample time of the first sample (default 0, or 10s with --playback)",
+    )
     vocals.set_defaults(func=cmd_vocals)
     return parser
 

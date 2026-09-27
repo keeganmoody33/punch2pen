@@ -79,8 +79,9 @@ private:
   std::atomic<double> hostDawSampleTime{0.0};
   std::atomic<uint32_t> captureEpoch{0};
 
-  // Avoid heap alloc in processBlock
+  // Audio-thread only. Punch-out and playback-stop close a capture window.
   bool wasRecordingLastBlock = false;
+  bool wasPlayingLastBlock = false;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Punch2PenAudioProcessor)
 };

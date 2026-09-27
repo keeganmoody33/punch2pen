@@ -27,7 +27,7 @@ flowchart LR
         API["Profile API<br/>(cloud/, paid only)"]
     end
 
-    PB -- "isRecording audio" --> RB
+    PB -- "playing or recording audio" --> RB
     RB --> IPC_C
     IPC_C -- "Handshake / AudioChunk / TransportStop / Correction" --> IPC_S
     IPC_S --> TC
@@ -42,7 +42,7 @@ flowchart LR
     ACC -- "vocabulary bias" --> OAI
 ```
 
-**Plugin side:** `processBlock()` captures audio only when the DAW transport reports `isRecording == true`. Samples are written into a lock-free `AudioRingBuffer` (SPSC, in `plugin/Source/RingBuffer.h`). An `IPCClient` thread completes a protocol handshake, drains the ring buffer, and streams `AudioChunk` messages to the engine. The editor is a WebView shell (`plugin/Source/ui/public/index.html`).
+**Plugin side:** `processBlock()` captures input audio while the host transport is playing or recording, including playback of a vocal already on the track when the track is not record-armed. Stopped transport does not capture. Samples are read into a lock-free `AudioRingBuffer` (SPSC, in `plugin/Source/RingBuffer.h`) and the buffer itself is left untouched, so the plugin adds no effect latency. An `IPCClient` thread completes a protocol handshake, drains the ring buffer, and streams `AudioChunk` messages stamped with the host sample time. The editor is a WebView shell (`plugin/Source/ui/public/index.html`).
 
 **Engine side:** `TranscriptionCoordinator` polls the `IPCServer` for audio, transport-stop events, and correction messages in a 1 ms loop. Audio is forwarded to whichever `TranscriberInterface` backend is active. Results flow back through the IPC connection and appear in the plugin WebView. Local whisper refuses to start if the model file is missing. The engine exits if it cannot bind `127.0.0.1:7483`.
 
@@ -53,7 +53,7 @@ flowchart LR
 | **Studio Receipt WebView** | One HTML blob in `juce::WebBrowserComponent` (`plugin/Source/ui/public/index.html`); default editor size 400×600, resizable |
 | **Polymorphic transcription backend** | Local whisper.cpp (`Transcriber`) or cloud OpenAI Realtime WebSocket API (`OpenAICloudTranscriber`), switchable via CLI `--cloud --api-key=` |
 | **Correction feedback loop** | **Free / lite:** corrections live in a session `Dictionary` (case-sensitive word map + `initial_prompt` bias) and reset when the engine restarts; nothing is written and nothing leaves the machine. **Paid / pro:** sign in inside the plugin; corrections write the active profile's dictionary (`~/.punch2pen/profiles/<id>.json`, synced through `cloud/`). Workspace seats keep each artist's dictionary isolated. See `cloud/README.md`. No prices are set. |
-| **Record-state gating** | Audio only captured when DAW transport reports `isRecording == true` |
+| **Transport capture** | Audio captured while the host is playing or recording. Playback of audio already on the track transcribes onto the host clock. Stopped transport does not capture. |
 | **Living Transcript** | WebView highlights the word under the playhead using engine `startTime`/`endTime` |
 | **Click-to-correct UI** | Word click opens the Direction C correction overlay; corrections are submitted via IPC to the engine |
 | **Plugin state persistence** | `transcriptionMode` and `bpm` saved via ValueTree XML serialization in `getStateInformation` / `setStateInformation` |
@@ -200,7 +200,7 @@ Green unit CI is not a Logic punch. Layers:
 | Profile API typecheck | `cd cloud && npm run typecheck` (CI `cloud-typecheck`) | Node 22 |
 | Plugin unit tests | `ringBufferTest`, `ipcClientTest`, `pluginProcessorStateTest`, `pluginProcessorCaptureTest` (CI `plugin-tests`) | macOS + JUCE |
 | Engine smoke (no Logic) | `./scripts/engine_smoke.sh` (CI `engine-smoke`) | whisper `ggml-base.bin`; isolated `PUNCH2PEN_HOME` |
-| Vocal golden file | `python3 scripts/verify_engine.py vocals` | Your dry WAV in `fixtures/vocals/` — **SKIP** if missing |
+| Vocal golden file | `python3 scripts/verify_engine.py vocals --playback` | Dry WAV in `fixtures/vocals/` as non-recording playback on the host playhead — **SKIP** if missing |
 | AU identity | `auval -strict -v aufx P2pn Dcta` | Mac after AU install. **Not** GitHub-hosted runners |
 | Logic punch | Insert **punch2pen**, arm, record, watch the Living Transcript | M-series MacBook Pro only |
 
