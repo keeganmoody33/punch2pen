@@ -83,6 +83,14 @@ if ! grep -q 'not open yet' public/creators.html; then
   echo "creators page must say applications are not open yet" >&2
   fail=1
 fi
+if grep -Eq 'method=|action=|<form' public/creators.html; then
+  echo "creators page must not submit a form" >&2
+  fail=1
+fi
+if ! grep -q 'type="button"' public/creators.html; then
+  echo "creators submit control must be a button, not a form submit" >&2
+  fail=1
+fi
 if ! grep -qi 'not available' public/login.html; then
   echo "login page must say sign-in is not available" >&2
   fail=1

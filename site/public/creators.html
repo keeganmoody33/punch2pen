@@ -38,14 +38,14 @@
     <section>
       <h2>Interest form</h2>
       <p class="lede">Fill it in if you want the shape of the note in front of you. Submitting does not deliver it. This page has nowhere to send an application.</p>
-      <form id="creator-interest" action="/creators" method="post">
+      <div id="creator-interest">
         <label class="field">
           <span>Name (optional)</span>
-          <input type="text" name="name" autocomplete="name" />
+          <input type="text" id="creator-name" autocomplete="name" />
         </label>
         <label class="field">
           <span>Role</span>
-          <select name="role" required>
+          <select id="creator-role">
             <option value="">Choose one</option>
             <option value="tutorial-creator">Tutorial creator</option>
             <option value="mix-engineer">Mix engineer</option>
@@ -53,7 +53,7 @@
         </label>
         <label class="field">
           <span>Interest</span>
-          <select name="interest" required>
+          <select id="creator-kind">
             <option value="">Choose one</option>
             <option value="pre-release">Pre-release interest</option>
             <option value="affiliate">Affiliate interest</option>
@@ -61,10 +61,10 @@
         </label>
         <label class="field">
           <span>Note (optional, not stored)</span>
-          <textarea name="note" rows="4" class="wide"></textarea>
+          <textarea id="creator-note" rows="4" class="wide"></textarea>
         </label>
-        <button type="submit" class="btn">Submit interest</button>
-      </form>
+        <button type="button" class="btn" id="creator-submit">Submit interest</button>
+      </div>
       <p class="note" id="creator-status">Applications are not open yet. This form is not delivered anywhere.</p>
     </section>
   </main>
@@ -91,11 +91,10 @@
   </footer>
   <script>
     (function () {
-      var form = document.getElementById("creator-interest");
+      var button = document.getElementById("creator-submit");
       var status = document.getElementById("creator-status");
-      if (!form || !status) return;
-      form.addEventListener("submit", function (ev) {
-        ev.preventDefault();
+      if (!button || !status) return;
+      button.addEventListener("click", function () {
         status.textContent = "Applications are not open yet. This page did not send your note. No key was issued, and there is no affiliate program.";
         status.className = "note warn";
       });

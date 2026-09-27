@@ -187,10 +187,11 @@
     }
 
     let tier = "free";
-    let applied = null;
+    const appliedByTier = { free: null, paid: null };
 
     function render() {
       const paid = tier === "paid";
+      const applied = appliedByTier[tier];
       pill.textContent = paid ? "Vocal seat" : "Local";
       pill.classList.toggle("signed", paid);
       if (!applied) {
@@ -218,6 +219,7 @@
 
     function setTier(next) {
       tier = next;
+      sheet.hidden = true;
       freeBtn.setAttribute("aria-pressed", tier === "free" ? "true" : "false");
       paidBtn.setAttribute("aria-pressed", tier === "paid" ? "true" : "false");
       render();
@@ -225,7 +227,7 @@
 
     word.addEventListener("click", () => {
       sheet.hidden = false;
-      input.value = applied ? applied.to : "top";
+      input.value = appliedByTier[tier] ? appliedByTier[tier].to : "top";
       input.focus();
     });
     cancel.addEventListener("click", () => {
@@ -234,7 +236,7 @@
     apply.addEventListener("click", () => {
       const to = input.value.trim();
       if (!to) return;
-      applied = { from: "topp", to: to };
+      appliedByTier[tier] = { from: "topp", to: to };
       sheet.hidden = true;
       render();
     });
@@ -248,7 +250,7 @@
     });
     if (replay) {
       replay.addEventListener("click", () => {
-        applied = null;
+        appliedByTier[tier] = null;
         sheet.hidden = true;
         input.value = "top";
         render();
