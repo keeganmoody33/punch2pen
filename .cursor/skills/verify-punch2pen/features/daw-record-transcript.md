@@ -22,7 +22,7 @@ Preconditions:
 
 - Darwin with a detected DAW **and** a human at the session, or this feature is SKIP.
 - Port 7483 is free or owned by the single engine you intend to use.
-- `scripts/verify_transcription.py` is **not** used as STT proof (a 440 Hz sine is not vocals). Use `scripts/verify_engine.py vocals --playback` when `fixtures/vocals/dry-vocal.wav` exists. That sends the fixture as non-recording playback and requires words on the host playhead.
+- `scripts/verify_transcription.py` is **not** used as STT proof (a 440 Hz sine is not vocals). `scripts/verify_engine.py vocals --playback` is engine timeline coverage: words from a fed vocal land on the host playhead. It does not load PluginProcessor. Capture gating is `pluginProcessorCaptureTest`. Logic proof stays manual.
 
 - **Automated skip (default for agents).** Run `.cursor/skills/verify-punch2pen/scripts/control-punch2pen drive daw-transcript`. Exit code `0` with status `SKIP`. Stdout names the missing piece (not Darwin, no DAW app, or no human host driver). Write that stdout to `artifacts/<run-id>/daw-transcript-skip.txt`. This is **not** a pass of the Living Transcript.
 - **Readiness only (Mac, optional).** Run `./scripts/test_daw_integration.sh --download-model --report artifacts/<run-id>/daw-readiness.txt` **after** `control-punch2pen cleanup` so ports do not collide. Treat `[FAIL]` lines as unreadiness, not as a substitute for a recorded take.

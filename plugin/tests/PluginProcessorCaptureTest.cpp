@@ -136,6 +136,59 @@ void testNonRecordingPlaybackCapturesOnHostClock() {
   std::cout << "[PASS] testNonRecordingPlaybackCapturesOnHostClock" << std::endl;
 }
 
+void testPlaybackThenRecordClosesWindow() {
+  MockPlayHead playHead;
+  playHead.playing = true;
+  playHead.recording = false;
+  playHead.timeInSamples = 1000;
+
+  auto proc = makeProcessor(playHead);
+  juce::AudioBuffer<float> buffer(2, 64);
+  juce::MidiBuffer midi;
+  fillBuffer(buffer, 0.2f);
+  proc->processBlock(buffer, midi);
+  assert(proc->getCaptureEpoch() == 0);
+
+  playHead.recording = true;
+  playHead.timeInSamples = 1064;
+  fillBuffer(buffer, 0.3f);
+  proc->processBlock(buffer, midi);
+  assert(proc->getCaptureEpoch() == 1);
+  assert(proc->getTransportPosition().isPlaying);
+  assert(proc->getTransportPosition().isRecording);
+
+  // Playback samples stay on epoch 0. The punch is written only after that
+  // window is closed, on the host clock.
+  auto *ring = proc->audioRingBufferForTest();
+  std::vector<float> out(64, 0.0f);
+  double dawStart = -1.0;
+  uint32_t epoch = 99;
+  assert(ring->read(out.data(), 64, &dawStart, &epoch) == 64);
+  assert(dawStart == 1000.0);
+  assert(epoch == 0);
+  assert(out[0] == 0.2f);
+  dawStart = -1.0;
+  epoch = 99;
+  assert(ring->read(out.data(), 64, &dawStart, &epoch) == 64);
+  assert(dawStart == 1064.0);
+  assert(epoch == 1);
+  assert(out[0] == 0.3f);
+
+  playHead.playing = false;
+  playHead.recording = false;
+  playHead.timeInSamples = 1128;
+  fillBuffer(buffer, 0.9f);
+  proc->processBlock(buffer, midi);
+  assert(ring->getNumReady() == 0);
+  assert(buffer.getSample(0, 0) == 0.9f);
+  assert(!proc->getTransportPosition().isPlaying);
+  assert(!proc->getTransportPosition().isRecording);
+
+  proc->releaseResources();
+  proc.reset();
+  std::cout << "[PASS] testPlaybackThenRecordClosesWindow" << std::endl;
+}
+
 void testRecordingCapturesFirstChannel() {
   MockPlayHead playHead;
   playHead.playing = true;
@@ -214,6 +267,7 @@ int main() {
 
   testStoppedTransportDoesNotCapture();
   testNonRecordingPlaybackCapturesOnHostClock();
+  testPlaybackThenRecordClosesWindow();
   testRecordingCapturesFirstChannel();
   testPunchOutIncrementsCaptureEpoch();
 

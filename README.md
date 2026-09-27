@@ -200,7 +200,7 @@ Green unit CI is not a Logic punch. Layers:
 | Profile API typecheck | `cd cloud && npm run typecheck` (CI `cloud-typecheck`) | Node 22 |
 | Plugin unit tests | `ringBufferTest`, `ipcClientTest`, `pluginProcessorStateTest`, `pluginProcessorCaptureTest` (CI `plugin-tests`) | macOS + JUCE |
 | Engine smoke (no Logic) | `./scripts/engine_smoke.sh` (CI `engine-smoke`) | whisper `ggml-base.bin`; isolated `PUNCH2PEN_HOME` |
-| Vocal golden file | `python3 scripts/verify_engine.py vocals --playback` | Dry WAV in `fixtures/vocals/` as non-recording playback on the host playhead — **SKIP** if missing |
+| Engine timeline coverage | `python3 scripts/verify_engine.py vocals --playback` | Words from a fed vocal land on the host playhead. Does not load the plugin or prove capture. **SKIP** if the WAV is missing |
 | AU identity | `auval -strict -v aufx P2pn Dcta` | Mac after AU install. **Not** GitHub-hosted runners |
 | Logic punch | Insert **punch2pen**, arm, record, watch the Living Transcript | M-series MacBook Pro only |
 

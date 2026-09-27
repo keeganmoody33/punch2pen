@@ -18,11 +18,12 @@ Usage: $(basename "$0") [options]
 
 Start punch2penEngine with an isolated PUNCH2PEN_HOME, prove handshake +
 correction IPC + free-tier ProfileStatus (session dictionary, no cloud),
-then run the vocal golden-file check (skip if no WAV).
+then run engine timeline coverage (words from a fed vocal land on the host
+playhead; skip if no WAV). That check does not load the plugin.
 
 Options:
   --skip-build       Use an existing \$PUNCH2PEN_BUILD_DIR/bin/punch2penEngine
-  --skip-vocals      Do not run scripts/verify_engine.py vocals
+  --skip-vocals      Do not run engine timeline coverage (verify_engine.py vocals)
   --require-vocals   Fail if fixtures/vocals/dry-vocal.wav is missing
   --self-test        Prove EXIT teardown SIGKILLs a SIGTERM-ignoring child
   --build-dir PATH   CMake build directory (default: $BUILD_DIR)
@@ -250,8 +251,9 @@ if [[ "$RUN_VOCALS" -eq 1 ]]; then
     VOCAL_ARGS+=(--require)
   fi
   python3 "$ROOT/scripts/verify_engine.py" "${VOCAL_ARGS[@]}"
+  log "engine_smoke: engine timeline coverage ok (words from a fed vocal land on the host playhead)"
 else
-  log "engine_smoke: vocals skipped"
+  log "engine_smoke: engine timeline coverage skipped"
 fi
 
 log "engine_smoke: PASS (no Logic)"

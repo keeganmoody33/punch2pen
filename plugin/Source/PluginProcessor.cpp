@@ -178,15 +178,16 @@ void Punch2PenAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
   }
   hostDawSampleTime.store(dawSampleTime);
 
-  // 2. Close the previous window before writing the next one. Punch-out
-  // finalizes a live take even if the transport keeps rolling. Stopping
-  // playback finalizes a retroactive pass over audio already on the track.
-  // Writes carry captureEpoch so a drain can stop at one pass and leave the
-  // next pass's samples in the ring.
+  // 2. Close the previous window before writing the next one. Punch-out,
+  // punch-in over an open playback pass, and a full transport stop each
+  // finalize the samples already in the ring. Writes carry captureEpoch so a
+  // drain can stop at one pass and leave the next pass's samples.
   const bool punchOut = wasRecordingLastBlock && !isRecording;
   const bool playbackStop =
       wasPlayingLastBlock && !isPlaying && !isRecording;
-  if (punchOut || playbackStop) {
+  const bool recordStartsDuringPlayback =
+      wasPlayingLastBlock && !wasRecordingLastBlock && isRecording;
+  if (punchOut || playbackStop || recordStartsDuringPlayback) {
     if (ipcClient)
       ipcClient->flagTransportStop(captureEpoch.load());
     captureEpoch.fetch_add(1);

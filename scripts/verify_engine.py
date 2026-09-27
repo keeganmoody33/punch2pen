@@ -5,8 +5,8 @@ Subcommands:
   smoke     Handshake + one correction (engine must already be running)
   profile   Request a ProfileStatus and assert tier / dictionary counts
   vocals    Send a real-vocal WAV and score against expected-words.txt.
-            --playback places that WAV on a host playhead (not record-armed)
-            and requires the words to land on that clock.
+            --playback is engine timeline coverage: words from that fed vocal
+            land on the host playhead. It does not load PluginProcessor.
   selftest  Protocol struct sizes only
 
 Vocals skip with exit 0 when the WAV is missing unless --require is set.
@@ -172,10 +172,11 @@ def load_wav_mono_float(path: Path) -> tuple[List[float], float]:
 def assert_words_on_host_timeline(
     results: Sequence[tuple], origin: float, n_samples: int
 ) -> int:
-    """Words from a playback pass must sit on the host playhead.
+    """Engine timeline coverage: fed-vocal words sit on the host playhead.
 
     A private 0-based clock (karaoke from the start of the buffer) fails this.
-    `origin` is the host sample time of the first sample sent.
+    `origin` is the host sample time of the first sample sent. This does not
+    load PluginProcessor and is not capture-gate proof.
     """
     horizon = origin + float(n_samples) + 1.0
     timed = 0
@@ -191,10 +192,10 @@ def assert_words_on_host_timeline(
         if float(end) + 1.0 < float(start):
             die(f"word {text!r} ends before it starts ({start} -> {end})")
     if timed < 1:
-        die("playback produced no words")
+        die("engine timeline coverage produced no words")
     print(
-        f"playback: {timed} words on host timeline "
-        f"starting at sample {origin:.0f}"
+        f"engine timeline coverage: {timed} words from a fed vocal "
+        f"land on the host playhead (origin sample {origin:.0f})"
     )
     return timed
 
@@ -230,7 +231,8 @@ def cmd_vocals(args: argparse.Namespace) -> int:
     if getattr(args, "daw_origin", None) is not None:
         daw_origin = float(args.daw_origin)
     elif playback:
-        # Press play ten seconds into a session that is already on the timeline.
+        # Offset the fed vocal so a 0-based engine clock fails timeline coverage.
+        # This never loads PluginProcessor.
         daw_origin = 10.0 * rate
     else:
         daw_origin = 0.0
@@ -272,8 +274,9 @@ def cmd_vocals(args: argparse.Namespace) -> int:
     if playback:
         assert_words_on_host_timeline(results, daw_origin, len(samples))
         print(
-            "playback: PASS non-recording host playhead "
-            "(audio already on the timeline still produces words)"
+            "engine timeline coverage: PASS "
+            "(words from a fed vocal land on the host playhead; "
+            "not plugin capture proof)"
         )
     print("vocals: PASS")
     return 0
@@ -326,8 +329,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--playback",
         action="store_true",
         help=(
-            "Send the fixture as non-recording playback on a host playhead "
-            "(default: 10s into the session) and require word times on that clock"
+            "Engine timeline coverage: words from a fed vocal land on the "
+            "host playhead (default origin 10s). Does not load PluginProcessor "
+            "or prove the capture gate"
         ),
     )
     vocals.add_argument(
