@@ -473,10 +473,10 @@ cat <<CHECKLIST
      rm -f ~/Library/Caches/AudioUnitCache/com.apple.audiounits.cache
 2. Start the engine before opening the session:
    $ENGINE_BIN
-3. Insert punch2pen on an audio track, arm the track, press record, and speak for 5-10 seconds.
+3. Insert punch2pen on a vocal track. Press play to transcribe audio already on the track (record-arm is not required). To punch a new take, arm the track, press record, and speak for 5-10 seconds.
 4. If no transcript appears, keep the engine terminal visible and check:
    - Did the plugin connect to 127.0.0.1:7483?
-   - Is Logic actually in record, not just playback?
+   - Is the transport playing or recording? Stopped transport does not capture.
    - Is the model present at $MODEL_FILE?
 5. If transcript appears but word highlighting is late, test a simple 4/4 session first, then your compound-meter session.
 6. Isolated engine smoke (no Logic): ./scripts/engine_smoke.sh
