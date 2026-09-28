@@ -1,6 +1,6 @@
-#include "../src/DatabaseManager.h"
+#include "../src/AccountManager.h"
 #include "../src/IPCServerInterface.h"
-#include "../src/ProfileManager.h"
+#include "../src/ProfileService.h"
 #include "../src/TranscriberInterface.h"
 #include "../src/TranscriptionCoordinator.h"
 #include <algorithm>
@@ -61,6 +61,18 @@ public:
     return c;
   }
 
+  bool hasPendingProfileCommand() override {
+    return !profileCommandQueue.empty();
+  }
+
+  std::string popProfileCommand() override {
+    if (profileCommandQueue.empty())
+      return {};
+    auto c = profileCommandQueue.front();
+    profileCommandQueue.erase(profileCommandQueue.begin());
+    return c;
+  }
+
   void queueAudio(std::vector<float> samples, double dawSampleTime = 0.0,
                   double sampleRate = 0.0, uint32_t captureEpoch = 0) {
     eventQueue.push_back(
@@ -73,6 +85,7 @@ public:
 
   std::vector<QueuedEvent> eventQueue;
   std::vector<CorrectionPair> correctionQueue;
+  std::vector<std::string> profileCommandQueue;
   double lastDawSampleTime_ = 0.0;
   double lastSampleRate_ = 0.0;
   uint32_t lastCaptureEpoch_ = 0;
@@ -127,21 +140,51 @@ public:
   std::vector<std::string> callOrder;
 };
 
+// Records what the coordinator hands to the account layer.
+class RecordingProfileService : public punch2pen::ProfileService {
+public:
+  void recordCorrection(const std::string &original,
+                        const std::string &corrected) override {
+    corrections.push_back({original, corrected});
+    ++revision;
+  }
+  std::vector<std::string> vocabularyForBias() const override {
+    return vocabulary;
+  }
+  uint64_t dictionaryRevision() const override { return revision; }
+  void postCommand(const std::string &json) override {
+    commands.push_back(json);
+  }
+
+  std::vector<std::pair<std::string, std::string>> corrections;
+  std::vector<std::string> commands;
+  std::vector<std::string> vocabulary{"studio", "microphone"};
+  uint64_t revision = 0;
+};
+
+namespace {
+punch2pen::AccountConfig freeConfig(const std::string &dir) {
+  punch2pen::AccountConfig cfg;
+  cfg.dataDir = dir;
+  cfg.profileApiUrl = "";
+  return cfg;
+}
+
+bool contains(const std::vector<std::string> &v, const std::string &s) {
+  return std::find(v.begin(), v.end(), s) != v.end();
+}
+} // namespace
+
 void testCoordinatorRouting() {
   MockIPCServer mockServer;
   MockTranscriber mockTranscriber;
 
   std::string tmpDir = "/tmp/punch2pen_test_coord";
   std::filesystem::create_directories(tmpDir);
-  punch2pen::DatabaseManager db;
-  db.initialize(tmpDir + "/test_corrections.csv");
+  punch2pen::AccountManager account(freeConfig(tmpDir), nullptr);
 
-  punch2pen::ProfileManager profileManager;
-  profileManager.setDataDirectory(tmpDir);
-  profileManager.loadProfile("test");
-
-  Punch2Pen::TranscriptionCoordinator coordinator(mockServer, mockTranscriber, db,
-                                                  profileManager);
+  Punch2Pen::TranscriptionCoordinator coordinator(mockServer, mockTranscriber,
+                                                  account);
 
   std::vector<float> fakeDAWAudio(1600, 0.5f);
   mockServer.queueAudio(fakeDAWAudio, 48000.0, 44100.0);
@@ -163,64 +206,24 @@ void testCoordinatorRouting() {
          "Error: DAW sample time not forwarded correctly!");
   assert(mockTranscriber.lastInputSampleRate == 44100.0 &&
          "Error: Host sample rate not forwarded to TranscriberInterface!");
+  assert(!mockTranscriber.setVocabularyBiasCalled &&
+         "Error: no correction and no dictionary, yet bias was applied");
 
   std::cout << "[PASS] testCoordinatorRouting" << std::endl;
 
   std::filesystem::remove_all(tmpDir);
 }
 
-void testCoordinatorCorrections() {
+void testCoordinatorCorrectionsReachFreeSessionDictionary() {
   MockIPCServer mockServer;
   MockTranscriber mockTranscriber;
 
   std::string tmpDir = "/tmp/punch2pen_test_coord_corr";
   std::filesystem::create_directories(tmpDir);
-  punch2pen::DatabaseManager db;
-  db.initialize(tmpDir + "/test_corrections.csv");
+  punch2pen::AccountManager account(freeConfig(tmpDir), nullptr);
 
-  punch2pen::ProfileManager profileManager;
-  profileManager.setDataDirectory(tmpDir);
-  profileManager.loadProfile("test");
-
-  Punch2Pen::TranscriptionCoordinator coordinator(mockServer, mockTranscriber, db,
-                                                  profileManager);
-
-  mockServer.correctionQueue.push_back({"hello", "world"});
-
-  std::thread worker([&]() { coordinator.run(); });
-  std::this_thread::sleep_for(std::chrono::milliseconds(20));
-  coordinator.stop();
-  worker.join();
-
-  assert(mockTranscriber.setVocabularyBiasCalled &&
-         "Error: Coordinator did not update vocabulary after correction!");
-
-  auto vocab = db.getVocabulary();
-  assert(!vocab.empty() && "Error: DatabaseManager vocabulary empty after correction!");
-
-  std::cout << "[PASS] testCoordinatorCorrections" << std::endl;
-
-  std::filesystem::remove_all(tmpDir);
-}
-
-void testCoordinatorProfileCorrections() {
-  MockIPCServer mockServer;
-  MockTranscriber mockTranscriber;
-
-  std::string tmpDbDir = "/tmp/punch2pen_test_coord_profile_db";
-  std::string tmpProfileDir = "/tmp/punch2pen_test_coord_profile_pm";
-  std::filesystem::create_directories(tmpDbDir);
-  std::filesystem::create_directories(tmpProfileDir);
-
-  punch2pen::DatabaseManager db;
-  db.initialize(tmpDbDir + "/test_corrections.csv");
-
-  punch2pen::ProfileManager profileManager;
-  profileManager.setDataDirectory(tmpProfileDir);
-  profileManager.loadProfile("test");
-
-  Punch2Pen::TranscriptionCoordinator coordinator(mockServer, mockTranscriber, db,
-                                                  profileManager);
+  Punch2Pen::TranscriptionCoordinator coordinator(mockServer, mockTranscriber,
+                                                  account);
 
   mockServer.correctionQueue.push_back({"mic", "studio microphone"});
 
@@ -229,37 +232,53 @@ void testCoordinatorProfileCorrections() {
   coordinator.stop();
   worker.join();
 
-  auto dbVocab = db.getVocabulary();
-  bool dbHasStudio = std::find(dbVocab.begin(), dbVocab.end(), "studio") != dbVocab.end();
-  bool dbHasMicrophone = std::find(dbVocab.begin(), dbVocab.end(), "microphone") != dbVocab.end();
-  assert(dbHasStudio && "DB vocabulary should contain 'studio'");
-  assert(dbHasMicrophone && "DB vocabulary should contain 'microphone'");
+  assert(mockTranscriber.setVocabularyBiasCalled &&
+         "Error: Coordinator did not update vocabulary after correction!");
+  assert(contains(mockTranscriber.lastVocabularyReceived, "studio"));
+  assert(contains(mockTranscriber.lastVocabularyReceived, "microphone"));
+  assert(account.tier() == "free");
+  assert(account.dictionaryEntryCount() == 1);
+  assert(account.mapWord("mic") == "studio microphone" &&
+         "Error: session dictionary did not map the corrected word");
+  // Free tier writes nothing to disk: session-only, reset on restart.
+  assert(!std::filesystem::exists(tmpDir + "/account.json"));
+  assert(!std::filesystem::exists(tmpDir + "/profiles"));
+  assert(!std::filesystem::exists(tmpDir + "/corrections.csv"));
 
-  auto profileCorrections = profileManager.getCorrections();
-  assert(profileCorrections.size() == 1 && "ProfileManager should have 1 correction");
-  assert(profileCorrections[0].original == "mic" &&
-         "Correction original should be 'mic'");
-  assert(profileCorrections[0].corrected == "studio microphone" &&
-         "Correction corrected should be 'studio microphone'");
+  std::cout << "[PASS] testCoordinatorCorrectionsReachFreeSessionDictionary"
+            << std::endl;
 
-  auto profileVocab = profileManager.getVocabulary();
-  bool profileHasStudio = std::find(profileVocab.begin(), profileVocab.end(), "studio") != profileVocab.end();
-  bool profileHasMicrophone = std::find(profileVocab.begin(), profileVocab.end(), "microphone") != profileVocab.end();
-  assert(profileHasStudio && "Profile vocabulary should contain 'studio'");
-  assert(profileHasMicrophone && "Profile vocabulary should contain 'microphone'");
+  std::filesystem::remove_all(tmpDir);
+}
 
-  auto &lastVocab = mockTranscriber.lastVocabularyReceived;
-  bool transcriberHasStudio = std::find(lastVocab.begin(), lastVocab.end(), "studio") != lastVocab.end();
-  bool transcriberHasMicrophone = std::find(lastVocab.begin(), lastVocab.end(), "microphone") != lastVocab.end();
-  assert(transcriberHasStudio &&
-         "Transcriber vocabulary bias should contain 'studio'");
-  assert(transcriberHasMicrophone &&
-         "Transcriber vocabulary bias should contain 'microphone'");
+void testCoordinatorForwardsProfileCommands() {
+  MockIPCServer mockServer;
+  MockTranscriber mockTranscriber;
+  RecordingProfileService profiles;
 
-  std::cout << "[PASS] testCoordinatorProfileCorrections" << std::endl;
+  Punch2Pen::TranscriptionCoordinator coordinator(mockServer, mockTranscriber,
+                                                  profiles);
 
-  std::filesystem::remove_all(tmpDbDir);
-  std::filesystem::remove_all(tmpProfileDir);
+  mockServer.profileCommandQueue.push_back(R"({"op":"status"})");
+  mockServer.profileCommandQueue.push_back(
+      R"({"op":"login_start","email":"a@b.co"})");
+  mockServer.correctionQueue.push_back({"helo", "hello"});
+
+  std::thread worker([&]() { coordinator.run(); });
+  std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  coordinator.stop();
+  worker.join();
+
+  assert(profiles.commands.size() == 2 &&
+         "Error: profile commands were not forwarded to the account layer");
+  assert(profiles.commands[0] == R"({"op":"status"})");
+  assert(profiles.corrections.size() == 1);
+  assert(profiles.corrections[0].second == "hello");
+  assert(mockTranscriber.setVocabularyBiasCalled &&
+         "Error: revision bump did not reapply vocabulary bias");
+  assert(mockTranscriber.lastVocabularyReceived == profiles.vocabulary);
+
+  std::cout << "[PASS] testCoordinatorForwardsProfileCommands" << std::endl;
 }
 
 void testCoordinatorDrainThreeChunksThenStop() {
@@ -268,15 +287,10 @@ void testCoordinatorDrainThreeChunksThenStop() {
 
   std::string tmpDir = "/tmp/punch2pen_test_coord_drain";
   std::filesystem::create_directories(tmpDir);
-  punch2pen::DatabaseManager db;
-  db.initialize(tmpDir + "/test_corrections.csv");
+  punch2pen::AccountManager account(freeConfig(tmpDir), nullptr);
 
-  punch2pen::ProfileManager profileManager;
-  profileManager.setDataDirectory(tmpDir);
-  profileManager.loadProfile("test");
-
-  Punch2Pen::TranscriptionCoordinator coordinator(mockServer, mockTranscriber, db,
-                                                  profileManager);
+  Punch2Pen::TranscriptionCoordinator coordinator(mockServer, mockTranscriber,
+                                                  account);
 
   mockServer.queueAudio(std::vector<float>(100, 0.1f), 48000.0, 48000.0);
   mockServer.queueAudio(std::vector<float>(200, 0.2f), 48100.0, 48000.0);
@@ -314,15 +328,10 @@ void testCoordinatorServicesCorrectionsDuringAudio() {
 
   std::string tmpDir = "/tmp/punch2pen_test_coord_corr_audio";
   std::filesystem::create_directories(tmpDir);
-  punch2pen::DatabaseManager db;
-  db.initialize(tmpDir + "/test_corrections.csv");
+  punch2pen::AccountManager account(freeConfig(tmpDir), nullptr);
 
-  punch2pen::ProfileManager profileManager;
-  profileManager.setDataDirectory(tmpDir);
-  profileManager.loadProfile("test");
-
-  Punch2Pen::TranscriptionCoordinator coordinator(mockServer, mockTranscriber, db,
-                                                  profileManager);
+  Punch2Pen::TranscriptionCoordinator coordinator(mockServer, mockTranscriber,
+                                                  account);
 
   mockServer.queueAudio(std::vector<float>(100, 0.1f), 0.0, 48000.0);
   mockServer.queueAudio(std::vector<float>(100, 0.2f), 100.0, 48000.0);
@@ -350,8 +359,8 @@ void testCoordinatorServicesCorrectionsDuringAudio() {
 
 int main() {
   testCoordinatorRouting();
-  testCoordinatorCorrections();
-  testCoordinatorProfileCorrections();
+  testCoordinatorCorrectionsReachFreeSessionDictionary();
+  testCoordinatorForwardsProfileCommands();
   testCoordinatorDrainThreeChunksThenStop();
   testCoordinatorServicesCorrectionsDuringAudio();
   std::cout << "All TranscriptionCoordinator tests passed!" << std::endl;

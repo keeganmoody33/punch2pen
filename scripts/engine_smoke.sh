@@ -18,13 +18,16 @@ usage() {
 Usage: $(basename "$0") [options]
 
 Start punch2penEngine with an isolated PUNCH2PEN_HOME, prove handshake +
-correction IPC, then run the vocal golden-file check (skip if no WAV).
+correction IPC + free-tier ProfileStatus (session dictionary, no cloud),
+then run engine timeline coverage (words from a fed vocal land on the host
+playhead; skip if no WAV). That check does not load the plugin.
 
 Options:
   --skip-build       Use an existing \$PUNCH2PEN_BUILD_DIR/bin/punch2penEngine
-  --skip-vocals      Do not run scripts/verify_engine.py vocals
+  --skip-vocals      Do not run engine timeline coverage (verify_engine.py vocals)
   --require-vocals   Fail if fixtures/vocals/dry-vocal.wav is missing
-  --reap-selftest    Kill a SIGTERM-ignoring dummy and exit (no engine)
+  --self-test        Prove teardown SIGKILLs a SIGTERM-ignoring child tree
+  --reap-selftest    Same as --self-test (exit after that check, no engine)
   --build-dir PATH   CMake build directory (default: $BUILD_DIR)
   -h, --help
 USAGE
@@ -127,7 +130,7 @@ while [[ $# -gt 0 ]]; do
     --skip-build) RUN_BUILD=0; shift ;;
     --skip-vocals) RUN_VOCALS=0; shift ;;
     --require-vocals) REQUIRE_VOCALS=1; shift ;;
-    --reap-selftest) REAP_SELFTEST_ONLY=1; shift ;;
+    --self-test|--reap-selftest) REAP_SELFTEST_ONLY=1; shift ;;
     --build-dir) BUILD_DIR="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) die "unknown option: $1" ;;
@@ -252,23 +255,30 @@ done
   die "engine log missing Received/Applied correction"
 }
 
-CSV="$ISOLATED/.punch2pen/corrections.csv"
-[[ -f "$CSV" ]] || die "missing $CSV after correction"
-grep -qxF "punch 2 pen,Punch2Pen" "$CSV" || die "CSV missing punch 2 pen,Punch2Pen"
-log "engine_smoke: correction CSV ok"
+# Free/lite: the correction lives in the engine's session dictionary only.
+# Nothing is written to disk and the engine never signs in or calls out.
+python3 "$ROOT/scripts/verify_engine.py" profile --port "$PORT" \
+  --expect-tier free --min-entries 1
+[[ ! -f "$ISOLATED/.punch2pen/corrections.csv" ]] || die "free tier wrote corrections.csv"
+[[ ! -f "$ISOLATED/.punch2pen/account.json" ]] || die "free tier wrote account.json"
+[[ ! -d "$ISOLATED/.punch2pen/profiles" ]] || die "free tier wrote a profile cache"
+log_has "Profile: free" || die "engine log missing 'Profile: free'"
+log "engine_smoke: free tier session dictionary ok (no cloud, nothing persisted)"
 
 if [[ "$RUN_VOCALS" -eq 1 ]]; then
   VOCAL_ARGS=(
     vocals
     --port "$PORT"
+    --playback
     --stt-timeout "${PUNCH2PEN_STT_TIMEOUT:-60}"
   )
   if [[ "$REQUIRE_VOCALS" -eq 1 ]]; then
     VOCAL_ARGS+=(--require)
   fi
   python3 "$ROOT/scripts/verify_engine.py" "${VOCAL_ARGS[@]}"
+  log "engine_smoke: engine timeline coverage ok (words from a fed vocal land on the host playhead)"
 else
-  log "engine_smoke: vocals skipped"
+  log "engine_smoke: engine timeline coverage skipped"
 fi
 
 log "engine_smoke: PASS (no Logic)"

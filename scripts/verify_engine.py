@@ -3,7 +3,10 @@
 
 Subcommands:
   smoke     Handshake + one correction (engine must already be running)
-  vocals    Send a real-vocal WAV and score against expected-words.txt
+  profile   Request a ProfileStatus and assert tier / dictionary counts
+  vocals    Send a real-vocal WAV and score against expected-words.txt.
+            --playback is engine timeline coverage: words from that fed vocal
+            land on the host playhead. It does not load PluginProcessor.
   selftest  Protocol struct sizes only
 
 Vocals skip with exit 0 when the WAV is missing unless --require is set.
@@ -13,6 +16,7 @@ A 440 Hz sine is not vocals; do not treat smoke as a transcription proof.
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import struct
 import sys
@@ -52,6 +56,10 @@ def cmd_selftest(_args: argparse.Namespace) -> int:
     if err:
         die(err)
     print("selftest: PASS protocol header sizes")
+    err = proto.handshake_response_required_ok()
+    if err:
+        die(err)
+    print("selftest: PASS HandshakeResponse required before live client")
     err = proto.wait_deadline_ok()
     if err:
         die(err)
@@ -76,6 +84,45 @@ def cmd_smoke(args: argparse.Namespace) -> int:
             sock.close()
     print(f"Sent Correction: '{original}' -> '{corrected}'")
     print("smoke: PASS handshake + correction send")
+    return 0
+
+
+def cmd_profile(args: argparse.Namespace) -> int:
+    """Ask the engine for its ProfileStatus over IPC.
+
+    Free/lite must report tier=free with a session-scoped dictionary and no
+    sign-in. After `smoke`, the session dictionary holds that correction.
+    """
+    sock = None
+    try:
+        sock = proto.connect(port=args.port, timeout=args.timeout)
+        proto.complete_handshake(sock)
+        proto.send_profile_command(sock, {"op": "status"})
+        status = proto.wait_for_profile_status(sock, timeout=args.timeout)
+    except ConnectionRefusedError:
+        die(f"could not connect to 127.0.0.1:{args.port} — is punch2penEngine running?")
+    except Exception as exc:
+        die(str(exc))
+    finally:
+        if sock is not None:
+            sock.close()
+
+    print(json.dumps(status, indent=2, sort_keys=True))
+    tier = status.get("tier")
+    dictionary = status.get("dictionary") or {}
+    entries = int(dictionary.get("entries", 0))
+    if args.expect_tier and tier != args.expect_tier:
+        die(f"expected tier {args.expect_tier!r}, engine reports {tier!r}")
+    if entries < args.min_entries:
+        die(f"expected at least {args.min_entries} dictionary entries, got {entries}")
+    if tier == "free":
+        if status.get("signedIn"):
+            die("free tier must not report signedIn")
+        if dictionary.get("scope") != "session":
+            die("free tier dictionary must be session-scoped")
+        if status.get("sync") != "local":
+            die("free tier must report sync=local (no cloud)")
+    print(f"profile: PASS tier={tier} entries={entries} scope={dictionary.get('scope')}")
     return 0
 
 
@@ -126,6 +173,37 @@ def load_wav_mono_float(path: Path) -> tuple[List[float], float]:
     return mono, float(rate)
 
 
+def assert_words_on_host_timeline(
+    results: Sequence[tuple], origin: float, n_samples: int
+) -> int:
+    """Engine timeline coverage: fed-vocal words sit on the host playhead.
+
+    A private 0-based clock (karaoke from the start of the buffer) fails this.
+    `origin` is the host sample time of the first sample sent. This does not
+    load PluginProcessor and is not capture-gate proof.
+    """
+    horizon = origin + float(n_samples) + 1.0
+    timed = 0
+    for text, start, end, _epoch in results:
+        if not str(text).strip():
+            continue
+        timed += 1
+        if float(start) + 1.0 < origin or float(start) > horizon:
+            die(
+                f"word {text!r} start {start} is off the host playhead "
+                f"(origin {origin:.0f}, horizon {horizon:.0f})"
+            )
+        if float(end) + 1.0 < float(start):
+            die(f"word {text!r} ends before it starts ({start} -> {end})")
+    if timed < 1:
+        die("engine timeline coverage produced no words")
+    print(
+        f"engine timeline coverage: {timed} words from a fed vocal "
+        f"land on the host playhead (origin sample {origin:.0f})"
+    )
+    return timed
+
+
 def cmd_vocals(args: argparse.Namespace) -> int:
     wav_path = Path(args.wav)
     expected_path = Path(args.expected)
@@ -153,12 +231,21 @@ def cmd_vocals(args: argparse.Namespace) -> int:
         die(f"{expected_path} has no words")
 
     samples, rate = load_wav_mono_float(wav_path)
+    playback = bool(getattr(args, "playback", False))
+    if getattr(args, "daw_origin", None) is not None:
+        daw_origin = float(args.daw_origin)
+    elif playback:
+        # Offset the fed vocal so a 0-based engine clock fails timeline coverage.
+        # This never loads PluginProcessor.
+        daw_origin = 10.0 * rate
+    else:
+        daw_origin = 0.0
     sock = None
     try:
         sock = proto.connect(port=args.port, timeout=args.timeout)
         proto.complete_handshake(sock)
         chunk = max(int(rate), 16000)
-        daw = 0.0
+        daw = daw_origin
         offset = 0
         while offset < len(samples):
             piece = samples[offset : offset + chunk]
@@ -188,6 +275,13 @@ def cmd_vocals(args: argparse.Namespace) -> int:
             "token overlap below threshold. Check the WAV is dry speech you own, "
             "not a mix, and that expected-words.txt matches what you said."
         )
+    if playback:
+        assert_words_on_host_timeline(results, daw_origin, len(samples))
+        print(
+            "engine timeline coverage: PASS "
+            "(words from a fed vocal land on the host playhead; "
+            "not plugin capture proof)"
+        )
     print("vocals: PASS")
     return 0
 
@@ -212,6 +306,15 @@ def build_parser() -> argparse.ArgumentParser:
     smoke.add_argument("--corrected", default="Punch2Pen")
     smoke.set_defaults(func=cmd_smoke)
 
+    profile = sub.add_parser(
+        "profile", parents=[common], help="Request and check a ProfileStatus"
+    )
+    profile.add_argument(
+        "--expect-tier", choices=("free", "paid"), default=None
+    )
+    profile.add_argument("--min-entries", type=int, default=0)
+    profile.set_defaults(func=cmd_profile)
+
     vocals = sub.add_parser(
         "vocals",
         parents=[common],
@@ -226,6 +329,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     vocals.add_argument("--min-overlap", type=float, default=0.5)
     vocals.add_argument("--stt-timeout", type=float, default=60.0)
+    vocals.add_argument(
+        "--playback",
+        action="store_true",
+        help=(
+            "Engine timeline coverage: words from a fed vocal land on the "
+            "host playhead (default origin 10s). Does not load PluginProcessor "
+            "or prove the capture gate"
+        ),
+    )
+    vocals.add_argument(
+        "--daw-origin",
+        type=float,
+        default=None,
+        help="Host sample time of the first sample (default 0, or 10s with --playback)",
+    )
     vocals.set_defaults(func=cmd_vocals)
     return parser
 

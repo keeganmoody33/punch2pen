@@ -23,24 +23,26 @@ flowchart LR
         TC["TranscriptionCoordinator"]
         T["Transcriber<br/>(whisper.cpp)"]
         OAI["OpenAICloudTranscriber<br/>(WebSocket)"]
-        DB["DatabaseManager<br/>(CSV)"]
+        ACC["AccountManager<br/>(session or profile Dictionary)"]
+        API["Profile API<br/>(cloud/, paid only)"]
     end
 
-    PB -- "isRecording audio" --> RB
+    PB -- "playing or recording audio" --> RB
     RB --> IPC_C
     IPC_C -- "Handshake / AudioChunk / TransportStop / Correction" --> IPC_S
     IPC_S --> TC
     TC --> T
     TC --> OAI
-    TC --> DB
+    TC --> ACC
+    ACC -. paid .-> API
     IPC_S -- "HandshakeResponse / TranscriptionResult" --> IPC_C
     IPC_C --> WV
     WV -- "word click / sendCorrection()" --> IPC_C
-    DB -- "vocabulary bias" --> T
-    DB -- "vocabulary bias" --> OAI
+    ACC -- "vocabulary bias" --> T
+    ACC -- "vocabulary bias" --> OAI
 ```
 
-**Plugin side:** `processBlock()` captures audio only when the DAW transport reports `isRecording == true`. Samples are written into a lock-free `AudioRingBuffer` (SPSC, in `plugin/Source/RingBuffer.h`). An `IPCClient` thread completes a protocol handshake, drains the ring buffer, and streams `AudioChunk` messages to the engine. The editor is a WebView shell (`plugin/Source/ui/public/index.html`).
+**Plugin side:** `processBlock()` captures input audio while the host transport is playing or recording, including playback of a vocal already on the track when the track is not record-armed. Stopped transport does not capture. Samples are read into a lock-free `AudioRingBuffer` (SPSC, in `plugin/Source/RingBuffer.h`) and the buffer itself is left untouched, so the plugin adds no effect latency. An `IPCClient` thread completes a protocol handshake, drains the ring buffer, and streams `AudioChunk` messages stamped with the host sample time. The editor is a WebView shell (`plugin/Source/ui/public/index.html`).
 
 **Engine side:** `TranscriptionCoordinator` polls the `IPCServer` for audio, transport-stop events, and correction messages in a 1 ms loop. Audio is forwarded to whichever `TranscriberInterface` backend is active. Results flow back through the IPC connection and appear in the plugin WebView. Local whisper refuses to start if the model file is missing. The engine exits if it cannot bind `127.0.0.1:7483`.
 
@@ -50,8 +52,8 @@ flowchart LR
 |---|---|
 | **Studio Receipt WebView** | One HTML blob in `juce::WebBrowserComponent` (`plugin/Source/ui/public/index.html`); default editor size 400×600, resizable |
 | **Polymorphic transcription backend** | Local whisper.cpp (`Transcriber`) or cloud OpenAI Realtime WebSocket API (`OpenAICloudTranscriber`), switchable via CLI `--cloud --api-key=` |
-| **Correction feedback loop** | User corrections stored in CSV at `~/.punch2pen/corrections.csv`; vocabulary extracted to bias future transcriptions via `initial_prompt` |
-| **Record-state gating** | Audio only captured when DAW transport reports `isRecording == true` |
+| **Correction feedback loop** | **Free / lite:** corrections live in a session `Dictionary` (case-sensitive word map + `initial_prompt` bias) and reset when the engine restarts; nothing is written and nothing leaves the machine. **Paid / pro:** sign in inside the plugin; corrections write the active profile's dictionary (`~/.punch2pen/profiles/<id>.json`, synced through `cloud/`). Workspace seats keep each artist's dictionary isolated. See `cloud/README.md`. No prices are set. |
+| **Transport capture** | Audio captured while the host is playing or recording. Playback of audio already on the track transcribes onto the host clock. Stopped transport does not capture. |
 | **Living Transcript** | WebView highlights the word under the playhead using engine `startTime`/`endTime` |
 | **Click-to-correct UI** | Word click opens the Direction C correction overlay; corrections are submitted via IPC to the engine |
 | **Plugin state persistence** | `transcriptionMode` and `bpm` saved via ValueTree XML serialization in `getStateInformation` / `setStateInformation` |
@@ -101,7 +103,7 @@ cmake --build build -j4
 
 The `--api-key=` flag can be omitted if the `OPENAI_API_KEY` environment variable is set. Do not bake a vendor key into the installer.
 
-Plugin auto-launch looks for `PUNCH2PEN_ENGINE`, then a nested `Contents/Helpers/punch2penEngine.app` inside the AU/VST3 bundle, then `/Applications/Punch2Pen/punch2penEngine.app`. It starts that app with Launch Services (`open -g`) so Logic's AU sandbox does not inherit onto the engine. A bare `punch2penEngine` at `/Applications/Punch2Pen/punch2penEngine` is the posix_spawn fallback. Leftover `~/punch2pen/bin/punch2penEngine` from old builds is ignored (those binaries still have a CI/build-machine rpath and die in dyld). Launch is retried every few seconds until TCP `127.0.0.1:7483` handshakes.
+Plugin auto-launch looks for `PUNCH2PEN_ENGINE`, then `/Applications/Punch2Pen/punch2penEngine.app`, then a nested `Contents/Helpers/punch2penEngine.app` inside the AU/VST3 bundle. It starts that app with Launch Services (`open -g -n`) so Logic's AU sandbox does not inherit onto the engine. If `open` fails, it posix_spawns `Contents/MacOS/punch2penEngine`. A bare `punch2penEngine` at `/Applications/Punch2Pen/punch2penEngine` is the last fallback. Leftover `~/punch2pen/bin/punch2penEngine` from old builds is ignored (those binaries still have a CI/build-machine rpath and die in dyld). Launch is retried every few seconds until TCP `127.0.0.1:7483` handshakes. The unsigned pkg postinstall also strips quarantine, mirrors the AU/VST3 into `~/Library/Audio/Plug-Ins` so a leftover user copy cannot hide the nested helper, seeds `ggml-base.bin`, and starts a RunAtLoad LaunchAgent so a freshly installed pkg is not stuck on WAIT.
 
 The engine is built with whisper/ggml/ixwebsocket statically linked when possible. Any remaining dylibs ship next to the binary. `LC_RPATH` is `@executable_path` / `@loader_path`, not the GitHub Actions runner or a `/tmp` build dir.
 
@@ -117,7 +119,13 @@ Writes an unsigned `dist/Punch2Pen_Installer.pkg`. Requires CMake plugin builds 
 auval -strict -v aufx P2pn Dcta
 ```
 
-The plugin must instantiate with the engine down. Auto-launch is a background helper, not part of AU initialize.
+The plugin must instantiate with the engine down. Auto-launch is a background helper, not part of AU initialize. Quit Logic before installing. After this pkg, `127.0.0.1:7483` should already be listening (LaunchAgent + postinstall `open`); the editor leaves WAIT once Handshake completes. Keegan dispatches **macOS Release** (agents get 403). Postinstall tries to download `ggml-base.bin` into `~/.punch2pen/models/` when it is missing.
+
+To stop the login helper (needed before `scripts/engine_smoke.sh` if port 7483 is taken):
+
+```bash
+launchctl bootout "gui/$(id -u)" /Library/LaunchAgents/com.doctaaa.punch2pen.engine.plist
+```
 
 ### GitHub Release (unsigned Mac pkg)
 
@@ -140,24 +148,27 @@ Wait for the **macOS Release** workflow. Download `Punch2Pen-1.0.0-macOS-unsigne
 
 Static landing page + Cloudflare Worker in `site/`. Copy: punch-in problem, Mac pkg from GitHub Release, free/lite vs paid/pro with **no prices**. PostHog events are wired (`download_click`, `interest_would_pay`, `waitlist_submit`); set `POSTHOG_KEY` as a Wrangler secret to actually send them.
 
+Deploy from the Cloudflare account that already lists **punch2pen.com** (nameservers `irma.ns.cloudflare.com` / `jonah.ns.cloudflare.com`). Custom domains in `site/wrangler.jsonc` create apex + www records; do not edit DNS by hand.
+
 ```bash
 cd site
 npm install
 npx wrangler deploy
 ```
 
-## Repository Structure
+CI (no Wrangler browser login): paste repo Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` for that zone account, then **Actions → Deploy site → Run workflow**, or push to `main` under `site/**`. That workflow is not macOS plugin CI.
 
 ## Repository Structure
 
 | Path | Description |
 |---|---|
 | `engine/` | Background transcription daemon (whisper.cpp, OpenAI Realtime, IPC server, coordinator loop) |
-| `engine/tests/` | Unit tests for coordinator, database manager, profile manager, protocol serialization, OpenAI JSON |
+| `engine/tests/` | Unit tests for coordinator, dictionary, account manager, profile API client, protocol serialization, OpenAI JSON |
 | `plugin/` | JUCE DAW plugin — audio capture, IPC client, Studio Receipt WebView |
 | `plugin/Source/` | C++ plugin sources (`PluginProcessor`, `PluginEditor`, `WebViewEditor`, `IPCClient`, `RingBuffer`) |
 | `plugin/tests/` | Unit tests for RingBuffer, IPCClient, and PluginProcessor state persistence |
 | `shared/` | Protocol definitions shared between plugin and engine (`Protocol.h`) |
+| `cloud/` | Paid profile API (Convex): login, portable dictionaries, workspace seats, static seat dashboard |
 | `scripts/` | Model download, engine smoke, vocal golden-file, DAW readiness helpers |
 | `fixtures/vocals/` | Drop-in dry WAV + expected words (audio gitignored; see README there) |
 | `site/` | punch2pen.com landing page (Cloudflare Worker + static assets) |
@@ -185,10 +196,11 @@ Green unit CI is not a Logic punch. Layers:
 
 | Layer | Command | Needs |
 |---|---|---|
-| Engine unit tests | `databaseManagerTest` … `transcriptTimingTest` (CI `engine-tests`) | CMake |
+| Engine unit tests | `dictionaryTest`, `accountManagerTest`, `cloudProfileClientTest` … `transcriptTimingTest` (CI `engine-tests`) | CMake |
+| Profile API typecheck | `cd cloud && npm run typecheck` (CI `cloud-typecheck`) | Node 22 |
 | Plugin unit tests | `ringBufferTest`, `ipcClientTest`, `pluginProcessorStateTest`, `pluginProcessorCaptureTest` (CI `plugin-tests`) | macOS + JUCE |
 | Engine smoke (no Logic) | `./scripts/engine_smoke.sh` (CI `engine-smoke`) | whisper `ggml-base.bin`; isolated `PUNCH2PEN_HOME` |
-| Vocal golden file | `python3 scripts/verify_engine.py vocals` | Your dry WAV in `fixtures/vocals/` — **SKIP** if missing |
+| Engine timeline coverage | `python3 scripts/verify_engine.py vocals --playback` | Words from a fed vocal land on the host playhead. Does not load the plugin or prove capture. **SKIP** if the WAV is missing |
 | AU identity | `auval -strict -v aufx P2pn Dcta` | Mac after AU install. **Not** GitHub-hosted runners |
 | Logic punch | Insert **punch2pen**, arm, record, watch the Living Transcript | M-series MacBook Pro only |
 
@@ -202,7 +214,7 @@ The following items are **planned but not yet implemented**:
 
 **Recently completed:**
 
-- ~~ProfileManager persistence~~ — per-user JSON profile loading/saving is implemented and wired into the engine startup/shutdown path.
+- ~~Paid profile path~~ — `AccountManager` + `cloud/` (Convex) give login, a portable per-artist dictionary, and isolated workspace seats. The plugin bridge feeds `window.setActiveProfile({name, kind, detail})`; sign-in UI lands with the Living Transcript WebView.
 - ~~Expanded test coverage~~ — plugin-side tests now exist for `AudioRingBuffer`, `IPCClient`, and `PluginProcessor` state round-trip (see `plugin/tests/`)
 - ~~CI/CD pipeline~~ — GitHub Actions CI runs engine tests and plugin tests as parallel jobs
 

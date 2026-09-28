@@ -71,15 +71,35 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -DPUNCH2PEN_BUILD_PLUGIN=OFF
       - name: Build test targets
-        run: cmake --build build --target databaseManagerTest profileManagerTest protocolSerializationTest openAIJsonTest transcriptionCoordinatorTest transcriptTimingTest -j4
+        run: cmake --build build --target dictionaryTest accountManagerTest cloudProfileClientTest protocolSerializationTest ipcServerHandshakeTest openAIJsonTest transcriptionCoordinatorTest transcriptTimingTest -j4
       - name: Run tests
         run: |
-          ./build/bin/databaseManagerTest
-          ./build/bin/profileManagerTest
+          ./build/bin/dictionaryTest
+          ./build/bin/accountManagerTest
+          ./build/bin/cloudProfileClientTest
           ./build/bin/protocolSerializationTest
+          perl -e 'alarm 30; exec @ARGV' ./build/bin/ipcServerHandshakeTest
+          python3 scripts/verify_engine.py selftest
+          python3 scripts/test_page_ready.py
+          python3 scripts/test_host_clock.py
           ./build/bin/openAIJsonTest
           ./build/bin/transcriptionCoordinatorTest
           ./build/bin/transcriptTimingTest
+
+  cloud-typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloud
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        run: npm ci
+      - name: Typecheck Convex functions
+        run: npm run typecheck
 
   plugin-tests:
     needs: native-changes
@@ -97,6 +117,24 @@ jobs:
           ./build/plugin/ipcClientTest_artefacts/Release/ipcClientTest
           ./build/plugin/pluginProcessorStateTest_artefacts/Release/pluginProcessorStateTest
           ./build/plugin/pluginProcessorCaptureTest_artefacts/Release/pluginProcessorCaptureTest
+      - name: Installer postinstall self-test
+        run: |
+          chmod +x installer/macos/scripts/postinstall scripts/check_installer_layout.sh
+          ./installer/macos/scripts/postinstall --self-test
+          ./scripts/check_installer_layout.sh --self-test
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path("engine/src/main.cpp").read_text()
+          bind = text.index("IPCServer server(7483)")
+          start = text.index("server.start()")
+          account = text.index("AccountManager account(")
+          whisper = text.index("make_unique<punch2pen::Transcriber>")
+          if not bind < start < account:
+              raise SystemExit("engine must bind 7483 before constructing AccountManager")
+          if not account < whisper:
+              raise SystemExit("engine must construct AccountManager before Transcriber")
+          print("[PASS] engine binds 7483 before account/whisper")
+          PY
       - name: Build AU, VST3, and engine
         run: cmake --build build --config Release --target punch2penEngine punch2pen_plugin_AU punch2pen_plugin_VST3 -j4
       - name: Check engine rpath is relocatable
@@ -126,10 +164,11 @@ jobs:
       - name: Build punch2penEngine
         run: cmake --build build --config Release --target punch2penEngine -j4
       - name: Engine smoke (no Logic)
+        # Vocals STT is one wall-clock --stt-timeout (default 60s), not 32 serial recvs.
         timeout-minutes: 10
         env:
           PUNCH2PEN_MODEL_CACHE: /tmp/punch2pen-model-cache
         run: |
           chmod +x scripts/engine_smoke.sh scripts/download_model.sh
           ./scripts/engine_smoke.sh --skip-build
-        # Vocals STT is one wall-clock --stt-timeout (default 60s), not 32 serial recvs.
+        # The checked-in Cap vocal fixture makes the vocals check run instead of skip.

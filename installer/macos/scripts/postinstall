@@ -1,0 +1,300 @@
+#!/bin/bash
+# Punch2Pen component postinstall. Runs as root after the AU, VST3, and
+# engine payloads are on disk. Must not fail the pkg: optional steps use
+# `|| true`. Does not open Logic or Pro Tools.
+#
+# Usage (installer): postinstall <package-path> <destination-volume>
+# Usage (CI):        postinstall --self-test
+
+set -u
+
+LABEL="com.doctaaa.punch2pen.engine"
+AU_REL="Library/Audio/Plug-Ins/Components/punch2pen.component"
+VST3_REL="Library/Audio/Plug-Ins/VST3/punch2pen.vst3"
+APP_REL="Applications/Punch2Pen/punch2penEngine.app"
+CLI_REL="Applications/Punch2Pen/punch2penEngine"
+AGENT_REL="Library/LaunchAgents/${LABEL}.plist"
+DOWNLOAD_REL="Applications/Punch2Pen/download_model.sh"
+
+join_root() {
+  local root="$1"
+  local rel="$2"
+  rel="${rel#/}"
+  if [[ "$root" == "/" ]]; then
+    printf '/%s\n' "$rel"
+  else
+    printf '%s/%s\n' "${root%/}" "$rel"
+  fi
+}
+
+is_live_volume() {
+  [[ "${PUNCH2PEN_POSTINSTALL_SKIP_LAUNCH:-}" != "1" ]] || return 1
+  [[ "$DEST" == "/" ]] || [[ "$DEST" == /Volumes/* ]]
+}
+
+console_user() {
+  if [[ -n "${PUNCH2PEN_POSTINSTALL_USER:-}" ]]; then
+    printf '%s\n' "$PUNCH2PEN_POSTINSTALL_USER"
+    return 0
+  fi
+  local u=""
+  if [[ -e /dev/console ]] && command -v /usr/bin/stat >/dev/null 2>&1; then
+    u="$(/usr/bin/stat -f '%Su' /dev/console 2>/dev/null || true)"
+  fi
+  if [[ -z "$u" || "$u" == "root" ]]; then
+    if [[ -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
+      u="$SUDO_USER"
+    else
+      u="${USER:-$(id -un 2>/dev/null || true)}"
+    fi
+  fi
+  printf '%s\n' "$u"
+}
+
+console_home() {
+  local u="$1"
+  if [[ -n "${PUNCH2PEN_POSTINSTALL_HOME:-}" ]]; then
+    printf '%s\n' "${PUNCH2PEN_POSTINSTALL_HOME%/}"
+    return 0
+  fi
+  local home=""
+  if command -v /usr/bin/dscl >/dev/null 2>&1 && [[ -n "$u" ]]; then
+    home="$(/usr/bin/dscl . -read "/Users/${u}" NFSHomeDirectory 2>/dev/null \
+      | awk '{print $2}' || true)"
+  fi
+  if [[ -z "$home" && -n "$u" ]]; then
+    home="$(eval echo "~${u}" 2>/dev/null || true)"
+  fi
+  if [[ -z "$home" || "$home" == "~${u}" ]]; then
+    home="${HOME:-}"
+  fi
+  printf '%s\n' "$home"
+}
+
+sync_tree() {
+  local src="$1"
+  local dest="$2"
+  [[ -e "$src" ]] || return 0
+  mkdir -p "$(dirname "$dest")"
+  rm -rf "$dest"
+  if command -v ditto >/dev/null 2>&1; then
+    ditto "$src" "$dest"
+  else
+    cp -R "$src" "$dest"
+  fi
+}
+
+clear_quarantine() {
+  command -v xattr >/dev/null 2>&1 || return 0
+  local path
+  for path in \
+      "$(join_root "$DEST" "Applications/Punch2Pen")" \
+      "$(join_root "$DEST" "$AU_REL")" \
+      "$(join_root "$DEST" "$VST3_REL")"; do
+    if [[ -e "$path" ]]; then
+      xattr -cr "$path" 2>/dev/null || true
+    fi
+  done
+}
+
+adhoc_sign_engine_app() {
+  command -v codesign >/dev/null 2>&1 || return 0
+  local app
+  app="$(join_root "$DEST" "$APP_REL")"
+  if [[ -d "$app" ]]; then
+    codesign --force -s - --deep "$app" >/dev/null 2>&1 || true
+  fi
+  local nested
+  for nested in \
+      "$(join_root "$DEST" "$AU_REL")/Contents/Helpers/punch2penEngine.app" \
+      "$(join_root "$DEST" "$VST3_REL")/Contents/Helpers/punch2penEngine.app"; do
+    if [[ -d "$nested" ]]; then
+      codesign --force -s - --deep "$nested" >/dev/null 2>&1 || true
+    fi
+  done
+}
+
+register_engine_app() {
+  local lsregister="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+  local app
+  app="$(join_root "$DEST" "$APP_REL")"
+  if [[ -x "$lsregister" && -d "$app" ]] && is_live_volume; then
+    "$lsregister" -f "$app" >/dev/null 2>&1 || true
+  fi
+}
+
+mirror_user_plugins() {
+  local home="$1"
+  local user_name="$2"
+  [[ -n "$home" ]] || return 0
+  local src dest
+  src="$(join_root "$DEST" "$AU_REL")"
+  dest="${home}/Library/Audio/Plug-Ins/Components/punch2pen.component"
+  if [[ -d "$src" ]]; then
+    echo "Punch2Pen: mirroring AU to ${dest}"
+    sync_tree "$src" "$dest"
+  fi
+  src="$(join_root "$DEST" "$VST3_REL")"
+  dest="${home}/Library/Audio/Plug-Ins/VST3/punch2pen.vst3"
+  if [[ -d "$src" ]]; then
+    echo "Punch2Pen: mirroring VST3 to ${dest}"
+    sync_tree "$src" "$dest"
+  fi
+  if [[ "$(id -u)" -eq 0 && -n "$user_name" && "$user_name" != "root" ]]; then
+    chown -R "$user_name" \
+      "${home}/Library/Audio/Plug-Ins/Components/punch2pen.component" \
+      "${home}/Library/Audio/Plug-Ins/VST3/punch2pen.vst3" 2>/dev/null || true
+  fi
+}
+
+seed_whisper_model() {
+  [[ "${PUNCH2PEN_POSTINSTALL_SKIP_MODEL:-}" == "1" ]] && return 0
+  local home="$1"
+  local user_name="$2"
+  [[ -n "$home" ]] || return 0
+  local dest="${home}/.punch2pen/models/ggml-base.bin"
+  if [[ -f "$dest" ]]; then
+    echo "Punch2Pen: whisper model already at ${dest}"
+    return 0
+  fi
+  local helper
+  helper="$(join_root "$DEST" "$DOWNLOAD_REL")"
+  if [[ ! -x "$helper" ]]; then
+    echo "Punch2Pen: download_model.sh missing at ${helper}; skipping model seed" >&2
+    return 0
+  fi
+  echo "Punch2Pen: downloading whisper base model for ${user_name} (needed to leave WAIT)"
+  if [[ "$(id -u)" -eq 0 && -n "$user_name" && "$user_name" != "root" ]] &&
+      command -v sudo >/dev/null 2>&1; then
+    sudo -H -u "$user_name" env HOME="$home" PUNCH2PEN_HOME="$home" \
+      "$helper" base || true
+  else
+    env HOME="$home" PUNCH2PEN_HOME="$home" "$helper" base || true
+  fi
+}
+
+stop_old_engine() {
+  is_live_volume || return 0
+  if command -v pkill >/dev/null 2>&1; then
+    pkill -x punch2penEngine 2>/dev/null || true
+  fi
+}
+
+refresh_au_cache() {
+  is_live_volume || return 0
+  killall AudioComponentRegistrar 2>/dev/null || true
+}
+
+bootstrap_launch_agent() {
+  is_live_volume || return 0
+  local plist
+  plist="$(join_root "$DEST" "$AGENT_REL")"
+  [[ -f "$plist" ]] || return 0
+  command -v launchctl >/dev/null 2>&1 || return 0
+  local uid
+  uid="$(id -u "$CONSOLE_USER" 2>/dev/null || true)"
+  [[ -n "$uid" ]] || return 0
+  launchctl bootout "gui/${uid}" "$plist" 2>/dev/null || true
+  launchctl bootstrap "gui/${uid}" "$plist" 2>/dev/null || true
+  launchctl kickstart -k "gui/${uid}/${LABEL}" 2>/dev/null || true
+}
+
+open_engine_now() {
+  is_live_volume || return 0
+  local app
+  app="$(join_root "$DEST" "$APP_REL")"
+  [[ -d "$app" ]] || return 0
+  command -v /usr/bin/open >/dev/null 2>&1 || return 0
+  if [[ "$(id -u)" -eq 0 && -n "$CONSOLE_USER" && "$CONSOLE_USER" != "root" ]] &&
+      command -v sudo >/dev/null 2>&1; then
+    sudo -H -u "$CONSOLE_USER" /usr/bin/open -g -n "$app" 2>/dev/null || true
+  else
+    /usr/bin/open -g -n "$app" 2>/dev/null || true
+  fi
+}
+
+run_postinstall() {
+  DEST="${PUNCH2PEN_POSTINSTALL_ROOT:-${2:-/}}"
+  DEST="${DEST:-/}"
+  if [[ "$DEST" != "/" ]]; then
+    DEST="${DEST%/}"
+  fi
+  CONSOLE_USER="$(console_user)"
+  CONSOLE_HOME="$(console_home "$CONSOLE_USER")"
+  echo "Punch2Pen postinstall dest=${DEST} user=${CONSOLE_USER} home=${CONSOLE_HOME}"
+
+  clear_quarantine
+  adhoc_sign_engine_app
+  register_engine_app
+  mirror_user_plugins "$CONSOLE_HOME" "$CONSOLE_USER"
+  seed_whisper_model "$CONSOLE_HOME" "$CONSOLE_USER"
+  stop_old_engine
+  bootstrap_launch_agent
+  open_engine_now
+  refresh_au_cache
+  echo "Punch2Pen postinstall finished"
+}
+
+POSTINSTALL_TMP=""
+
+cleanup_self_test() {
+  if [[ -n "${POSTINSTALL_TMP:-}" ]]; then
+    rm -rf "$POSTINSTALL_TMP"
+    POSTINSTALL_TMP=""
+  fi
+}
+
+self_test() {
+  set -e
+  POSTINSTALL_TMP="$(mktemp -d "${TMPDIR:-/tmp}/p2p-postinstall.XXXXXX")"
+  trap cleanup_self_test EXIT
+  local tmp="$POSTINSTALL_TMP"
+
+  local root="${tmp}/dest"
+  local home="${tmp}/Users/studio"
+  mkdir -p \
+    "${root}/Applications/Punch2Pen/punch2penEngine.app/Contents/MacOS" \
+    "${root}/Library/Audio/Plug-Ins/Components/punch2pen.component/Contents/Helpers/punch2penEngine.app/Contents/MacOS" \
+    "${root}/Library/Audio/Plug-Ins/VST3/punch2pen.vst3/Contents/Helpers/punch2penEngine.app/Contents/MacOS" \
+    "${root}/Library/LaunchAgents" \
+    "${home}/Library/Audio/Plug-Ins/Components/punch2pen.component/Contents/MacOS"
+
+  printf 'engine\n' > "${root}/Applications/Punch2Pen/punch2penEngine.app/Contents/MacOS/punch2penEngine"
+  chmod 755 "${root}/Applications/Punch2Pen/punch2penEngine.app/Contents/MacOS/punch2penEngine"
+  printf 'nested\n' > "${root}/Library/Audio/Plug-Ins/Components/punch2pen.component/Contents/Helpers/punch2penEngine.app/Contents/MacOS/punch2penEngine"
+  printf 'nested\n' > "${root}/Library/Audio/Plug-Ins/VST3/punch2pen.vst3/Contents/Helpers/punch2penEngine.app/Contents/MacOS/punch2penEngine"
+  printf 'stale-au\n' > "${home}/Library/Audio/Plug-Ins/Components/punch2pen.component/Contents/MacOS/punch2pen"
+  # Stale user AU from COPY_PLUGIN_AFTER_BUILD: no Contents/Helpers.
+  cat > "${root}/Library/LaunchAgents/${LABEL}.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.doctaaa.punch2pen.engine</string>
+  <key>RunAtLoad</key>
+  <true/>
+</dict>
+</plist>
+PLIST
+
+  PUNCH2PEN_POSTINSTALL_ROOT="$root" \
+    PUNCH2PEN_POSTINSTALL_USER="studio" \
+    PUNCH2PEN_POSTINSTALL_HOME="$home" \
+    PUNCH2PEN_POSTINSTALL_SKIP_LAUNCH=1 \
+    PUNCH2PEN_POSTINSTALL_SKIP_MODEL=1 \
+    run_postinstall ignored "$root"
+
+  [[ -d "${home}/Library/Audio/Plug-Ins/Components/punch2pen.component/Contents/Helpers/punch2penEngine.app" ]]
+  [[ -d "${home}/Library/Audio/Plug-Ins/VST3/punch2pen.vst3/Contents/Helpers/punch2penEngine.app" ]]
+  [[ -f "${home}/Library/Audio/Plug-Ins/Components/punch2pen.component/Contents/Helpers/punch2penEngine.app/Contents/MacOS/punch2penEngine" ]]
+  echo "[PASS] postinstall --self-test (stale user AU gained nested helper)"
+}
+
+if [[ "${1:-}" == "--self-test" ]]; then
+  self_test
+  exit 0
+fi
+
+run_postinstall "$@"
+exit 0

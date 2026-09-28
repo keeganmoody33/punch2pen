@@ -252,15 +252,13 @@ else
   fi
 fi
 
-if [[ -f "$P2P_HOME/corrections.csv" ]]; then
-  record pass "Corrections CSV" "$P2P_HOME/corrections.csv"
+if [[ -f "$P2P_HOME/account.json" ]]; then
+  record pass "Paid profile session" "$P2P_HOME/account.json (signed in; dictionary caches under profiles/)"
 else
-  record warn "Corrections CSV" "not present yet; it will be created after corrections are submitted"
+  record pass "Free / lite" "no account.json; corrections stay in the engine session and nothing is written"
 fi
-if compgen -G "$P2P_HOME/profile_*.json" >/dev/null; then
-  record pass "Profile JSON" "$(compgen -G "$P2P_HOME/profile_*.json" | tr '\n' ' ')"
-else
-  record warn "Profile JSON" "not present yet; it will be created on engine shutdown after profile changes"
+if [[ -f "$P2P_HOME/profile-api.json" ]]; then
+  record pass "Profile API override" "$P2P_HOME/profile-api.json"
 fi
 
 section "Configure and build"
@@ -298,7 +296,7 @@ fi
 
 section "Unit and helper tests"
 if [[ "$RUN_TESTS" -eq 1 ]]; then
-  ENGINE_TESTS=(databaseManagerTest profileManagerTest protocolSerializationTest openAIJsonTest transcriptionCoordinatorTest transcriptTimingTest)
+  ENGINE_TESTS=(databaseManagerTest profileManagerTest protocolSerializationTest ipcServerHandshakeTest openAIJsonTest transcriptionCoordinatorTest transcriptTimingTest)
   for test_name in "${ENGINE_TESTS[@]}"; do
     test_bin="$BUILD_DIR/bin/$test_name"
     if [[ -x "$test_bin" ]]; then
@@ -475,10 +473,10 @@ cat <<CHECKLIST
      rm -f ~/Library/Caches/AudioUnitCache/com.apple.audiounits.cache
 2. Start the engine before opening the session:
    $ENGINE_BIN
-3. Insert punch2pen on an audio track, arm the track, press record, and speak for 5-10 seconds.
+3. Insert punch2pen on a vocal track. Press play to transcribe audio already on the track (record-arm is not required). To punch a new take, arm the track, press record, and speak for 5-10 seconds.
 4. If no transcript appears, keep the engine terminal visible and check:
    - Did the plugin connect to 127.0.0.1:7483?
-   - Is Logic actually in record, not just playback?
+   - Is the transport playing or recording? Stopped transport does not capture.
    - Is the model present at $MODEL_FILE?
 5. If transcript appears but word highlighting is late, test a simple 4/4 session first, then your compound-meter session.
 6. Isolated engine smoke (no Logic): ./scripts/engine_smoke.sh

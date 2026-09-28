@@ -22,6 +22,9 @@ public:
   void sendTransportStop(uint32_t captureEpoch = 0);
   void flagTransportStop(uint32_t epoch = 0);
   void sendCorrection(const std::string &original, const std::string &corrected);
+  // JSON ProfileCommand for the engine's account layer, e.g.
+  // {"op":"login_start","email":"..."} or {"op":"set_active","profileId":"..."}.
+  void sendProfileCommand(const std::string &json);
   void setTranscriptionMode(TranscriptionMode mode);
   TranscriptionMode getTranscriptionMode() const;
 
@@ -32,7 +35,13 @@ public:
                                          double startTime, double endTime,
                                          uint32_t captureEpoch) = 0;
     virtual void onStatusChanged(bool isConnected) = 0;
+    // Engine ProfileStatus JSON (tier, active profile, dictionary counts).
+    virtual void onProfileStatus(const std::string &json) { (void)json; }
   };
+
+  // Last ProfileStatus seen on this connection, so an editor opened later
+  // can paint the active-profile pill before the engine repeats itself.
+  std::string lastProfileStatus() const;
 
   void addListener(Listener *listener);
   void removeListener(Listener *listener);
@@ -76,6 +85,9 @@ private:
 #endif
   juce::CriticalSection listenerLock;
   std::vector<Listener *> listeners;
+
+  mutable juce::CriticalSection profileStatusLock;
+  std::string lastProfileStatusJson;
 };
 
 } // namespace punch2pen

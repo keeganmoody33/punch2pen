@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import socket
 import struct
 import threading
@@ -15,7 +16,10 @@ MESSAGE_HANDSHAKE = 3
 MESSAGE_HANDSHAKE_RESPONSE = 4
 MESSAGE_CORRECTION = 5
 MESSAGE_TRANSPORT_STOP = 6
+MESSAGE_PROFILE_COMMAND = 7
+MESSAGE_PROFILE_STATUS = 8
 PROTOCOL_VERSION = 1
+MAX_JSON_PAYLOAD = 256 * 1024
 
 HOST = "127.0.0.1"
 PORT = 7483
@@ -97,6 +101,28 @@ def send_transport_stop(sock: socket.socket, capture_epoch: int = 0) -> None:
     sock.sendall(TRANSPORT_STOP_HEADER.pack(capture_epoch))
 
 
+def send_profile_command(sock: socket.socket, command: dict) -> None:
+    """ProfileCommand: header + raw UTF-8 JSON, no sub-header."""
+    payload = json.dumps(command, separators=(",", ":")).encode("utf-8")
+    if len(payload) > MAX_JSON_PAYLOAD:
+        raise ValueError("profile command too large")
+    sock.sendall(MESSAGE_HEADER.pack(MESSAGE_PROFILE_COMMAND, len(payload)))
+    sock.sendall(payload)
+
+
+def wait_for_profile_status(sock: socket.socket, timeout: float) -> dict:
+    """Return the next ProfileStatus JSON document, skipping other types."""
+    sock.settimeout(timeout)
+    for _ in range(64):
+        msg_type, payload = read_message(sock)
+        if msg_type == MESSAGE_PROFILE_STATUS:
+            doc = json.loads(payload.decode("utf-8"))
+            if not isinstance(doc, dict) or doc.get("type") != "profileStatus":
+                raise RuntimeError("ProfileStatus payload is not a status document")
+            return doc
+    raise TimeoutError("no ProfileStatus among the last 64 messages")
+
+
 def read_message(
     sock: socket.socket,
 ) -> Tuple[int, bytes]:
@@ -153,6 +179,169 @@ def wait_for_results(
     if not results:
         raise TimeoutError("timed out waiting for TranscriptionResult")
     return results
+
+
+def _bind_listener() -> socket.socket:
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind((HOST, 0))
+    server.listen(5)
+    return server
+
+
+def _reply_handshake(conn: socket.socket, version: int) -> None:
+    accepted = 1 if version == PROTOCOL_VERSION else 0
+    body = HANDSHAKE_RESPONSE.pack(PROTOCOL_VERSION, accepted)
+    conn.sendall(MESSAGE_HEADER.pack(MESSAGE_HANDSHAKE_RESPONSE, len(body)) + body)
+
+
+def _read_client_handshake(conn: socket.socket) -> int:
+    """Read frames until Handshake. Earlier frames stay on this socket."""
+    conn.settimeout(2.0)
+    while True:
+        msg_type, payload = read_message(conn)
+        if msg_type == MESSAGE_HANDSHAKE:
+            if len(payload) != HANDSHAKE.size:
+                raise RuntimeError("handshake payload size")
+            (version,) = HANDSHAKE.unpack(payload)
+            return int(version)
+
+
+def handshake_response_required_ok() -> Optional[str]:
+    """Client is live only after a HandshakeResponse frame.
+
+    TCP accept with no HandshakeResponse is the v1.0.3 WAIT outcome
+    (engine log: client connected, HandshakeResponse absent). That must
+    fail. An early non-handshake frame must not close the socket. A
+    rejected handshake must leave the same listener up — no second bind.
+    """
+    held = threading.Event()
+
+    def accept_and_hold(server: socket.socket) -> None:
+        conn, _addr = server.accept()
+        try:
+            held.wait(timeout=2.0)
+        finally:
+            conn.close()
+
+    silent = _bind_listener()
+    silent_port = silent.getsockname()[1]
+    silent_thread = threading.Thread(
+        target=accept_and_hold, args=(silent,), daemon=True
+    )
+    silent_thread.start()
+    try:
+        sock = connect(port=silent_port, timeout=0.4)
+        try:
+            try:
+                complete_handshake(sock)
+            except Exception:
+                pass
+            else:
+                return (
+                    "TCP accept without HandshakeResponse was treated as a "
+                    "live client; the plugin stays on WAIT"
+                )
+        finally:
+            sock.close()
+    finally:
+        held.set()
+        silent.close()
+
+    def transcript_first(server: socket.socket) -> None:
+        conn, _addr = server.accept()
+        try:
+            text = b"lyric"
+            payload = RESULT_HEADER.pack(len(text), 0.0, 1.0, 1) + text
+            conn.sendall(MESSAGE_HEADER.pack(MESSAGE_RESULT, len(payload)) + payload)
+            time.sleep(0.3)
+        except OSError:
+            pass
+        finally:
+            conn.close()
+
+    early_tx = _bind_listener()
+    early_port = early_tx.getsockname()[1]
+    threading.Thread(target=transcript_first, args=(early_tx,), daemon=True).start()
+    try:
+        sock = connect(port=early_port, timeout=1.0)
+        try:
+            try:
+                complete_handshake(sock)
+            except Exception:
+                pass
+            else:
+                return "transcript frame before HandshakeResponse was accepted"
+        finally:
+            sock.close()
+    finally:
+        early_tx.close()
+
+    def same_listener(server: socket.socket) -> None:
+        handled = 0
+        while handled < 2:
+            conn, _addr = server.accept()
+            try:
+                conn.settimeout(2.0)
+                while True:
+                    msg_type, payload = read_message(conn)
+                    if msg_type != MESSAGE_HANDSHAKE:
+                        continue
+                    if len(payload) != HANDSHAKE.size:
+                        return
+                    (version,) = HANDSHAKE.unpack(payload)
+                    _reply_handshake(conn, int(version))
+                    if int(version) == PROTOCOL_VERSION:
+                        handled += 1
+                        break
+            except (OSError, RuntimeError, TimeoutError):
+                pass
+            finally:
+                conn.close()
+
+    listener = _bind_listener()
+    listener_port = listener.getsockname()[1]
+    threading.Thread(target=same_listener, args=(listener,), daemon=True).start()
+    try:
+        first = connect(port=listener_port, timeout=1.0)
+        try:
+            send_profile_command(first, {"op": "status"})
+            first.sendall(MESSAGE_HEADER.pack(MESSAGE_HANDSHAKE, HANDSHAKE.size))
+            first.sendall(HANDSHAKE.pack(0))
+            msg_type, payload = read_message(first)
+            if msg_type != MESSAGE_HANDSHAKE_RESPONSE or len(payload) != HANDSHAKE_RESPONSE.size:
+                return (
+                    "early non-handshake frame closed the socket or skipped "
+                    "HandshakeResponse"
+                )
+            _version, accepted = HANDSHAKE_RESPONSE.unpack(payload)
+            if accepted != 0:
+                return "rejected handshake was treated as a live client"
+            first.sendall(MESSAGE_HEADER.pack(MESSAGE_HANDSHAKE, HANDSHAKE.size))
+            first.sendall(HANDSHAKE.pack(PROTOCOL_VERSION))
+            msg_type, payload = read_message(first)
+            if msg_type != MESSAGE_HANDSHAKE_RESPONSE:
+                return "HandshakeResponse was not the frame that completed handshake"
+            _version, accepted = HANDSHAKE_RESPONSE.unpack(payload)
+            if accepted != 1:
+                return "completed handshake was not accepted"
+        finally:
+            first.close()
+
+        # Do not bind again. The retry uses the listener from the failure.
+        second = connect(port=listener_port, timeout=1.0)
+        try:
+            complete_handshake(second)
+        except Exception as exc:
+            return (
+                "failed handshake required a second bind; retry on the same "
+                f"listener failed: {exc}"
+            )
+        finally:
+            second.close()
+    finally:
+        listener.close()
+    return None
 
 
 def packed_sizes_ok() -> Optional[str]:
