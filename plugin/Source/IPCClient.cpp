@@ -14,9 +14,13 @@
 #endif
 
 #if JUCE_MAC || JUCE_IOS
+#include <arpa/inet.h>
+#include <cerrno>
 #include <fcntl.h>
+#include <netinet/in.h>
 #include <pwd.h>
 #include <spawn.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -51,6 +55,70 @@ bool readExact(juce::StreamingSocket &socket, void *data, int len) {
   }
   return true;
 }
+
+// Handshake must not sit on an established socket forever. socket.read(..., true)
+// ignores the 2s deadline, so WAIT never clears and HandshakeResponse is never
+// delivered to the editor.
+bool readExactUntil(juce::StreamingSocket &socket, void *data, int len,
+                    uint32_t startedAt) {
+  auto *p = static_cast<char *>(data);
+  int got = 0;
+  while (got < len) {
+    const uint32_t elapsed = juce::Time::getMillisecondCounter() - startedAt;
+    if (elapsed >= 2000)
+      return false;
+    const int ready = socket.waitUntilReady(true, (int)(2000 - elapsed));
+    if (ready <= 0)
+      return false;
+    const int n = socket.read(p + got, len - got, false);
+    if (n <= 0)
+      return false;
+    got += n;
+  }
+  return true;
+}
+
+void logHandshake(const juce::String &line) {
+  const juce::File dataDir =
+      juce::File(juce::String(punch2pen::punch2penDataDir()));
+  dataDir.createDirectory();
+  dataDir.getChildFile("plugin-ipc.log")
+      .appendText(juce::Time::getCurrentTime().toString(true, true) + " " +
+                  line + "\n");
+}
+
+#if JUCE_MAC
+bool loopbackPortAccepting(int port) {
+  const int fd = ::socket(AF_INET, SOCK_STREAM, 0);
+  if (fd < 0)
+    return false;
+  const int flags = fcntl(fd, F_GETFL, 0);
+  if (flags >= 0)
+    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+  sockaddr_in addr{};
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons(static_cast<uint16_t>(port));
+  addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  const int rc = ::connect(fd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr));
+  bool up = rc == 0;
+  if (!up && errno == EINPROGRESS) {
+    fd_set writefds;
+    FD_ZERO(&writefds);
+    FD_SET(fd, &writefds);
+    timeval tv{};
+    tv.tv_sec = 0;
+    tv.tv_usec = 200000;
+    if (select(fd + 1, nullptr, &writefds, nullptr, &tv) > 0) {
+      int soerr = 0;
+      socklen_t len = sizeof(soerr);
+      getsockopt(fd, SOL_SOCKET, SO_ERROR, &soerr, &len);
+      up = soerr == 0;
+    }
+  }
+  ::close(fd);
+  return up;
+}
+#endif
 } // namespace
 
 IPCClient::IPCClient(int port, bool autoLaunchEngineFlag)
@@ -220,9 +288,11 @@ void IPCClient::attemptConnection() {
       // punch2penEngine only fails to bind 7483 and leaves this editor on WAIT.
       socket.close();
       connected = false;
+      logHandshake("HandshakeResponse not delivered; socket was up, UI stays WAIT");
       return;
     }
     connected = true;
+    logHandshake("HandshakeResponse delivered");
 
     {
       juce::ScopedLock lock(listenerLock);
@@ -233,9 +303,17 @@ void IPCClient::attemptConnection() {
     // Ask the engine who is signed in so the active-profile pill is right
     // from the first frame; the engine answers with a ProfileStatus.
     sendProfileCommand(R"({"op":"status"})");
-  } else {
-    if (autoLaunchEngine)
-      launchEngine();
+  } else if (autoLaunchEngine) {
+#if JUCE_MAC
+    // 7483 already accepting: open -n starts a second engine that cannot bind
+    // and this editor never leaves WAIT.
+    if (loopbackPortAccepting(serverPort)) {
+      logHandshake("launchEngine skipped: 127.0.0.1:" +
+                   juce::String(serverPort) + " already accepting");
+      return;
+    }
+#endif
+    launchEngine();
   }
 }
 
@@ -250,6 +328,7 @@ bool IPCClient::completeHandshake() {
     return false;
   if (!writeExact(socket, &handshake, sizeof(handshake)))
     return false;
+  logHandshake("handshake sent");
 
   const uint32_t startedAt = juce::Time::getMillisecondCounter();
   while (!threadShouldExit()) {
@@ -257,12 +336,8 @@ bool IPCClient::completeHandshake() {
     if (elapsed >= 2000)
       return false;
 
-    const int ready = socket.waitUntilReady(true, (int)(2000 - elapsed));
-    if (ready <= 0)
-      return false;
-
     protocol::Header reply{};
-    if (!readExact(socket, &reply, (int)sizeof(reply)))
+    if (!readExactUntil(socket, &reply, (int)sizeof(reply), startedAt))
       return false;
 
     if (reply.length > protocol::kMaxJsonPayloadBytes)
@@ -272,12 +347,12 @@ bool IPCClient::completeHandshake() {
       if (reply.length != (uint32_t)sizeof(protocol::HandshakeResponse)) {
         if (reply.length > 0) {
           std::vector<char> skip(reply.length);
-          readExact(socket, skip.data(), (int)reply.length);
+          readExactUntil(socket, skip.data(), (int)reply.length, startedAt);
         }
         return false;
       }
       protocol::HandshakeResponse response{};
-      if (!readExact(socket, &response, (int)sizeof(response)))
+      if (!readExactUntil(socket, &response, (int)sizeof(response), startedAt))
         return false;
       return response.accepted != 0 &&
              response.version == protocol::kProtocolVersion;
@@ -285,7 +360,7 @@ bool IPCClient::completeHandshake() {
 
     if (reply.length > 0) {
       std::vector<char> skip(reply.length);
-      if (!readExact(socket, skip.data(), (int)reply.length))
+      if (!readExactUntil(socket, skip.data(), (int)reply.length, startedAt))
         return false;
     }
   }
@@ -471,6 +546,13 @@ juce::File IPCClient::resolveEngineBinary() const {
 }
 
 void IPCClient::launchEngine() {
+#if JUCE_MAC
+  if (loopbackPortAccepting(serverPort)) {
+    logHandshake("launchEngine skipped: 127.0.0.1:" + juce::String(serverPort) +
+                 " already accepting");
+    return;
+  }
+#endif
   const uint32_t now = juce::Time::getMillisecondCounter();
   const uint32_t prev = lastLaunchAttemptMs.load();
   if (prev != 0 && (now - prev) < kLaunchCooldownMs)

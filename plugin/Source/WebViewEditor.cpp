@@ -7,6 +7,26 @@ namespace punch2pen {
 
 namespace {
 
+// Sung bar from a word's own sample position, the host BPM, and the
+// time signature. Quarter-note PPQ matches getTransportPosition().
+// startSample is in host-rate DAW samples. A non-positive rate keeps
+// the 48 kHz preview clock.
+int barForWordSample(double sample, double bpm, int numerator, int denominator,
+                     double sampleRate) {
+  if (!(sampleRate > 0.0))
+    sampleRate = 48000.0;
+  if (!(bpm > 0.0))
+    bpm = 120.0;
+  const int num = numerator > 0 ? numerator : 4;
+  const int den = denominator > 0 ? denominator : 4;
+  const double ppq = (sample / sampleRate) * (bpm / 60.0);
+  const double ppqPerBar =
+      static_cast<double>(num) * (4.0 / static_cast<double>(den));
+  if (!(ppqPerBar > 0.0))
+    return 1;
+  return static_cast<int>(std::floor(juce::jmax(0.0, ppq) / ppqPerBar)) + 1;
+}
+
 juce::String getIndexHtml() {
   int size = 0;
   if (auto *data = BinaryData::getNamedResource("index_html", size))
@@ -94,7 +114,7 @@ WebViewEditor::WebViewEditor(Punch2PenAudioProcessor &p)
                         .withBackgroundColour(juce::Colour(0xff1E1E1E)));
 #endif
 
-  webView = std::make_unique<juce::WebBrowserComponent>(options);
+  webView = std::make_unique<DocumentBrowser>(*this, options);
   addAndMakeVisible(*webView);
   webView->setBounds(getLocalBounds());
 
@@ -135,6 +155,9 @@ void WebViewEditor::timerCallback() {
   auto transport = audioProcessor.getTransportPosition();
 
   jsUpdatePlayhead(audioProcessor.getHostDawSampleTime());
+  jsSetHostClock(transport.bpm, transport.timeSigNum, transport.timeSigDenom,
+                 audioProcessor.getHostTimeSeconds(),
+                 audioProcessor.getSampleRate());
 
   if (transport.bar != lastBar || transport.beat != lastBeat) {
     jsUpdatePosition(transport.bar, transport.beat);
@@ -180,7 +203,10 @@ void WebViewEditor::onTranscriptionReceived(const std::string &text,
       safeThis->displayedCaptureEpoch.store(captureEpoch);
       safeThis->runJs("window.resetTranscript();");
     }
-    int bar = juce::jmax(1, safeThis->lastBar);
+    const auto clock = safeThis->audioProcessor.getTransportPosition();
+    const int bar = barForWordSample(startTime, clock.bpm, clock.timeSigNum,
+                                     clock.timeSigDenom,
+                                     safeThis->audioProcessor.getSampleRate());
     safeThis->jsAppendWord(juce::String(text), startTime, endTime, bar);
   });
 }
@@ -243,6 +269,21 @@ void WebViewEditor::jsUpdatePosition(int bar, int beat) {
   // Changes on every beat — never buffer.
   runJs("window.updatePosition(" + juce::String(bar) + ","
         + juce::String(beat) + ");",
+        /*queueIfPending=*/false);
+}
+
+void WebViewEditor::jsSetHostClock(double bpm, int numerator, int denominator,
+                                   double seconds, double sampleRate) {
+  // Every timer tick. Transient: do not buffer 30 Hz clock updates.
+  // A non-positive processor rate keeps the page's 48 kHz preview clock.
+  if (!(sampleRate > 0.0))
+    sampleRate = 48000.0;
+  runJs("window.setHostClock("
+        + juce::String(bpm) + ","
+        + juce::String(numerator) + ","
+        + juce::String(denominator) + ","
+        + juce::String(seconds) + ","
+        + juce::String(sampleRate) + ");",
         /*queueIfPending=*/false);
 }
 
@@ -319,13 +360,37 @@ void WebViewEditor::jsSetProfileStatus(const juce::String &json) {
 }
 
 // ── Native callbacks from the page ──────────────────────────────────────────
+void WebViewEditor::DocumentBrowser::pageFinishedLoading(
+    const juce::String &url) {
+  juce::WebBrowserComponent::pageFinishedLoading(url);
+  owner.pageFinishedLoading(url);
+}
+
+void WebViewEditor::pageFinishedLoading(const juce::String &url) {
+  juce::ignoreUnused(url);
+  if (!pageReady)
+    pageReady = true;
+  for (const auto &js : queuedJs) {
+    if (webView)
+      webView->evaluateJavascript(js);
+  }
+  queuedJs.clear();
+
+  auto *client = audioProcessor.getIPCClient();
+  if (client != nullptr)
+    lastConnected = client->isConnected();
+  jsSetConnectionStatus(lastConnected);
+}
+
 juce::var WebViewEditor::nativeOnReady(const juce::Array<juce::var> &) {
   pageReady = true;
   for (const auto &js : queuedJs) {
     if (webView) webView->evaluateJavascript(js);
   }
   queuedJs.clear();
-  // Push current connection state on first ready.
+  auto *client = audioProcessor.getIPCClient();
+  if (client != nullptr)
+    lastConnected = client->isConnected();
   jsSetConnectionStatus(lastConnected);
   return {};
 }

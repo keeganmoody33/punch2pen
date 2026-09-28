@@ -29,7 +29,7 @@ Preconditions:
 - You are not attaching to a user's studio engine.
 
 - **Send fixture correction.** Run `.cursor/skills/verify-punch2pen/scripts/control-punch2pen drive correction`. Exit code `0`. Stdout includes `Sent Correction: 'punch 2 pen' -> 'Punch2Pen'`.
-- **Engine received it.** Engine log contains `Client connected!`, `Received Correction: 'punch 2 pen' -> 'Punch2Pen'`, `Applied correction. Vocabulary terms:`, and `Profile: free — local, session-only corrections`.
+- **Engine received it.** Engine log contains `Received Correction: 'punch 2 pen' -> 'Punch2Pen'`, `Applied correction. Vocabulary terms:`, and `Profile: free — local, session-only corrections`. `Client connected!` is only the TCP accept; the smoke send already required a HandshakeResponse or it exits 1.
 - **Session dictionary.** `scripts/verify_engine.py profile --expect-tier free --min-entries 1` prints the ProfileStatus JSON and `profile: PASS`. The helper saves it to `artifacts/<run-id>/profile-status.json`.
 - **Nothing persisted.** Isolated `$HOME/.punch2pen/` has no `corrections.csv`, `account.json`, or `profiles/`.
 - **UI entry (Mac DAW, optional).** With the plugin editor open and a word on screen, click the word, enter `Punch2Pen`, choose Apply. Same log lines, and the `#profile-pill` still reads `LOCAL`. If the editor is not open, record SKIP for `correction-ui` — do not treat the IPC send as a click proof.

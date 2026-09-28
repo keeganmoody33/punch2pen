@@ -56,6 +56,10 @@ def cmd_selftest(_args: argparse.Namespace) -> int:
     if err:
         die(err)
     print("selftest: PASS protocol header sizes")
+    err = proto.handshake_response_required_ok()
+    if err:
+        die(err)
+    print("selftest: PASS HandshakeResponse required before live client")
     err = proto.wait_deadline_ok()
     if err:
         die(err)

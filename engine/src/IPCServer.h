@@ -67,6 +67,9 @@ private:
   int port;
   std::atomic<bool> running{false};
   std::thread acceptThread;
+  // Joined from stop() after each live socket is shutdown. Never detach:
+  // a blocked recv would keep the process alive.
+  std::vector<std::thread> clientThreads;
   std::mutex clientLock;
 
   std::mutex audioQueueLock;
