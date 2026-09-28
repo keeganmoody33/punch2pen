@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Docs — Punch2Pen</title>
+  <meta name="description" content="Install the unsigned macOS pkg, what the nested engine helper is, and how a correction relates to the dictionary." />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/site.css" />
+</head>
+<body>
+  <header class="top">
+    <a class="mark" href="/">[ PUNCH<span class="accent">2</span>PEN ]</a>
+    <nav>
+      <a href="/product">Product</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/for-studios">Studios</a>
+      <a href="/creators">Creators</a>
+      <a href="/docs" aria-current="page">Docs</a>
+      <a href="/login">Sign in</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <p class="eyebrow">Notes that exist</p>
+    <h1>Install, the helper, the dictionary.</h1>
+    <p class="lede">Three notes: the unsigned Mac pkg, the engine app nested inside the plugin, and what Apply actually writes. Search covers this page only.</p>
+    <label class="field">
+      <span>Search this page</span>
+      <input type="search" id="doc-search" placeholder="pkg, helper, dictionary" autocomplete="off" />
+    </label>
+    <p class="note" id="doc-search-status"></p>
+    <ul class="plain" id="doc-toc">
+      <li><a href="#install">Install the unsigned pkg</a></li>
+      <li><a href="#helper">The nested engine helper</a></li>
+      <li><a href="#corrections">Corrections and the dictionary</a></li>
+    </ul>
+
+    <article class="doc" id="install" data-title="Install the unsigned macOS pkg">
+      <h2>Install the unsigned pkg</h2>
+      <p>Quit Logic first. The download is an unsigned macOS package from the <a href="https://github.com/keeganmoody33/punch2pen/releases/latest">latest GitHub Release</a>. Gatekeeper will warn. There is no Developer ID signature and no notarization yet.</p>
+      <ol class="plain">
+        <li>Open the pkg. If Gatekeeper blocks it, the release page is still the place to get the file. Right-click Open when macOS offers that for the unsigned installer or the unsigned helper.</li>
+        <li>The package lays down the AU at <code>/Library/Audio/Plug-Ins/Components/punch2pen.component</code> and the VST3 at <code>/Library/Audio/Plug-Ins/VST3/punch2pen.vst3</code>.</li>
+        <li>The engine app lands at <code>/Applications/Punch2Pen/punch2penEngine.app</code>. A second copy is nested at <code>Contents/Helpers/punch2penEngine.app</code> inside both the AU and the VST3.</li>
+        <li>Postinstall strips quarantine, ad-hoc signs those engine apps, and mirrors the AU and VST3 into <code>~/Library/Audio/Plug-Ins</code> so an older copy in your home folder cannot hide the nested helper.</li>
+        <li>Postinstall downloads <code>~/.punch2pen/models/ggml-base.bin</code> when that Whisper model is missing. Offline, place the file there yourself. The model is not baked into the pkg.</li>
+        <li>Postinstall registers a RunAtLoad LaunchAgent at <code>/Library/LaunchAgents/com.doctaaa.punch2pen.engine.plist</code> and starts the engine, so <code>127.0.0.1:7483</code> is up before the editor opens.</li>
+        <li>Insert <strong>punch2pen</strong> on an audio track in Logic. The editor leaves WAIT after the handshake. Identity check, on a Mac you trust: <code>auval -strict -v aufx P2pn Dcta</code>.</li>
+      </ol>
+      <p>If the editor stays on WAIT: confirm <code>ggml-base.bin</code> is in place, do not use a leftover <code>~/punch2pen/bin/punch2penEngine</code> from an old build, and right-click Open <code>/Applications/Punch2Pen/punch2penEngine.app</code> once if Gatekeeper still blocks the helper. Engine logs go to <code>~/.punch2pen/engine.log</code>. Plugin launch attempts go to <code>~/.punch2pen/plugin-ipc.log</code>.</p>
+      <p>To stop the login helper before a local engine smoke test: <code>launchctl bootout "gui/$(id -u)" /Library/LaunchAgents/com.doctaaa.punch2pen.engine.plist</code>.</p>
+    </article>
+
+    <article class="doc" id="helper" data-title="The nested engine helper">
+      <h2>The nested engine helper</h2>
+      <p>The helper is <code>punch2penEngine</code>, the local transcription process. It is not a second plugin. It loads whisper.cpp, binds <code>127.0.0.1:7483</code>, and takes audio and corrections from the plugin. The free utility never points it at the profile API.</p>
+      <p>Logic’s AU sandbox must not inherit onto that process. The plugin starts the helper with Launch Services (<code>open -g -n</code>) so the engine is its own app. If <code>open</code> fails, the plugin posix-spawns <code>Contents/MacOS/punch2penEngine</code> inside the app bundle.</p>
+      <p>Lookup order:</p>
+      <ol class="plain">
+        <li><code>PUNCH2PEN_ENGINE</code>, if you set it.</li>
+        <li><code>/Applications/Punch2Pen/punch2penEngine.app</code></li>
+        <li><code>Contents/Helpers/punch2penEngine.app</code> nested in the AU or VST3 you loaded.</li>
+        <li>A bare <code>/Applications/Punch2Pen/punch2penEngine</code> binary, last.</li>
+      </ol>
+      <p>Leftover <code>~/punch2pen/bin/punch2penEngine</code> is ignored. Those old binaries still carry a build-machine library path and die on launch. The plugin retries every few seconds until the socket handshakes. Two engines cannot share port 7483.</p>
+    </article>
+
+    <article class="doc" id="corrections" data-title="Corrections and the dictionary">
+      <h2>Corrections and the dictionary</h2>
+      <p>The only edit is in the plugin. Click a word in the Living Transcript. A sheet docks at the bottom of the transcript with the word you clicked. Apply replaces every exact, case-sensitive match in the take and sends the pair to the engine. Cancel or Esc closes the sheet and sends nothing. Leading and trailing punctuation on a token stays put; the dictionary matches the word itself.</p>
+      <p>The engine keeps that pair in a dictionary: a case-sensitive map from the mis-heard token to the spelling you typed, plus a short vocabulary list (capped, ranked by how often you correct it and how recent it is) that biases the next whisper pass. There is no list editor, no import, and no screen for rewriting the dictionary by hand. You teach it by correcting words in the take.</p>
+      <p><strong>Free / local session.</strong> The dictionary is in memory for this engine run. Nothing is written to disk. Nothing is sent. Restart, or a sign-out if you had been signed in, drops it.</p>
+      <p><strong>Signed-in seat.</strong> Apply still starts in the plugin. The pair is then written to that profile’s cache at <code>~/.punch2pen/profiles/&lt;id&gt;.json</code> and synced to the profile API. A pair that has not been acknowledged yet stays pending, including across a refresh, so an offline correction is not thrown away. The account file next to it is <code>~/.punch2pen/account.json</code> (mode 0600) and holds the session, not the words.</p>
+      <p>Only the person signed in on that seat can read or write that dictionary. A workspace owner can add or revoke seats and does not get the pairs. The bar, the beat, and the playhead sample stay in the plugin, locked to the DAW clock. The dictionary stores the correction pair, not the timeline.</p>
+      <p>Sign-in for that seat is email plus a six-digit code, and it is <a href="/login">not available in this build</a> until mail delivery is configured.</p>
+    </article>
+  </main>
+
+  <footer class="foot">
+    <span>Punch2Pen · Mac first · never a browser engine</span>
+    <span>
+      <a href="/product">Product</a>
+      ·
+      <a href="/pricing">Pricing</a>
+      ·
+      <a href="/for-studios">Studios</a>
+      ·
+      <a href="/creators">Creators</a>
+      ·
+      <a href="/docs">Docs</a>
+      ·
+      <a href="/login">Sign in</a>
+      ·
+      <a href="/privacy">Privacy</a>
+      ·
+      <a href="https://github.com/keeganmoody33/punch2pen">Source</a>
+    </span>
+  </footer>
+  <script>
+    (function () {
+      var input = document.getElementById("doc-search");
+      var status = document.getElementById("doc-search-status");
+      var toc = document.getElementById("doc-toc");
+      var docs = Array.prototype.slice.call(document.querySelectorAll(".doc"));
+      if (!input) return;
+      function show(n) {
+        if (!status) return;
+        status.className = "note";
+        if (!input.value.trim()) {
+          status.textContent = "Searching the install, helper, and correction notes on this page.";
+          return;
+        }
+        if (!n) {
+          status.textContent = "Nothing on this page matches. These are the only notes published here.";
+          status.className = "note warn";
+          return;
+        }
+        status.textContent = n === 1 ? "1 section on this page." : n + " sections on this page.";
+        status.className = "note ok";
+      }
+      function run() {
+        var q = input.value.trim().toLowerCase();
+        var shown = 0;
+        docs.forEach(function (el) {
+          var title = el.getAttribute("data-title") || "";
+          var ok = !q || (title + " " + el.textContent).toLowerCase().indexOf(q) !== -1;
+          el.classList.toggle("is-hidden", !ok);
+          if (ok) shown += 1;
+          if (toc) {
+            var link = toc.querySelector('a[href="#' + el.id + '"]');
+            if (link && link.parentElement) link.parentElement.hidden = !ok;
+          }
+        });
+        show(shown);
+      }
+      input.addEventListener("input", run);
+      run();
+    })();
+  </script>
+</body>
+</html>

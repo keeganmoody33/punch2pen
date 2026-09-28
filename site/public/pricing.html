@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pricing — Punch2Pen</title>
+  <meta name="description" content="Free, Pro, and Studio. No dollar amounts. The price is not published yet. Pro is the portable dictionary. Studio is isolated artist seats." />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/site.css" />
+</head>
+<body>
+  <header class="top">
+    <a class="mark" href="/">[ PUNCH<span class="accent">2</span>PEN ]</a>
+    <nav>
+      <a href="/product">Product</a>
+      <a href="/pricing" aria-current="page">Pricing</a>
+      <a href="/for-studios">Studios</a>
+      <a href="/creators">Creators</a>
+      <a href="/docs">Docs</a>
+      <a href="/login">Sign in</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <p class="eyebrow">Three tiers</p>
+    <h1>The split is real. The price is not published yet.</h1>
+    <p class="lede">Free is the local utility. Pro is a login and a portable dictionary. Studio is a room of isolated seats. None of those tiers has a number on it.</p>
+
+    <section>
+      <div class="table-scroll">
+        <table class="tiers">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Free</th>
+              <th>Pro</th>
+              <th>Studio</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Speech-to-text</td>
+              <td data-col="Free">Local generic model on this Mac.</td>
+              <td data-col="Pro">The same local engine. The profile adds your dictionary as context for the next pass.</td>
+              <td data-col="Studio">Same as Pro, once per seat.</td>
+            </tr>
+            <tr>
+              <td>Cloud</td>
+              <td data-col="Free">None. The free utility never contacts the profile API.</td>
+              <td data-col="Pro">The profile API holds the dictionary for that login.</td>
+              <td data-col="Studio">A workspace of seats on that same API.</td>
+            </tr>
+            <tr>
+              <td>Dictionary</td>
+              <td data-col="Free">Session only. Nothing is written. Restart drops it.</td>
+              <td data-col="Pro">Portable dictionary. The correction loop writes it. It follows that login.</td>
+              <td data-col="Studio">One dictionary per artist seat. Isolated from the other seats in the room.</td>
+            </tr>
+            <tr>
+              <td>Login</td>
+              <td data-col="Free">No account.</td>
+              <td data-col="Pro">Email, then a six-digit code, when mail delivery is configured. It is not available in this build.</td>
+              <td data-col="Studio">The owner adds a seat and hands the artist that email. Same sign-in, still not available until mail delivery is configured.</td>
+            </tr>
+            <tr>
+              <td>Cross-DAW</td>
+              <td data-col="Free">No. The session ends with the engine.</td>
+              <td data-col="Pro">The dictionary follows the login from one DAW to another. The host clock does not.</td>
+              <td data-col="Studio">Each seat carries its own dictionary. Same rule. The clock stays in the plugin.</td>
+            </tr>
+            <tr>
+              <td>Clock</td>
+              <td data-col="Free">In the plugin, locked to the DAW.</td>
+              <td data-col="Pro">In the plugin, locked to the DAW.</td>
+              <td data-col="Studio">In the plugin, locked to the DAW.</td>
+            </tr>
+            <tr>
+              <td>Price</td>
+              <td data-col="Free">Not published yet</td>
+              <td data-col="Pro">Not published yet</td>
+              <td data-col="Studio">Not published yet</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="fine" style="margin-top:0.9rem">Cross-DAW is the dictionary, not a host list. Logic on Mac is the host we run. Other DAWs are <a href="/product">not shipped</a>. Studio seats are described on <a href="/for-studios">For studios</a>.</p>
+    </section>
+
+    <section>
+      <p class="eyebrow">What you can do today</p>
+      <h2>Download the free utility. Paid is not a SKU yet.</h2>
+      <p class="lede">The Mac pkg is the free local session. Sign-in for Pro and Studio waits on mail delivery. This page will not invent a charge to fill the gap.</p>
+      <div class="actions">
+        <a class="btn primary" href="https://github.com/keeganmoody33/punch2pen/releases/latest">Download Free Utility</a>
+        <a class="btn ghost" href="/login">Why sign-in is dark</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>Punch2Pen · Mac first · never a browser engine</span>
+    <span>
+      <a href="/product">Product</a>
+      ·
+      <a href="/pricing">Pricing</a>
+      ·
+      <a href="/for-studios">Studios</a>
+      ·
+      <a href="/creators">Creators</a>
+      ·
+      <a href="/docs">Docs</a>
+      ·
+      <a href="/login">Sign in</a>
+      ·
+      <a href="/privacy">Privacy</a>
+      ·
+      <a href="https://github.com/keeganmoody33/punch2pen">Source</a>
+    </span>
+  </footer>
+</body>
+</html>

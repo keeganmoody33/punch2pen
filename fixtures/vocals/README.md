@@ -44,8 +44,13 @@ when the product is fine.
 
 ## What this is not
 
-- Not a Logic punch-in. The plugin only captures while the DAW reports
-  recording. That loop stays on your Mac.
+- Not a Logic session. The plugin captures while the host is playing or
+  recording, so playback of audio already on the track is transcribed.
+  Proving that inside Logic stays on your Mac.
+- `python3 scripts/verify_engine.py vocals --playback` is engine timeline
+  coverage only: words from this fed vocal land on the host playhead. It
+  does not load PluginProcessor. Capture gating is
+  `pluginProcessorCaptureTest`. Logic proof stays manual.
 - Not a license to check in other people’s tracks.
 - Not TTS. A synthetic voice can be a later extra; it does not replace the
   studio take.

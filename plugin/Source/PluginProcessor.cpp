@@ -130,6 +130,7 @@ void Punch2PenAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
     buffer.clear(i, 0, buffer.getNumSamples());
 
   bool isRecording = transportIsRecording.load();
+  bool isPlaying = transportIsPlaying.load();
   double dawSampleTime = hostDawSampleTime.load();
   bool haveAbsoluteHostTime = false;
 
@@ -147,7 +148,12 @@ void Punch2PenAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         transportTimeSigDenom.store(ts->denominator);
       }
 
-      transportIsPlaying.store(pos->getIsPlaying());
+      isPlaying = pos->getIsPlaying();
+      transportIsPlaying.store(isPlaying);
+
+      if (auto seconds = pos->getTimeInSeconds())
+        hostTimeSeconds.store(*seconds);
+
       isRecording = pos->getIsRecording();
       transportIsRecording.store(isRecording);
 
@@ -171,26 +177,37 @@ void Punch2PenAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
           dawSampleTime += static_cast<double>(buffer.getNumSamples());
       }
     }
-  } else if (isRecording || transportIsPlaying.load()) {
+  } else if (isRecording || isPlaying) {
     dawSampleTime += static_cast<double>(buffer.getNumSamples());
   }
   hostDawSampleTime.store(dawSampleTime);
 
-  // 2. Capture audio while recording. Writes carry captureEpoch so a punch-out
-  // drain can stop at take A and leave a concurrent punch-in's samples.
-  if (isRecording) {
-    auto *channelData = buffer.getReadPointer(0);
-    audioRingBuffer->write(channelData, buffer.getNumSamples(), dawSampleTime,
-                           captureEpoch.load());
-  }
-
-  if (wasRecordingLastBlock && !isRecording) {
+  // 2. Close the previous window before writing the next one. Punch-out,
+  // punch-in over an open playback pass, and a full transport stop each
+  // finalize the samples already in the ring. Writes carry captureEpoch so a
+  // drain can stop at one pass and leave the next pass's samples.
+  const bool punchOut = wasRecordingLastBlock && !isRecording;
+  const bool playbackStop =
+      wasPlayingLastBlock && !isPlaying && !isRecording;
+  const bool recordStartsDuringPlayback =
+      wasPlayingLastBlock && !wasRecordingLastBlock && isRecording;
+  if (punchOut || playbackStop || recordStartsDuringPlayback) {
     if (ipcClient)
       ipcClient->flagTransportStop(captureEpoch.load());
     captureEpoch.fetch_add(1);
   }
 
+  // Input is read, never written. The track audio passes through with no
+  // effect latency. Record-arm is not required: host playback is enough.
+  const bool capturing = isPlaying || isRecording;
+  if (capturing && totalNumInputChannels > 0) {
+    auto *channelData = buffer.getReadPointer(0);
+    audioRingBuffer->write(channelData, buffer.getNumSamples(), dawSampleTime,
+                           captureEpoch.load());
+  }
+
   wasRecordingLastBlock = isRecording;
+  wasPlayingLastBlock = isPlaying;
 }
 
 bool Punch2PenAudioProcessor::hasEditor() const {
