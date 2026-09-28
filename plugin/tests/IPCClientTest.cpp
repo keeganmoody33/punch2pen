@@ -769,14 +769,28 @@ void testStopDoesNotEmitNewerTake() {
     if (client == nullptr)
       return;
 
-    Punch2Pen::protocol::Header header;
-    if (!readExact(*client, &header, sizeof(header))) {
-      delete client;
-      return;
+    while (true) {
+      Punch2Pen::protocol::Header header;
+      if (!readExact(*client, &header, sizeof(header)))
+        break;
+      if (header.type == Punch2Pen::protocol::MessageType::AudioChunk) {
+        Punch2Pen::protocol::AudioChunkHeader chunkHeader;
+        if (!readExact(*client, &chunkHeader, sizeof(chunkHeader)))
+          break;
+        std::vector<float> payload(chunkHeader.numSamples);
+        if (!readExact(*client, payload.data(),
+                       (int)chunkHeader.numSamples * (int)sizeof(float)))
+          break;
+        audioChunks.fetch_add(1);
+      } else if (header.type ==
+                 Punch2Pen::protocol::MessageType::TransportStop) {
+        Punch2Pen::protocol::TransportStopHeader stopHeader;
+        if (!readExact(*client, &stopHeader, sizeof(stopHeader)))
+          break;
+        gotStop = true;
+        break;
+      }
     }
-    if (header.type == Punch2Pen::protocol::MessageType::AudioChunk)
-      audioChunks.fetch_add(1);
-    gotStop = (header.type == Punch2Pen::protocol::MessageType::TransportStop);
     delete client;
   });
 

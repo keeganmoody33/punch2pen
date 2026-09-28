@@ -3,19 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
   <title>punch2pen</title>
   <!--
-    punch2pen — Living Transcript.
+    punch2pen — Open vibe on the Living Transcript.
 
-    This single file is the entire plugin face. WebViewEditor loads it into
-    juce::WebBrowserComponent and drives it over a tiny JS API. The window
-    opens at 400×600 (C++ setSize) and is resizable; everything here is fluid.
+    Visual restyle of the main-branch receipt (host clock, profile login,
+    living transcript). Keegan cancelled Studio Receipt / booth-paper look.
+    Dark DAW-native chrome; C++ JS contract is unchanged. Window opens at
+    400×600 (C++ setSize) and is resizable; everything here is fluid.
 
       C++ → JS (evaluateJavascript):
         appendWord(text, startSample, endSample, barNumber)
         updatePlayhead(currentDAWSample)
         setConnectionStatus(connected)        // boolean
         updatePosition(bar, beat)             // ints
+        setHostClock(bpm, numerator, denominator, seconds, sampleRate)
         setState(stateName)                   // disconnected|idle|recording|playback|correction
         resetTranscript()                     // clears all words (new take)
         showCorrection(originalWord, x, y)    // opens the correction sheet
@@ -39,6 +42,7 @@
     Element IDs the bridge / verify harness bind to:
       #header-bar  #app-title  #profile-pill  #status-badge
       #position-display  #position-text  (.bar-num .beat-num)
+      #host-clock  #host-bpm  #host-time
       #connection-banner
       #transcript-container  #transcript-scroll  #transcript-inner
       #return-to-live
@@ -56,30 +60,28 @@
   <style>
     :root {
       /*
-        Booth paper — Punch2Pen identity.
-        Keep in lockstep with site/public/site.css.
-        Not the teal #21 restyle. Chrome is mono (the punch);
-        lyrics are serif (the pen). Accent is stamp vermillion.
-        Active word is an invert plate, not a colored chip.
+        Open — dark, DAW-native, not a toy.
+        Chrome is graphite + teal. Rec is the only red.
+        Living-transcript behaviour (host clock, profile, follow) stays.
       */
-      --bg-deep:     #100E0C;
-      --bg-pane:     #171411;
-      --bg-chrome:   #1E1A16;
-      --bg-raised:   #2A241E;
-      --line:        rgba(243, 235, 218, 0.09);
-      --line-strong: rgba(243, 235, 218, 0.18);
+      --bg-deep:     #1E1E1E;
+      --bg-pane:     #14151A;
+      --bg-chrome:   #22242A;
+      --bg-raised:   #2A2D34;
+      --line:        rgba(255, 255, 255, 0.08);
+      --line-strong: rgba(255, 255, 255, 0.14);
 
-      --ink:         #F3EBDA;
-      --ink-2:       rgba(243, 235, 218, 0.74);
-      --ink-3:       rgba(243, 235, 218, 0.48);
-      --ink-4:       rgba(243, 235, 218, 0.28);
+      --ink:         #F3F4F6;
+      --ink-2:       rgba(243, 244, 246, 0.72);
+      --ink-3:       rgba(243, 244, 246, 0.48);
+      --ink-4:       rgba(243, 244, 246, 0.28);
 
-      --accent:      #E4452F;
-      --accent-ink:  #F3EBDA;
-      --accent-dim:  rgba(228, 69, 47, 0.16);
-      --wait:        #C9A36A;
-      --rec:         #E4452F;
-      --play:        #6FBF8A;
+      --accent:      #7AD4C0;
+      --accent-ink:  #10211C;
+      --accent-dim:  rgba(122, 212, 192, 0.16);
+      --wait:        #D7B07A;
+      --rec:         #FF453A;
+      --play:        #7AD4C0;
 
       /* Temporal Hierarchy */
       --past:        0.38;
@@ -90,9 +92,9 @@
       --title-size:  24px;
       --lyric-lh:    1.42;
 
-      --mono:  ui-monospace, "SF Mono", Menlo, "JetBrains Mono", "IBM Plex Mono", Consolas, monospace;
-      --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "New York", Georgia, "Times New Roman", serif;
-      --sans:  -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Inter, system-ui, sans-serif;
+      --mono:  "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+      --serif: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", sans-serif;
+      --sans:  -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", sans-serif;
       --radius: 5px;
     }
 
@@ -102,9 +104,10 @@
       width: 100%; height: 100%;
       background: var(--bg-deep);
       color: var(--ink);
-      font-family: var(--mono);
+      font-family: var(--sans);
       font-size: 12px;
       overflow: hidden;
+      color-scheme: dark;
       -webkit-font-smoothing: antialiased;
       -webkit-user-select: none; user-select: none;
     }
@@ -127,14 +130,14 @@
       padding: 0 12px;
       background: var(--bg-chrome);
       border-bottom: 1px solid var(--line);
-      box-shadow: inset 0 1px 0 rgba(228, 69, 47, 0.42);
+      box-shadow: none;
       position: relative;
       z-index: 6;
     }
     #app-title {
-      font-weight: 700;
-      font-size: 11px;
-      letter-spacing: 0.16em;
+      font-weight: 600;
+      font-size: 13px;
+      letter-spacing: 0.04em;
       color: var(--ink);
       white-space: nowrap;
     }
@@ -170,11 +173,16 @@
 
     #status-badge {
       margin-left: auto;
-      display: inline-flex; align-items: center; gap: 6px;
-      font-weight: 700; font-size: 10px; letter-spacing: 0.20em;
+      display: inline-flex; align-items: center; gap: 7px;
+      font-family: var(--mono);
+      font-weight: 600; font-size: 9px; letter-spacing: 0.18em;
       text-transform: uppercase;
       color: var(--ink-3);
       white-space: nowrap;
+      padding: 5px 9px 5px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.22);
     }
     #status-badge::before {
       content: ""; width: 7px; height: 7px; border-radius: 50%;
@@ -185,9 +193,10 @@
     body[data-mode="recording"]    #status-badge { color: var(--rec); }
     body[data-mode="playback"]     #status-badge { color: var(--play); }
     body[data-mode="recording"] #status-badge::before { animation: p2p-pulse 1.3s ease-out infinite; }
+    body[data-mode="recording"] #header-bar { box-shadow: inset 0 -1px 0 var(--rec); }
     @keyframes p2p-pulse {
-      0%   { box-shadow: 0 0 0 0 rgba(228, 69, 47, 0.65); }
-      70%  { box-shadow: 0 0 0 9px transparent; }
+      0%   { box-shadow: 0 0 0 0 rgba(255, 69, 58, 0.55); }
+      70%  { box-shadow: 0 0 0 8px transparent; }
       100% { box-shadow: 0 0 0 0 transparent; }
     }
 
@@ -214,7 +223,7 @@
       display: flex; align-items: center; gap: 10px;
       padding: 8px 8px;
       border-radius: var(--radius);
-      background: rgba(243, 235, 218, 0.04);
+      background: rgba(255, 255, 255, 0.04);
     }
     .profile-row .pill-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); flex-shrink: 0; }
     body[data-profile-kind="pro"]  .profile-row .pill-dot,
@@ -300,7 +309,7 @@
       cursor: pointer;
     }
     .seat-row:hover { border-color: var(--line); }
-    .seat-row[aria-selected="true"] { background: rgba(243, 235, 218, 0.04); cursor: default; }
+    .seat-row[aria-selected="true"] { background: rgba(255, 255, 255, 0.04); cursor: default; }
     .seat-row .seat-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-4); flex-shrink: 0; }
     .seat-row[aria-selected="true"] .seat-dot { background: var(--play); }
     .seat-row .who { flex: 1; min-width: 0; }
@@ -327,6 +336,13 @@
       white-space: nowrap;
     }
     #position-text .bar-num, #position-text .beat-num { color: var(--ink); }
+    #host-clock {
+      font-weight: 700; font-size: 11px; letter-spacing: 0.08em;
+      color: var(--ink-3);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    #host-clock .host-bpm, #host-clock .host-time { color: var(--ink); }
     #sync-indicator {
       margin-left: auto;
       display: none; align-items: center; gap: 6px;
@@ -371,10 +387,10 @@
       position: absolute; inset: 0;
       overflow-y: auto; overflow-x: hidden;
       scrollbar-width: thin;
-      scrollbar-color: rgba(243, 235, 218, 0.16) transparent;
+      scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
     }
     #transcript-scroll::-webkit-scrollbar { width: 8px; }
-    #transcript-scroll::-webkit-scrollbar-thumb { background: rgba(243, 235, 218, 0.16); border-radius: 4px; }
+    #transcript-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); border-radius: 4px; }
     #transcript-scroll::-webkit-scrollbar-track { background: transparent; }
     #transcript-inner {
       padding: var(--pad-top, 200px) 22px var(--pad-bot, 200px) 22px;
@@ -586,8 +602,8 @@
     }
     #status-text.nudge { color: var(--ink-2); }
     #logo-mark {
-      width: 16px; height: 16px;
-      opacity: 0.7;
+      width: 24px; height: 24px;
+      opacity: 1;
       color: var(--accent);
       flex-shrink: 0;
     }
@@ -598,11 +614,18 @@
     body.no-motion #profile-popover { animation: none; }
   </style>
 </head>
-<body data-state="disconnected" data-mode="disconnected" data-profile-kind="local">
+<body data-state="disconnected" data-mode="disconnected" data-profile-kind="local" data-vibe="open">
 
   <!-- HEADER ─────────────────────────────────────────────── -->
   <header id="header-bar">
-    <span id="app-title">[ PUNCH<span class="accent">2</span>PEN ]</span>
+    <span id="logo-mark" aria-hidden="true" title="punch2pen">
+      <!-- Playhead in an open frame. Inline so WKWebView needs no extra C++ resources. -->
+      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <rect x="5.5" y="5.5" width="21" height="21" rx="5" stroke="currentColor" stroke-width="2"/>
+        <path d="M13 11.5v9l8-4.5-8-4.5z" fill="currentColor"/>
+      </svg>
+    </span>
+    <span id="app-title">punch<span class="accent">2</span>pen</span>
     <button id="profile-pill" type="button" aria-haspopup="dialog" aria-expanded="false"
             title="Active profile">
       <span class="pill-dot"></span>
@@ -627,9 +650,8 @@
         <span class="check">✓</span>
       </div>
       <p class="pop-copy">
-        Corrections stay in this session. A signed-in profile keeps lyrics, timecode,
-        and your own dictionary with you across DAWs and rooms — each artist’s
-        dictionary stays separate.
+        Corrections stay in this session. A signed-in profile keeps your own dictionary
+        with you across DAWs and rooms — each artist’s dictionary stays separate.
       </p>
       <form id="login-email-form" class="pop-form" novalidate>
         <input id="login-email" class="pop-input" type="email" placeholder="you@studio.com"
@@ -667,6 +689,10 @@
   <div id="position-display">
     <span id="position-text">
       BAR <span class="bar-num">1</span> · BEAT <span class="beat-num">1</span>
+    </span>
+    <span id="host-clock">
+      <span id="host-bpm" class="host-bpm">120</span> BPM
+      · <span id="host-time" class="host-time">00:00:00.000</span>
     </span>
     <span id="sync-indicator">LIVE</span>
   </div>
@@ -714,14 +740,6 @@
   <!-- STATUS BAR ─────────────────────────────────────────── -->
   <footer id="status-bar">
     <span id="status-text" aria-live="polite"></span>
-    <span id="logo-mark" aria-hidden="true" title="placeholder mark">
-      <!-- Stamp 2 — placeholder until a real asset lands in Source/ui/public/assets/. -->
-      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <rect x="1.5" y="1.5" width="29" height="29" rx="6" stroke="currentColor" stroke-width="1.6"/>
-        <path d="M10.2 11.2c0-2.6 2.2-4.4 5.7-4.4 3.4 0 5.7 1.8 5.7 4.5 0 2.2-1.3 3.5-3.7 4.8L12 21.4V23h11.6"
-              stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/>
-      </svg>
-    </span>
   </footer>
 
   <script>
@@ -735,6 +753,8 @@
       const badge       = document.getElementById('status-badge');
       const barNum      = document.querySelector('#position-text .bar-num');
       const beatNum     = document.querySelector('#position-text .beat-num');
+      const hostBpmEl   = document.getElementById('host-bpm');
+      const hostTimeEl  = document.getElementById('host-time');
       const syncInd     = document.getElementById('sync-indicator');
       const container   = document.getElementById('transcript-container');
       const scroller    = document.getElementById('transcript-scroll');
@@ -750,6 +770,13 @@
       const BADGE_TEXT = { disconnected: 'WAIT', idle: 'IDLE', recording: 'REC', playback: 'PLAY' };
       const WORDS_PER_LINE = 8;
       const HOLD_SAMPLES = 36000;     // ≈0.75 s at 48 kHz: keep the last word lit after the take ends
+      const HOST_SAMPLE_RATE = 48000; // static preview until the host clock arrives
+
+      // Host clock. 120 and 48000 are only the readout until setHostClock arrives.
+      let hostBpm = 120;
+      let hostSigNum = 4;
+      let hostSigDenom = 4;
+      let hostSampleRate = HOST_SAMPLE_RATE;
 
       // ────────────────────────────────────────────────────────
       // Native bridge (JS → C++). The JUCE backend can appear after this
@@ -839,11 +866,62 @@
         beatNum.textContent = String(beat);
       }
 
+      function formatHostTime(seconds) {
+        const totalMs = Math.max(0, Math.round((Number(seconds) || 0) * 1000));
+        const ms = totalMs % 1000;
+        const totalSec = Math.floor(totalMs / 1000);
+        const s = totalSec % 60;
+        const m = Math.floor(totalSec / 60) % 60;
+        const h = Math.floor(totalSec / 3600);
+        const pad = (n, w) => String(n).padStart(w, '0');
+        return pad(h, 2) + ':' + pad(m, 2) + ':' + pad(s, 2) + '.' + pad(ms, 3);
+      }
+
+      function formatHostBpm(bpm) {
+        const n = Math.round(Number(bpm) * 100) / 100;
+        if (!Number.isFinite(n) || n <= 0) return '';
+        return String(n);
+      }
+
+      function renderHostClock(seconds) {
+        if (hostBpmEl) hostBpmEl.textContent = formatHostBpm(hostBpm);
+        if (hostTimeEl) hostTimeEl.textContent = formatHostTime(seconds);
+      }
+
+      // Host tempo, timeline, and sample rate. Replaces the preview's 120 and
+      // 48000 once the bridge speaks. A missing or non-positive rate keeps the
+      // current clock. No typed BPM, no invented frame rate: time is HH:MM:SS.mmm.
+      function setHostClock(bpm, numerator, denominator, seconds, sampleRate) {
+        const nextBpm = Number(bpm);
+        if (Number.isFinite(nextBpm) && nextBpm > 0) hostBpm = nextBpm;
+        const num = Math.floor(Number(numerator));
+        const den = Math.floor(Number(denominator));
+        if (Number.isFinite(num) && num >= 1) hostSigNum = num;
+        if (Number.isFinite(den) && den >= 1) hostSigDenom = den;
+        const rate = Number(sampleRate);
+        if (Number.isFinite(rate) && rate > 0) hostSampleRate = rate;
+        renderHostClock(seconds);
+      }
+
+      // Sung bar from this word's sample, the host BPM, the time signature,
+      // and the host sample rate. Word samples are host-rate DAW samples.
+      function barForSample(sample) {
+        const bpm = hostBpm > 0 ? hostBpm : 120;
+        const num = hostSigNum >= 1 ? hostSigNum : 4;
+        const den = hostSigDenom >= 1 ? hostSigDenom : 4;
+        const rate = hostSampleRate > 0 ? hostSampleRate : HOST_SAMPLE_RATE;
+        const ppq = (Number(sample) / rate) * (bpm / 60);
+        const ppqPerBar = num * (4 / den);
+        if (!(ppqPerBar > 0)) return 1;
+        return Math.floor(Math.max(0, ppq) / ppqPerBar) + 1;
+      }
+
       // ────────────────────────────────────────────────────────
       // Transcript model — one .lyric-line per bar (max 8 words)
       // ────────────────────────────────────────────────────────
       function appendWord(text, startSample, endSample, barNumber) {
-        const bar = Number(barNumber);
+        void barNumber; // arrival bar is not the sung bar
+        const bar = barForSample(startSample);
         let line = lines[lines.length - 1];
         const startNewLine =
           !line ||
@@ -853,7 +931,7 @@
         if (startNewLine) {
           const el = document.createElement('div');
           el.className = 'lyric-line line-upcoming';
-          el.dataset.bar = String(barNumber);
+          el.dataset.bar = String(bar);
           inner.appendChild(el);
           line = { el, bar, words: [] };
           lines.push(line);
@@ -1468,6 +1546,7 @@
       window.updatePlayhead      = updatePlayhead;
       window.setConnectionStatus = setConnectionStatus;
       window.updatePosition      = updatePosition;
+      window.setHostClock        = setHostClock;
       window.setState            = setState;
       window.resetTranscript     = resetTranscript;
       window.showCorrection      = showCorrection;

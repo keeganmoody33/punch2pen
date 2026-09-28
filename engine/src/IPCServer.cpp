@@ -115,24 +115,29 @@ bool IPCServer::start() {
 
 void IPCServer::stop() {
   running = false;
-  // close() alone does not always wake a blocking accept() on macOS, so
-  // SIGTERM then wait() in engine_smoke hung until the 10-minute CI cap.
+  // On macOS, shutdown() of a listening socket does not reliably wake
+  // accept(). close() before join does. The fd is cleared here so stop()
+  // cannot close it a second time.
   if (serverSocket >= 0) {
     shutdown(serverSocket, SHUT_RDWR);
+    close(serverSocket);
+    serverSocket = -1;
   }
+  if (acceptThread.joinable())
+    acceptThread.join();
+
+  std::vector<std::thread> toJoin;
   {
     std::lock_guard<std::mutex> lock(clientLock);
     for (const int clientSocket : liveSockets)
       shutdown(clientSocket, SHUT_RDWR);
     if (activeClientSocket >= 0)
       shutdown(activeClientSocket, SHUT_RDWR);
+    toJoin.swap(clientThreads);
   }
-  if (acceptThread.joinable()) {
-    acceptThread.join();
-  }
-  if (serverSocket >= 0) {
-    close(serverSocket);
-    serverSocket = -1;
+  for (std::thread &worker : toJoin) {
+    if (worker.joinable())
+      worker.join();
   }
 }
 
@@ -214,7 +219,9 @@ void IPCServer::acceptLoop() {
     if (clientSocket >= 0) {
       suppressClientSigPipe(clientSocket);
       std::cout << "Client connected!" << std::endl;
-      std::thread(&IPCServer::clientHandler, this, clientSocket).detach();
+      std::lock_guard<std::mutex> lock(clientLock);
+      liveSockets.push_back(clientSocket);
+      clientThreads.emplace_back(&IPCServer::clientHandler, this, clientSocket);
     }
   }
 }
@@ -268,11 +275,6 @@ bool IPCServer::readAndAcknowledgeHandshake(int clientSocket,
 }
 
 void IPCServer::clientHandler(int clientSocket) {
-  {
-    std::lock_guard<std::mutex> lock(clientLock);
-    liveSockets.push_back(clientSocket);
-  }
-
   bool handshook = false;
   constexpr uint32_t kMaxAudioBytes = 8u * 1024u * 1024u;
 
