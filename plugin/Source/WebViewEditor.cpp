@@ -7,6 +7,26 @@ namespace punch2pen {
 
 namespace {
 
+// Sung bar from a word's own sample position, the host BPM, and the
+// time signature. Quarter-note PPQ matches getTransportPosition().
+// startSample is in host-rate DAW samples. A non-positive rate keeps
+// the 48 kHz preview clock.
+int barForWordSample(double sample, double bpm, int numerator, int denominator,
+                     double sampleRate) {
+  if (!(sampleRate > 0.0))
+    sampleRate = 48000.0;
+  if (!(bpm > 0.0))
+    bpm = 120.0;
+  const int num = numerator > 0 ? numerator : 4;
+  const int den = denominator > 0 ? denominator : 4;
+  const double ppq = (sample / sampleRate) * (bpm / 60.0);
+  const double ppqPerBar =
+      static_cast<double>(num) * (4.0 / static_cast<double>(den));
+  if (!(ppqPerBar > 0.0))
+    return 1;
+  return static_cast<int>(std::floor(juce::jmax(0.0, ppq) / ppqPerBar)) + 1;
+}
+
 juce::String getIndexHtml() {
   int size = 0;
   if (auto *data = BinaryData::getNamedResource("index_html", size))
@@ -17,8 +37,8 @@ juce::String getIndexHtml() {
   if (auto *data = BinaryData::getNamedResource("indexhtml", size))
     return juce::String::fromUTF8(data, size);
 
-  return "<html><body style='background:#1C1917;color:#FCD34D;"
-         "font-family:monospace;padding:24px'>"
+  return "<html><body style='background:#100E0C;color:#F3EBDA;"
+         "font-family:ui-monospace,Menlo,monospace;padding:24px'>"
          "<h3>punch2pen WebView</h3>"
          "<p>BinaryData resource \"index_html\"/\"indexhtml\" not found. "
          "Re-run CMake configure and verify that "
@@ -65,6 +85,12 @@ WebViewEditor::WebViewEditor(Punch2PenAudioProcessor &p)
                        auto completion) {
                   completion(nativeOnReady(args));
                 })
+            .withNativeFunction(
+                "profileCommand",
+                [this](const juce::Array<juce::var> &args,
+                       auto completion) {
+                  completion(nativeProfileCommand(args));
+                })
             .withResourceProvider(
                 [](const juce::String &url)
                     -> std::optional<juce::WebBrowserComponent::Resource> {
@@ -88,7 +114,7 @@ WebViewEditor::WebViewEditor(Punch2PenAudioProcessor &p)
                         .withBackgroundColour(juce::Colour(0xff1E1E1E)));
 #endif
 
-  webView = std::make_unique<juce::WebBrowserComponent>(options);
+  webView = std::make_unique<DocumentBrowser>(*this, options);
   addAndMakeVisible(*webView);
   webView->setBounds(getLocalBounds());
 
@@ -98,6 +124,11 @@ WebViewEditor::WebViewEditor(Punch2PenAudioProcessor &p)
   if (auto *client = audioProcessor.getIPCClient()) {
     client->addListener(this);
     lastConnected = client->isConnected();
+    // The engine may have reported the active profile before this editor
+    // existed; replay it so the pill is right on first paint.
+    const std::string cached = client->lastProfileStatus();
+    if (!cached.empty())
+      jsSetProfileStatus(juce::String::fromUTF8(cached.c_str()));
   }
 
   startTimerHz(30);
@@ -124,6 +155,9 @@ void WebViewEditor::timerCallback() {
   auto transport = audioProcessor.getTransportPosition();
 
   jsUpdatePlayhead(audioProcessor.getHostDawSampleTime());
+  jsSetHostClock(transport.bpm, transport.timeSigNum, transport.timeSigDenom,
+                 audioProcessor.getHostTimeSeconds(),
+                 audioProcessor.getSampleRate());
 
   if (transport.bar != lastBar || transport.beat != lastBeat) {
     jsUpdatePosition(transport.bar, transport.beat);
@@ -169,7 +203,10 @@ void WebViewEditor::onTranscriptionReceived(const std::string &text,
       safeThis->displayedCaptureEpoch.store(captureEpoch);
       safeThis->runJs("window.resetTranscript();");
     }
-    int bar = juce::jmax(1, safeThis->lastBar);
+    const auto clock = safeThis->audioProcessor.getTransportPosition();
+    const int bar = barForWordSample(startTime, clock.bpm, clock.timeSigNum,
+                                     clock.timeSigDenom,
+                                     safeThis->audioProcessor.getSampleRate());
     safeThis->jsAppendWord(juce::String(text), startTime, endTime, bar);
   });
 }
@@ -180,6 +217,15 @@ void WebViewEditor::onStatusChanged(bool connected) {
     if (safeThis == nullptr) return;
     safeThis->lastConnected = connected;
     safeThis->jsSetConnectionStatus(connected);
+  });
+}
+
+void WebViewEditor::onProfileStatus(const std::string &json) {
+  juce::Component::SafePointer<WebViewEditor> safeThis(this);
+  const juce::String payload = juce::String::fromUTF8(json.c_str());
+  juce::MessageManager::callAsync([safeThis, payload] {
+    if (safeThis == nullptr) return;
+    safeThis->jsSetProfileStatus(payload);
   });
 }
 
@@ -226,6 +272,21 @@ void WebViewEditor::jsUpdatePosition(int bar, int beat) {
         /*queueIfPending=*/false);
 }
 
+void WebViewEditor::jsSetHostClock(double bpm, int numerator, int denominator,
+                                   double seconds, double sampleRate) {
+  // Every timer tick. Transient: do not buffer 30 Hz clock updates.
+  // A non-positive processor rate keeps the page's 48 kHz preview clock.
+  if (!(sampleRate > 0.0))
+    sampleRate = 48000.0;
+  runJs("window.setHostClock("
+        + juce::String(bpm) + ","
+        + juce::String(numerator) + ","
+        + juce::String(denominator) + ","
+        + juce::String(seconds) + ","
+        + juce::String(sampleRate) + ");",
+        /*queueIfPending=*/false);
+}
+
 void WebViewEditor::jsSetConnectionStatus(bool connected) {
   runJs(juce::String("window.setConnectionStatus(")
         + (connected ? "true" : "false") + ");");
@@ -235,14 +296,101 @@ void WebViewEditor::jsSetState(const juce::String &state) {
   runJs("window.setState(" + juce::JSON::toString(juce::var(state)) + ");");
 }
 
+void WebViewEditor::jsSetProfileStatus(const juce::String &json) {
+  // Only the newest status matters; drop any older one still queued.
+  if (!pageReady) {
+    for (int i = queuedJs.size(); --i >= 0;)
+      if (queuedJs[i].startsWith("/*profile*/"))
+        queuedJs.remove(i);
+  }
+  lastProfileStatus = json;
+
+  // Fold the engine's ProfileStatus into the page's active-profile pill:
+  //   window.setActiveProfile({ name, kind: 'local'|'pro'|'seat', detail })
+  // Free/lite stays 'local'. A signed-in seat is 'seat' (studio workspace)
+  // or 'pro' (the artist owns the workspace). The raw status also goes to
+  // window.setProfileStatus when the page defines it, so a sign-in panel
+  // can drive profileCommand without a bridge change.
+  juce::String name = "Local";
+  juce::String kind = "local";
+  const juce::String dot = juce::String::fromUTF8(" \xC2\xB7 ");
+  juce::String detail = "This Mac" + dot + "no account";
+  const juce::var status = juce::JSON::parse(json);
+  if (auto *obj = status.getDynamicObject()) {
+    const juce::String tier = obj->getProperty("tier").toString();
+    const bool signedIn = static_cast<bool>(obj->getProperty("signedIn"));
+    const juce::var active = obj->getProperty("activeProfile");
+    const juce::var dictionary = obj->getProperty("dictionary");
+    const int entries = dictionary.getDynamicObject() != nullptr
+                            ? static_cast<int>(dictionary["entries"])
+                            : 0;
+    if (tier == "paid" && active.getDynamicObject() != nullptr) {
+      name = active["name"].toString();
+      if (name.isEmpty()) name = "Profile";
+      kind = active["role"].toString() == "owner" ? "pro" : "seat";
+      const juce::String workspace = active["workspaceName"].toString();
+      const juce::String sync = obj->getProperty("sync").toString();
+      detail = (workspace.isNotEmpty() ? workspace + dot : juce::String())
+               + juce::String(entries) + (entries == 1 ? " word" : " words")
+               + " in dictionary"
+               + (sync.isNotEmpty() ? dot + sync : juce::String());
+    } else if (signedIn) {
+      name = "No seat";
+      detail = obj->getProperty("message").toString();
+      if (detail.isEmpty()) detail = "Signed in" + dot + "no active seat";
+    } else if (entries > 0) {
+      detail = "This Mac" + dot + juce::String(entries)
+               + (entries == 1 ? " correction" : " corrections")
+               + " in this session only";
+    }
+  }
+
+  auto *profile = new juce::DynamicObject();
+  profile->setProperty("name", name);
+  profile->setProperty("kind", kind);
+  profile->setProperty("detail", detail);
+  const juce::String profileJson = juce::JSON::toString(juce::var(profile));
+
+  // The status is passed as a JSON *string*; the page parses it so a
+  // malformed payload cannot turn into script.
+  runJs("/*profile*/"
+        "if (window.setActiveProfile) window.setActiveProfile(" + profileJson + ");"
+        "if (window.setProfileStatus) window.setProfileStatus("
+        + juce::JSON::toString(juce::var(json)) + ");");
+}
+
 // ── Native callbacks from the page ──────────────────────────────────────────
+void WebViewEditor::DocumentBrowser::pageFinishedLoading(
+    const juce::String &url) {
+  juce::WebBrowserComponent::pageFinishedLoading(url);
+  owner.pageFinishedLoading(url);
+}
+
+void WebViewEditor::pageFinishedLoading(const juce::String &url) {
+  juce::ignoreUnused(url);
+  if (!pageReady)
+    pageReady = true;
+  for (const auto &js : queuedJs) {
+    if (webView)
+      webView->evaluateJavascript(js);
+  }
+  queuedJs.clear();
+
+  auto *client = audioProcessor.getIPCClient();
+  if (client != nullptr)
+    lastConnected = client->isConnected();
+  jsSetConnectionStatus(lastConnected);
+}
+
 juce::var WebViewEditor::nativeOnReady(const juce::Array<juce::var> &) {
   pageReady = true;
   for (const auto &js : queuedJs) {
     if (webView) webView->evaluateJavascript(js);
   }
   queuedJs.clear();
-  // Push current connection state on first ready.
+  auto *client = audioProcessor.getIPCClient();
+  if (client != nullptr)
+    lastConnected = client->isConnected();
   jsSetConnectionStatus(lastConnected);
   return {};
 }
@@ -272,6 +420,15 @@ juce::var WebViewEditor::nativeSubmitCorrection(const juce::Array<juce::var> &ar
 }
 
 juce::var WebViewEditor::nativeOnCorrectionCancelled(const juce::Array<juce::var> &) {
+  return {};
+}
+
+juce::var WebViewEditor::nativeProfileCommand(const juce::Array<juce::var> &args) {
+  if (args.size() < 1) return {};
+  const auto json = args[0].toString().toStdString();
+  if (json.empty()) return {};
+  if (auto *client = audioProcessor.getIPCClient())
+    client->sendProfileCommand(json);
   return {};
 }
 

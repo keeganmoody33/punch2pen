@@ -5,42 +5,170 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  site-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Site copy gates
+        run: |
+          chmod +x site/check.sh
+          ./site/check.sh
+
+  # macos jobs skip unless engine/plugin/installer (or related native) paths
+  # change. site/**, README, gitignore, and site-check-only CI edits stay on
+  # ubuntu so a leftover engine-smoke process cannot fail a site PR.
+  native-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      native: ${{ steps.detect.outputs.native }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect native source changes
+        id: detect
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          BEFORE: ${{ github.event.before }}
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          native_re='^(engine|plugin|installer|scripts|shared|fixtures)/|^CMakeLists\.txt$|^verify_setup\.sh$'
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            changed="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --jq '.[].filename')"
+          else
+            if [[ -z "${BEFORE:-}" || "$BEFORE" =~ ^0+$ ]]; then
+              echo "native=true" >> "$GITHUB_OUTPUT"
+              echo "No compare base; running macos jobs."
+              exit 0
+            fi
+            git fetch --no-tags origin "$BEFORE" 2>/dev/null || true
+            changed="$(git diff --name-only "$BEFORE" "$GITHUB_SHA")"
+          fi
+          echo "Changed files:"
+          echo "$changed"
+          if grep -E -q "$native_re" <<<"$changed"; then
+            echo "native=true" >> "$GITHUB_OUTPUT"
+            echo "Native paths changed; macos jobs will run."
+          else
+            echo "native=false" >> "$GITHUB_OUTPUT"
+            echo "Site/docs/CI-only change; skipping macos jobs."
+          fi
+
   engine-tests:
+    needs: native-changes
+    if: needs.native-changes.outputs.native == 'true'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - name: Configure
         run: cmake -S . -B build -DPUNCH2PEN_BUILD_PLUGIN=OFF
       - name: Build test targets
-        run: cmake --build build --target databaseManagerTest profileManagerTest protocolSerializationTest openAIJsonTest transcriptionCoordinatorTest transcriptTimingTest -j4
+        run: cmake --build build --target dictionaryTest accountManagerTest cloudProfileClientTest protocolSerializationTest ipcServerHandshakeTest openAIJsonTest transcriptionCoordinatorTest transcriptTimingTest -j4
       - name: Run tests
         run: |
-          ./build/bin/databaseManagerTest
-          ./build/bin/profileManagerTest
+          ./build/bin/dictionaryTest
+          ./build/bin/accountManagerTest
+          ./build/bin/cloudProfileClientTest
           ./build/bin/protocolSerializationTest
+          perl -e 'alarm 30; exec @ARGV' ./build/bin/ipcServerHandshakeTest
+          python3 scripts/verify_engine.py selftest
+          python3 scripts/test_page_ready.py
+          python3 scripts/test_host_clock.py
           ./build/bin/openAIJsonTest
           ./build/bin/transcriptionCoordinatorTest
           ./build/bin/transcriptTimingTest
 
+  cloud-typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloud
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        run: npm ci
+      - name: Typecheck Convex functions
+        run: npm run typecheck
+
   plugin-tests:
+    needs: native-changes
+    if: needs.native-changes.outputs.native == 'true'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - name: Configure with plugin
         run: cmake -S . -B build -DPUNCH2PEN_BUILD_PLUGIN=ON -DCMAKE_BUILD_TYPE=Release
       - name: Build plugin test targets
-        run: cmake --build build --config Release --target ringBufferTest ipcClientTest pluginProcessorStateTest -j4
+        run: cmake --build build --config Release --target ringBufferTest ipcClientTest pluginProcessorStateTest pluginProcessorCaptureTest -j4
       - name: Run plugin tests
         run: |
           ./build/plugin/ringBufferTest_artefacts/Release/ringBufferTest
           ./build/plugin/ipcClientTest_artefacts/Release/ipcClientTest
           ./build/plugin/pluginProcessorStateTest_artefacts/Release/pluginProcessorStateTest
+          ./build/plugin/pluginProcessorCaptureTest_artefacts/Release/pluginProcessorCaptureTest
+      - name: Installer postinstall self-test
+        run: |
+          chmod +x installer/macos/scripts/postinstall scripts/check_installer_layout.sh
+          ./installer/macos/scripts/postinstall --self-test
+          ./scripts/check_installer_layout.sh --self-test
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path("engine/src/main.cpp").read_text()
+          bind = text.index("IPCServer server(7483)")
+          start = text.index("server.start()")
+          account = text.index("AccountManager account(")
+          whisper = text.index("make_unique<punch2pen::Transcriber>")
+          if not bind < start < account:
+              raise SystemExit("engine must bind 7483 before constructing AccountManager")
+          if not account < whisper:
+              raise SystemExit("engine must construct AccountManager before Transcriber")
+          print("[PASS] engine binds 7483 before account/whisper")
+          PY
       - name: Build AU, VST3, and engine
         run: cmake --build build --config Release --target punch2penEngine punch2pen_plugin_AU punch2pen_plugin_VST3 -j4
+      - name: Check engine rpath is relocatable
+        run: |
+          chmod +x scripts/check_engine_rpath.sh
+          ./scripts/check_engine_rpath.sh build/bin/punch2penEngine
       - name: Package unsigned macOS installer
         run: ./installer/macos/build_pkg.sh --skip-build --build-dir build
       - name: auval
         run: |
           echo "Skipping auval on GitHub-hosted macos runners (no signed AU host session)."
           echo "After install on a Mac: auval -strict -v aufx P2pn Dcta"
+
+  engine-smoke:
+    needs: native-changes
+    if: needs.native-changes.outputs.native == 'true'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache whisper base model
+        uses: actions/cache@v4
+        with:
+          path: /tmp/punch2pen-model-cache/ggml-base.bin
+          key: whisper-ggml-base-v1.7.4
+      - name: Configure engine only
+        run: cmake -S . -B build -DPUNCH2PEN_BUILD_PLUGIN=OFF -DCMAKE_BUILD_TYPE=Release
+      - name: Build punch2penEngine
+        run: cmake --build build --config Release --target punch2penEngine -j4
+      - name: Engine smoke (no Logic)
+        # Vocals STT is one wall-clock --stt-timeout (default 60s), not 32 serial recvs.
+        timeout-minutes: 10
+        env:
+          PUNCH2PEN_MODEL_CACHE: /tmp/punch2pen-model-cache
+        run: |
+          chmod +x scripts/engine_smoke.sh scripts/download_model.sh
+          ./scripts/engine_smoke.sh --skip-build
+        # The checked-in Cap vocal fixture makes the vocals check run instead of skip.

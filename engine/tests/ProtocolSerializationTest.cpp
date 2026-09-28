@@ -1,7 +1,10 @@
 #include "Protocol.h"
+#include "UserHome.h"
 #include <cassert>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <string>
 #include <vector>
 
 void testHeaderSerialization() {
@@ -102,8 +105,33 @@ void testMessageTypeCoverage() {
   assert(static_cast<uint32_t>(punch2pen::protocol::MessageType::HandshakeResponse) == 4);
   assert(static_cast<uint32_t>(punch2pen::protocol::MessageType::Correction) == 5);
   assert(static_cast<uint32_t>(punch2pen::protocol::MessageType::TransportStop) == 6);
+  assert(static_cast<uint32_t>(punch2pen::protocol::MessageType::ProfileCommand) == 7);
+  assert(static_cast<uint32_t>(punch2pen::protocol::MessageType::ProfileStatus) == 8);
+  // Adding the profile channel must not force a handshake bump: old plugins
+  // and engines skip unknown types.
+  assert(punch2pen::protocol::kProtocolVersion == 1);
 
   std::cout << "[PASS] testMessageTypeCoverage" << std::endl;
+}
+
+void testProfileJsonMessageFraming() {
+  const std::string payload = R"({"op":"set_active","profileId":"prof_a"})";
+  punch2pen::protocol::Header header;
+  header.type = punch2pen::protocol::MessageType::ProfileCommand;
+  header.length = static_cast<uint32_t>(payload.size());
+  assert(header.length <= punch2pen::protocol::kMaxJsonPayloadBytes);
+
+  std::vector<char> buf(sizeof(header) + payload.size());
+  std::memcpy(buf.data(), &header, sizeof(header));
+  std::memcpy(buf.data() + sizeof(header), payload.data(), payload.size());
+
+  punch2pen::protocol::Header parsed;
+  std::memcpy(&parsed, buf.data(), sizeof(parsed));
+  assert(parsed.type == punch2pen::protocol::MessageType::ProfileCommand);
+  const std::string parsedPayload(buf.data() + sizeof(parsed), parsed.length);
+  assert(parsedPayload == payload && "JSON payload has no sub-header");
+
+  std::cout << "[PASS] testProfileJsonMessageFraming" << std::endl;
 }
 
 void testHandshakeSerialization() {
@@ -182,6 +210,22 @@ void testFullMessageRoundTrip() {
   std::cout << "[PASS] testFullMessageRoundTrip" << std::endl;
 }
 
+void testRealUserHome() {
+  const char *previous = std::getenv("PUNCH2PEN_HOME");
+  const std::string previousCopy = previous != nullptr ? previous : "";
+  ::setenv("PUNCH2PEN_HOME", "/tmp/p2p-home-test", 1);
+  assert(punch2pen::realUserHome() == "/tmp/p2p-home-test");
+  assert(punch2pen::punch2penDataDir() == "/tmp/p2p-home-test/.punch2pen");
+  if (!previousCopy.empty())
+    ::setenv("PUNCH2PEN_HOME", previousCopy.c_str(), 1);
+  else
+    ::unsetenv("PUNCH2PEN_HOME");
+
+  const std::string home = punch2pen::realUserHome();
+  assert(!home.empty());
+  std::cout << "[PASS] testRealUserHome (" << home << ")" << std::endl;
+}
+
 int main() {
   testHeaderSerialization();
   testAudioChunkHeaderSerialization();
@@ -189,8 +233,10 @@ int main() {
   testTranscriptionResultHeaderSerialization();
   testTransportStopHeaderSerialization();
   testMessageTypeCoverage();
+  testProfileJsonMessageFraming();
   testHandshakeSerialization();
   testFullMessageRoundTrip();
+  testRealUserHome();
   std::cout << "All Protocol serialization tests passed!" << std::endl;
   return 0;
 }

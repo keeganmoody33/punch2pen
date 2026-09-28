@@ -115,12 +115,47 @@ fi
 
 cp -R "${AU_BUNDLE}" "$STAGE_AU/"
 cp -R "${VST3_BUNDLE}" "$STAGE_VST3/"
+
+MAKE_APP="${PROJECT_ROOT}/installer/macos/make_engine_app.sh"
+BUNDLE_LIBS="${PROJECT_ROOT}/installer/macos/bundle_engine_libs.sh"
+CHECK_RPATH="${PROJECT_ROOT}/scripts/check_engine_rpath.sh"
+chmod +x "$MAKE_APP" "$BUNDLE_LIBS" "$CHECK_RPATH"
+
+ENGINE_DIR="$(cd "$(dirname "$ENGINE_BIN")" && pwd)"
+bash "$MAKE_APP" "${ENGINE_BIN}" "${STAGE_ENGINE}/punch2penEngine.app"
 cp "${ENGINE_BIN}" "$STAGE_ENGINE/punch2penEngine"
 chmod 755 "$STAGE_ENGINE/punch2penEngine"
+cp "${PROJECT_ROOT}/scripts/download_model.sh" "$STAGE_ENGINE/download_model.sh"
+chmod 755 "$STAGE_ENGINE/download_model.sh"
+
+STAGE_AGENT="${STAGING_DIR}/engine/Library/LaunchAgents"
+mkdir -p "$STAGE_AGENT"
+cp "${PROJECT_ROOT}/installer/macos/launchagent.plist" \
+    "${STAGE_AGENT}/com.doctaaa.punch2pen.engine.plist"
+shopt -s nullglob
+for lib in "${ENGINE_DIR}"/*.dylib; do
+  cp "$lib" "$STAGE_ENGINE/"
+done
+shopt -u nullglob
+bash "$BUNDLE_LIBS" "$STAGE_ENGINE/punch2penEngine" "$ENGINE_DIR" "${BUILD_DIR}/lib"
+
+# Logic loads the AU/VST3 bundle, not /Applications. Nested helper so
+# Launch Services can start an unsandboxed engine from the already-allowed plugin.
+bash "$MAKE_APP" "${ENGINE_BIN}" \
+    "${STAGE_AU}/punch2pen.component/Contents/Helpers/punch2penEngine.app"
+bash "$MAKE_APP" "${ENGINE_BIN}" \
+    "${STAGE_VST3}/punch2pen.vst3/Contents/Helpers/punch2penEngine.app"
+
+bash "$CHECK_RPATH" \
+    "$STAGE_ENGINE/punch2penEngine" \
+    "$STAGE_ENGINE/punch2penEngine.app" \
+    "${STAGE_AU}/punch2pen.component/Contents/Helpers/punch2penEngine.app" \
+    "${STAGE_VST3}/punch2pen.vst3/Contents/Helpers/punch2penEngine.app"
 
 echo "Staged AU: ${AU_BUNDLE}"
 echo "Staged VST3: ${VST3_BUNDLE}"
-echo "Staged engine: ${ENGINE_BIN}"
+echo "Staged engine app: ${STAGE_ENGINE}/punch2penEngine.app"
+echo "Staged engine CLI: ${STAGE_ENGINE}/punch2penEngine"
 
 # 5. Build Component Packages
 echo -e "\n[5] Building Component Packages..."
@@ -137,10 +172,13 @@ pkgbuild --root "${STAGING_DIR}/vst3" \
     --install-location "/" \
     "${DIST_DIR}/punch2pen_vst3.pkg"
 
+SCRIPTS_DIR="${PROJECT_ROOT}/installer/macos/scripts"
+chmod +x "${SCRIPTS_DIR}/postinstall"
 pkgbuild --root "${STAGING_DIR}/engine" \
     --identifier "com.doctaaa.punch2pen.engine" \
     --version "${VERSION}" \
     --install-location "/" \
+    --scripts "$SCRIPTS_DIR" \
     "${DIST_DIR}/punch2pen_engine.pkg"
 
 # 6. Create Distribution Package
@@ -176,5 +214,10 @@ productbuild --distribution "${DIST_DIR}/distribution.xml" \
     --resources "${RESOURCES_DIR}" \
     "${DIST_DIR}/Punch2Pen_Installer.pkg"
 
+CHECK_LAYOUT="${PROJECT_ROOT}/scripts/check_installer_layout.sh"
+chmod +x "$CHECK_LAYOUT"
+bash "$CHECK_LAYOUT" "$STAGING_DIR"
+
 echo -e "\nBuild complete (unsigned). Installer: ${DIST_DIR}/Punch2Pen_Installer.pkg"
 echo "AU identity remains aufx / P2pn / Dcta. Notarization is not included."
+echo "Postinstall clears quarantine, seeds ggml-base.bin, and starts punch2penEngine."

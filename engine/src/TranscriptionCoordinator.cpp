@@ -3,16 +3,14 @@
 #include <chrono>
 #include <iostream>
 #include <thread>
-#include <unordered_set>
 
 namespace punch2pen {
 
 TranscriptionCoordinator::TranscriptionCoordinator(IPCServerInterface &ipcServerRef,
                                                    TranscriberInterface &transcriberRef,
-                                                   DatabaseManager &dbRef,
-                                                   ProfileManager &profileManagerRef)
-    : ipcServer(ipcServerRef), transcriber(transcriberRef), db(dbRef),
-      profileManager(profileManagerRef) {}
+                                                   ProfileService &profilesRef)
+    : ipcServer(ipcServerRef), transcriber(transcriberRef),
+      profiles(profilesRef) {}
 
 void TranscriptionCoordinator::run() {
   running.store(true);
@@ -37,20 +35,29 @@ void TranscriptionCoordinator::run() {
       didWork = true;
     }
 
+    bool correctionApplied = false;
     while (ipcServer.hasPendingCorrection()) {
       auto correction = ipcServer.popCorrection();
-      db.addCorrection(correction.original, correction.corrected);
-      profileManager.addCorrection(correction.original, correction.corrected);
+      profiles.recordCorrection(correction.original, correction.corrected);
+      correctionApplied = true;
+      didWork = true;
+    }
 
-      auto dbVocab = db.getVocabulary();
-      auto profileVocab = profileManager.getVocabulary();
-      std::unordered_set<std::string> merged(dbVocab.begin(), dbVocab.end());
-      merged.insert(profileVocab.begin(), profileVocab.end());
-      std::vector<std::string> vocab(merged.begin(), merged.end());
+    while (ipcServer.hasPendingProfileCommand()) {
+      profiles.postCommand(ipcServer.popProfileCommand());
+      didWork = true;
+    }
+
+    // Corrections, profile switches, and cloud refreshes all land here: the
+    // account layer bumps its revision and the bias is reapplied once.
+    const uint64_t revision = profiles.dictionaryRevision();
+    if (revision != appliedRevision) {
+      const auto vocab = profiles.vocabularyForBias();
       transcriber.setVocabularyBias(vocab);
-
-      std::cout << "Applied correction. Vocabulary terms: " << vocab.size()
-                << std::endl;
+      appliedRevision = revision;
+      if (correctionApplied)
+        std::cout << "Applied correction. Vocabulary terms: " << vocab.size()
+                  << std::endl;
       didWork = true;
     }
 

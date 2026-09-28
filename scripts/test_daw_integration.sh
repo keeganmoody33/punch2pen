@@ -43,7 +43,7 @@ Options:
   --skip-tests           Do not run unit/integration helper tests
   --skip-engine          Do not launch the engine readiness check
   --install-plugin       Copy built VST3/AU bundles into ~/Library/Audio/Plug-Ins
-  --setup-engine-link    Copy the built engine into plugin auto-launch paths
+  --setup-engine-link    Copy the built engine into /Applications/Punch2Pen
   --open-daw NAME        Open a detected DAW after checks (logic|reaper|ableton)
   --cloud                Start engine in OpenAI cloud mode for the engine check
   --api-key KEY          API key to pass with --cloud (or use OPENAI_API_KEY)
@@ -252,15 +252,13 @@ else
   fi
 fi
 
-if [[ -f "$P2P_HOME/corrections.csv" ]]; then
-  record pass "Corrections CSV" "$P2P_HOME/corrections.csv"
+if [[ -f "$P2P_HOME/account.json" ]]; then
+  record pass "Paid profile session" "$P2P_HOME/account.json (signed in; dictionary caches under profiles/)"
 else
-  record warn "Corrections CSV" "not present yet; it will be created after corrections are submitted"
+  record pass "Free / lite" "no account.json; corrections stay in the engine session and nothing is written"
 fi
-if compgen -G "$P2P_HOME/profile_*.json" >/dev/null; then
-  record pass "Profile JSON" "$(compgen -G "$P2P_HOME/profile_*.json" | tr '\n' ' ')"
-else
-  record warn "Profile JSON" "not present yet; it will be created on engine shutdown after profile changes"
+if [[ -f "$P2P_HOME/profile-api.json" ]]; then
+  record pass "Profile API override" "$P2P_HOME/profile-api.json"
 fi
 
 section "Configure and build"
@@ -298,7 +296,7 @@ fi
 
 section "Unit and helper tests"
 if [[ "$RUN_TESTS" -eq 1 ]]; then
-  ENGINE_TESTS=(databaseManagerTest profileManagerTest protocolSerializationTest openAIJsonTest transcriptionCoordinatorTest transcriptTimingTest)
+  ENGINE_TESTS=(databaseManagerTest profileManagerTest protocolSerializationTest ipcServerHandshakeTest openAIJsonTest transcriptionCoordinatorTest transcriptTimingTest)
   for test_name in "${ENGINE_TESTS[@]}"; do
     test_bin="$BUILD_DIR/bin/$test_name"
     if [[ -x "$test_bin" ]]; then
@@ -312,6 +310,7 @@ if [[ "$RUN_TESTS" -eq 1 ]]; then
     '*/ringBufferTest_artefacts/*/ringBufferTest'
     '*/ipcClientTest_artefacts/*/ipcClientTest'
     '*/pluginProcessorStateTest_artefacts/*/pluginProcessorStateTest'
+    '*/pluginProcessorCaptureTest_artefacts/*/pluginProcessorCaptureTest'
   )
   for pattern in "${PLUGIN_TEST_PATTERNS[@]}"; do
     test_bin="$(find_first "$pattern")"
@@ -371,6 +370,9 @@ if [[ "$RUN_ENGINE" -eq 1 ]]; then
     if [[ "$RUN_TESTS" -eq 1 && -f "$ROOT_DIR/scripts/verify_correction.py" ]] && command_exists python3; then
       run_cmd "Correction IPC helper" python3 "$ROOT_DIR/scripts/verify_correction.py" || true
     fi
+    if [[ "$RUN_TESTS" -eq 1 && -f "$ROOT_DIR/scripts/verify_engine.py" ]] && command_exists python3; then
+      run_cmd "Vocal golden-file (skip if no WAV)" python3 "$ROOT_DIR/scripts/verify_engine.py" vocals || true
+    fi
   fi
 else
   record warn "Engine smoke test" "skipped by --skip-engine"
@@ -400,32 +402,52 @@ else
 fi
 
 SYSTEM_ENGINE_DIR="/Applications/Punch2Pen"
-USER_ENGINE_DIR="$HOME/punch2pen/bin"
+LEFTOVER_USER_ENGINE="$HOME/punch2pen/bin/punch2penEngine"
+MAKE_ENGINE_APP="$ROOT_DIR/installer/macos/make_engine_app.sh"
+BUNDLE_ENGINE_LIBS="$ROOT_DIR/installer/macos/bundle_engine_libs.sh"
 if [[ "$SETUP_ENGINE_LINK" -eq 1 ]]; then
   if [[ -x "$ENGINE_BIN" ]]; then
+    ENGINE_DIR="$(cd "$(dirname "$ENGINE_BIN")" && pwd)"
     ENGINE_INSTALL_COUNT=0
     if mkdir -p "$SYSTEM_ENGINE_DIR" 2>/dev/null && cp "$ENGINE_BIN" "$SYSTEM_ENGINE_DIR/punch2penEngine" 2>/dev/null; then
+      shopt -s nullglob
+      for lib in "${ENGINE_DIR}"/*.dylib; do
+        cp "$lib" "$SYSTEM_ENGINE_DIR/" 2>/dev/null || true
+      done
+      shopt -u nullglob
+      if [[ -x "$BUNDLE_ENGINE_LIBS" ]]; then
+        "$BUNDLE_ENGINE_LIBS" "$SYSTEM_ENGINE_DIR/punch2penEngine" "$ENGINE_DIR" 2>/dev/null || true
+      fi
       record pass "Install engine helper" "$SYSTEM_ENGINE_DIR/punch2penEngine"
       ENGINE_INSTALL_COUNT=$((ENGINE_INSTALL_COUNT + 1))
+      if [[ -x "$MAKE_ENGINE_APP" ]] && "$MAKE_ENGINE_APP" "$ENGINE_BIN" "$SYSTEM_ENGINE_DIR/punch2penEngine.app" 2>/dev/null; then
+        record pass "Install engine app" "$SYSTEM_ENGINE_DIR/punch2penEngine.app"
+      fi
     else
-      record warn "Install engine helper" "could not write $SYSTEM_ENGINE_DIR; install manually if plugin auto-launch prefers the system path"
+      record warn "Install engine helper" "could not write $SYSTEM_ENGINE_DIR; nested AU/VST3 helper is the Logic launch path"
     fi
 
-    if mkdir -p "$USER_ENGINE_DIR" && cp "$ENGINE_BIN" "$USER_ENGINE_DIR/punch2penEngine"; then
-      record pass "Install engine helper" "$USER_ENGINE_DIR/punch2penEngine"
+    if [[ -e "$LEFTOVER_USER_ENGINE" ]]; then
+      record warn "Leftover ~/punch2pen/bin" "$LEFTOVER_USER_ENGINE exists; plugin no longer auto-launches it (broken CI rpath). Remove it."
+    fi
+
+    NESTED_HELPER=""
+    if [[ -n "${AU_BUNDLE:-}" ]]; then
+      NESTED_HELPER="${AU_BUNDLE}/Contents/Helpers/punch2penEngine.app"
+    fi
+    if [[ -d "$NESTED_HELPER" ]]; then
+      record pass "Nested engine helper" "$NESTED_HELPER"
       ENGINE_INSTALL_COUNT=$((ENGINE_INSTALL_COUNT + 1))
-    else
-      record warn "Install engine helper" "could not write $USER_ENGINE_DIR"
     fi
 
     if [[ "$ENGINE_INSTALL_COUNT" -eq 0 ]]; then
-      record fail "Install engine helper" "no plugin auto-launch path was updated"
+      record fail "Install engine helper" "no packaged auto-launch path was updated"
     fi
   else
     record fail "Install engine helper" "engine binary unavailable"
   fi
 else
-  record warn "Engine helper install" "skipped; use --setup-engine-link to update plugin auto-launch paths"
+  record warn "Engine helper install" "skipped; use --setup-engine-link to update /Applications/Punch2Pen"
 fi
 
 if command_exists auval && [[ -d "$USER_AU_DIR/punch2pen.component" ]]; then
@@ -456,7 +478,8 @@ cat <<CHECKLIST
    - Did the plugin connect to 127.0.0.1:7483?
    - Is Logic actually in record, not just playback?
    - Is the model present at $MODEL_FILE?
-5. If transcript appears but timing is wrong, test a simple 4/4 session first, then your compound-meter session.
+5. If transcript appears but word highlighting is late, test a simple 4/4 session first, then your compound-meter session.
+6. Isolated engine smoke (no Logic): ./scripts/engine_smoke.sh
 CHECKLIST
 
 if [[ -n "$OPEN_DAW" ]]; then

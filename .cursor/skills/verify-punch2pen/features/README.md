@@ -19,14 +19,14 @@ This directory is the maintained source for verifying user-facing punch2pen beha
 - Start every recipe from the baseline unless its preconditions say otherwise.
 - Treat every command as literal.
 - Engine/IPC actions go through `control-punch2pen launch|doctor|drive|cleanup`.
-- DAW recording, karaoke click, and host transport are **manual on Mac**. There is no expect/Playwright/AudioPluginHost session in this tree.
+- DAW recording, Living Transcript click, and host transport are **manual on Mac**. There is no expect/Playwright/AudioPluginHost session in this tree.
 - Restore fixture corrections after a mutation. Do not remove proof artifacts during cleanup.
 
 ## Proof and skip reporting
 
 - Capture the user action and the resulting state, not only the final screen or log line.
 - Engine proof includes command, stdout/stderr tail, exit code, and pid/port ownership.
-- Mutation proof includes a second read of `corrections.csv` (or auval log).
+- Mutation proof includes a second read of the engine's ProfileStatus (`verify_engine.py profile`) or the auval log.
 - Record the feature ID and entry point with every artifact.
 - Report an unreachable path with the attempted command and the unmet precondition.
 - Do not report a skipped DAW entry point as verified through unit tests or sine-wave python.

@@ -147,6 +147,9 @@ void Punch2PenAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer,
         transportTimeSigDenom.store(ts->denominator);
       }
 
+      if (auto seconds = pos->getTimeInSeconds())
+        hostTimeSeconds.store(*seconds);
+
       transportIsPlaying.store(pos->getIsPlaying());
       isRecording = pos->getIsRecording();
       transportIsRecording.store(isRecording);

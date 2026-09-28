@@ -50,6 +50,7 @@ target_sources(punch2pen_plugin
 
 target_include_directories(punch2pen_plugin PRIVATE
     "${CMAKE_CURRENT_BINARY_DIR}/punch2pen_plugin_artefacts/JuceLibraryCode"
+    "${CMAKE_SOURCE_DIR}/shared"
 )
 
 target_compile_definitions(punch2pen_plugin PUBLIC
@@ -132,3 +133,51 @@ target_compile_definitions(pluginProcessorStateTest PRIVATE
     JucePlugin_IsMidiEffect=0
     JucePlugin_IsSynth=0
 )
+
+# Headless capture-gating (mock playhead, no Logic)
+juce_add_console_app(pluginProcessorCaptureTest PRODUCT_NAME "pluginProcessorCaptureTest")
+juce_generate_juce_header(pluginProcessorCaptureTest)
+target_sources(pluginProcessorCaptureTest PRIVATE
+    tests/PluginProcessorCaptureTest.cpp
+    Source/PluginProcessor.cpp
+    Source/PluginEditor.cpp
+    Source/WebViewEditor.cpp
+    Source/IPCClient.cpp
+)
+target_link_libraries(pluginProcessorCaptureTest PRIVATE
+    punch2pen_resources
+    juce::juce_audio_utils
+    juce::juce_gui_extra
+    juce::juce_recommended_config_flags
+)
+target_include_directories(pluginProcessorCaptureTest PRIVATE
+    Source
+    ${CMAKE_SOURCE_DIR}/shared
+)
+target_compile_definitions(pluginProcessorCaptureTest PRIVATE
+    JUCE_WEB_BROWSER=1
+    JUCE_USE_CURL=0
+    JUCE_VST3_CAN_REPLACE_VST2=0
+    JucePlugin_Name="punch2pen"
+    JucePlugin_WantsMidiInput=0
+    JucePlugin_ProducesMidiOutput=0
+    JucePlugin_IsMidiEffect=0
+    JucePlugin_IsSynth=0
+)
+
+if(APPLE)
+    add_dependencies(punch2pen_plugin_AU punch2penEngine)
+    add_dependencies(punch2pen_plugin_VST3 punch2penEngine)
+    foreach(_p2p_fmt AU VST3)
+        add_custom_command(TARGET punch2pen_plugin_${_p2p_fmt} POST_BUILD
+            COMMAND /bin/bash
+                    "${CMAKE_SOURCE_DIR}/installer/macos/make_engine_app.sh"
+                    "$<TARGET_FILE:punch2penEngine>"
+                    "$<TARGET_BUNDLE_DIR:punch2pen_plugin_${_p2p_fmt}>/Contents/Helpers/punch2penEngine.app"
+            COMMAND /bin/bash
+                    "${CMAKE_SOURCE_DIR}/scripts/check_engine_rpath.sh"
+                    "$<TARGET_BUNDLE_DIR:punch2pen_plugin_${_p2p_fmt}>/Contents/Helpers/punch2penEngine.app"
+            COMMENT "Embed punch2penEngine.app helper in punch2pen_plugin_${_p2p_fmt}"
+        )
+    endforeach()
+endif()
