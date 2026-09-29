@@ -1,4 +1,4 @@
-# Punch to Pen (punch2pen) — Real-time speech-to-text for Digital Audio Workstations
+# Punch2Pen (punch2pen) — Real-time speech-to-text for Digital Audio Workstations
 
 punch2pen transcribes vocals inside a DAW in real time. During playback the UI is a **Living Transcript**: it highlights the word under the playhead and treats the active line as a title. Users can click any word to correct a mis-hear; those corrections feed back into the model.
 
