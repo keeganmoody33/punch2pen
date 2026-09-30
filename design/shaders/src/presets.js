@@ -1,7 +1,8 @@
 /*
   Brand presets for Paper Shaders. Colors come from design/tokens/tokens.json
-  (tokens.generated.js is written by ../build.mjs). Red never appears here:
-  red means recording.
+  (tokens.generated.js is written by ../build.mjs). REC red (#FF453A) never
+  appears here. Brand red glows on site surfaces only: inside the plugin a red
+  glow reads as armed or recording, so plugin shaders stay amber and white.
 
   Budget: one moving shader per screen. Plugin shaders only run while nothing is
   playing or recording, and stop the moment words arrive.
@@ -12,8 +13,8 @@ const objectSizing = { fit: 'contain', scale: 1, rotation: 0, offsetX: 0, offset
 const patternSizing = { ...objectSizing, fit: 'none' };
 
 export const PRESETS = {
-  /* Site hero and section grounds: dim booth light through grain. Grain Gradient.
-     The ramp stops at green-800 so text on top keeps its contrast. */
+  /* Site hero and section grounds: a red-lit booth through grain. Grain Gradient.
+     The ramp stops at red-800 so white text on top keeps its contrast. */
   'booth-glow': {
     shader: 'grainGradient',
     where: 'Site hero ground, cover, section bands',
@@ -21,7 +22,7 @@ export const PRESETS = {
       ...patternSizing,
       speed: 0.35,
       colorBack: T['graphite-900'],
-      colors: [T['graphite-900'], T['green-950'], T['green-900'], T['green-800']],
+      colors: [T['graphite-900'], T['red-950'], T['red-900'], T['red-800']],
       softness: 1,
       intensity: 0.22,
       noise: 0.32,
@@ -29,8 +30,8 @@ export const PRESETS = {
     },
   },
 
-  /* The Pad as real card stock. Paper Texture 2.0 (Sep 2026): three-color scheme,
-     wrinkles, roughness rows. Static: renders once, costs nothing after. */
+  /* The Pad as a real legal-pad sheet. Paper Texture 2.0 (Sep 2026): three-color
+     scheme, wrinkles, roughness rows. Static: renders once, costs nothing after. */
   'pad-card': {
     shader: 'paperTexture',
     where: 'Tier cards, lyric sheet, share card',
@@ -40,7 +41,7 @@ export const PRESETS = {
       speed: 0,
       colorBack: T['pad-shade'],
       colorPaper: T['pad-paper'],
-      colorShadow: '#D8D3C6',
+      colorShadow: '#D6CB86',
       blending: 1,
       distortion: 0.2,
       clip: false,
@@ -89,7 +90,8 @@ export const PRESETS = {
     },
   },
 
-  /* Plugin IDLE: the same 2 turns green once the engine answers. */
+  /* Plugin IDLE: the same 2 turns white once the engine answers. White, not red:
+     a red glow in the plugin would read as recording. */
   'idle-smoke': {
     shader: 'gemSmoke',
     where: 'Plugin idle empty state',
@@ -102,7 +104,7 @@ export const PRESETS = {
       speed: 0.45,
       colorBack: T['graphite-950'],
       colorInner: T['graphite-950'],
-      colors: [T['green-700'], T['green-400'], T.ink],
+      colors: [T['graphite-600'], '#B9BDC7', T.ink],
       outerGlow: 0.35,
       innerGlow: 0.9,
       innerDistortion: 0.8,
@@ -114,7 +116,7 @@ export const PRESETS = {
     },
   },
 
-  /* The punch lands: the fist as a heat signature in the green ramp. Heatmap. */
+  /* The punch lands: the fist as a heat signature, brand red to white-hot. Heatmap. */
   'punch-heat': {
     shader: 'heatmap',
     where: 'Site brand band, cover, launch posts',
@@ -129,11 +131,12 @@ export const PRESETS = {
       innerGlow: 0.75,
       outerGlow: 0.6,
       colorBack: T['graphite-900'],
-      colors: [T['green-900'], T['green-700'], T['green-400'], T['green-100'], T.ink],
+      colors: [T['red-900'], T['red-700'], T['red-600'], T['red-300'], T.ink],
     },
   },
 
-  /* Flyer print: marks and artist photos as green halftone. Halftone Dots (Nov 2025). */
+  /* Flyer print: marks and artist photos as black halftone on legal yellow, like a
+     photocopied show flyer. Halftone Dots (Nov 2025). */
   'flyer-dots': {
     shader: 'halftoneDots',
     where: 'Share cards, creators page photos, merch',
@@ -143,8 +146,8 @@ export const PRESETS = {
       fit: 'contain',
       scale: 0.9,
       speed: 0,
-      colorBack: T['graphite-900'],
-      colorFront: T['green-400'],
+      colorBack: T['pad-paper'],
+      colorFront: T['pad-ink'],
       size: 0.32,
       radius: 1.2,
       contrast: 0.55,

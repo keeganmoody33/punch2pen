@@ -10,6 +10,7 @@ Paper Desktop's MCP server runs only on your own computer: the `paper mcp` CLI, 
    ```bash
    claude plugin marketplace add paper-design/agent-plugins && claude plugin install paper-desktop@paper
    ```
+   Checked 2026-09-30: this installs `paper-desktop` 0.2.1, which starts `~/.paper/bin/paper mcp`. Paper Desktop puts that binary there, so open the app once before step 3. The plugin does nothing in a cloud session, which has no Paper app.
 3. Restart Claude Code and run `/mcp`. Paper should be listed.
 
 ## 2. Get the files on your Mac
@@ -31,8 +32,8 @@ name, data-width and data-height.
 
 1. First, create Paper color tokens from the "semantic" group in
    design/tokens/tokens.json (bg-deep, bg-pane, bg-chrome, bg-raised, ink, ink-2,
-   ink-3, ink-4, accent, accent-ink, rec, wait, play, marker, pad-*). Resolve
-   aliases to hex.
+   ink-3, ink-4, accent, accent-ink, accent-fill, highlight, focus, rec, wait,
+   play, marker, pad-*). Resolve aliases to hex.
 2. Then build artboards one at a time in file-name order (01, 02 … 23). For each:
    - Create an artboard with the meta name and size.
    - Rebuild the page with the same structure and flex layouts. Resolve CSS

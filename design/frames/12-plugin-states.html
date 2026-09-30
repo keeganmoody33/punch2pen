@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=1440">
-<meta name="paper:artboard" content="Plugin / 12 States" data-width="1440" data-height="2051">
+<meta name="paper:artboard" content="Plugin / 12 States" data-width="1440" data-height="2070">
 <title>Plugin States · Punch2Pen</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap">
 <link rel="stylesheet" href="../tokens/tokens.css">
@@ -18,7 +18,7 @@
   .state h3 { font-size: 22px; }
 </style>
 </head>
-<body class="board" style="--board-h: 2051px">
+<body class="board" style="--board-h: 2070px">
 
 <header class="board-head">
   <div class="lead">
@@ -39,7 +39,7 @@
   <div class="state">
     <div class="p-window" data-mode="disconnected">
       <header class="p-header">
-        <img class="p-wordmark" src="../brand/wordmark-booth.svg" alt="Punch2Pen">
+        <img class="p-wordmark" src="../brand/wordmark-plugin.svg" alt="Punch2Pen">
         <button class="p-pill" data-kind="local" type="button"><span class="dot"></span><span class="name">Local</span><svg class="caret" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4 5 6.5 7.5 4"/></svg></button>
         <span class="p-spacer"></span>
         <span class="p-badge is-wait">Wait</span>
@@ -53,7 +53,7 @@
           <div class="sub">Transcription runs on this Mac. The engine starts on its own after install. If this stays on WAIT, check that the Whisper model is in place.</div>
         </div>
       </div>
-      <footer class="p-status"><span class="text">Local engine offline · transcription runs on this Mac</span><img class="p-logo" src="../brand/two-booth.svg" alt=""></footer>
+      <footer class="p-status"><span class="text">Local engine offline · transcription runs on this Mac</span><img class="p-logo" src="../brand/two-plugin.svg" alt=""></footer>
     </div>
     <div class="cap">
       <div class="top"><h3>Disconnected</h3><span class="label">data-state="disconnected"</span></div>
@@ -65,7 +65,7 @@
   <div class="state">
     <div class="p-window" data-mode="idle">
       <header class="p-header">
-        <img class="p-wordmark" src="../brand/wordmark-booth.svg" alt="Punch2Pen">
+        <img class="p-wordmark" src="../brand/wordmark-plugin.svg" alt="Punch2Pen">
         <button class="p-pill" data-kind="local" type="button"><span class="dot"></span><span class="name">Local</span><svg class="caret" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4 5 6.5 7.5 4"/></svg></button>
         <span class="p-spacer"></span>
         <span class="p-badge">Idle</span>
@@ -78,11 +78,11 @@
           <div class="sub">Hit <span class="key">R</span> in the DAW and punch in. The words land here on the host clock while you still have the headphones on.</div>
         </div>
       </div>
-      <footer class="p-status"><span class="text">Local transcription · no account needed</span><img class="p-logo" src="../brand/two-booth.svg" alt=""></footer>
+      <footer class="p-status"><span class="text">Local transcription · no account needed</span><img class="p-logo" src="../brand/two-plugin.svg" alt=""></footer>
     </div>
     <div class="cap">
       <div class="top"><h3>Idle</h3><span class="label">data-state="idle"</span></div>
-      <p class="note">Connected and stopped. The same 2 turns green: the engine answered. The shader is disposed when the transport moves or the first word lands, so it never runs while music plays.</p>
+      <p class="note">Connected and stopped. The same 2 turns white: the engine answered. Never red here; a red glow in a DAW means record-armed. The shader is disposed when the transport moves or the first word lands, so it never runs while music plays.</p>
     </div>
   </div>
 
@@ -90,7 +90,7 @@
   <div class="state">
     <div class="p-window" data-mode="recording">
       <header class="p-header">
-        <img class="p-wordmark" src="../brand/wordmark-booth.svg" alt="Punch2Pen">
+        <img class="p-wordmark" src="../brand/wordmark-plugin.svg" alt="Punch2Pen">
         <button class="p-pill" data-kind="local" type="button"><span class="dot"></span><span class="name">Local</span><svg class="caret" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4 5 6.5 7.5 4"/></svg></button>
         <span class="p-spacer"></span>
         <span class="p-badge is-rec">Rec</span>
@@ -103,7 +103,7 @@
           <div class="p-line is-active"><span class="p-word">every</span><span class="p-word">word</span><span class="p-word">I</span><span class="p-word">drop</span><span class="p-cursor"></span></div>
         </div>
       </div>
-      <footer class="p-status"><span class="text">Transcribing the punch · words land as the engine hears them</span><img class="p-logo" src="../brand/two-booth.svg" alt=""></footer>
+      <footer class="p-status"><span class="text">Transcribing the punch · words land as the engine hears them</span><img class="p-logo" src="../brand/two-plugin.svg" alt=""></footer>
     </div>
     <div class="cap">
       <div class="top"><h3>Recording</h3><span class="label">data-state="recording"</span></div>
@@ -115,7 +115,7 @@
   <div class="state">
     <div class="p-window" data-mode="playback">
       <header class="p-header">
-        <img class="p-wordmark" src="../brand/wordmark-booth.svg" alt="Punch2Pen">
+        <img class="p-wordmark" src="../brand/wordmark-plugin.svg" alt="Punch2Pen">
         <button class="p-pill" data-kind="local" type="button"><span class="dot"></span><span class="name">Local</span><svg class="caret" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4 5 6.5 7.5 4"/></svg></button>
         <span class="p-spacer"></span>
         <span class="p-badge is-play">Play</span>
@@ -131,7 +131,7 @@
           <div class="p-line"><span class="p-word">one</span><span class="p-word">more</span><span class="p-word">pass</span><span class="p-word">on</span><span class="p-word">the</span><span class="p-word">hook</span></div>
         </div>
       </div>
-      <footer class="p-status"><span class="text">Following the playhead · click a word to correct it</span><img class="p-logo" src="../brand/two-booth.svg" alt=""></footer>
+      <footer class="p-status"><span class="text">Following the playhead · click a word to correct it</span><img class="p-logo" src="../brand/two-plugin.svg" alt=""></footer>
     </div>
     <div class="cap">
       <div class="top"><h3>Playback</h3><span class="label">data-state="playback"</span></div>
@@ -143,7 +143,7 @@
   <div class="state">
     <div class="p-window" data-mode="playback">
       <header class="p-header">
-        <img class="p-wordmark" src="../brand/wordmark-booth.svg" alt="Punch2Pen">
+        <img class="p-wordmark" src="../brand/wordmark-plugin.svg" alt="Punch2Pen">
         <button class="p-pill" data-kind="local" type="button"><span class="dot"></span><span class="name">Local</span><svg class="caret" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4 5 6.5 7.5 4"/></svg></button>
         <span class="p-spacer"></span>
         <span class="p-badge is-play">Play</span>
@@ -158,7 +158,7 @@
         </div>
         <button class="p-rtl" type="button"><span class="dot"></span>Return to live</button>
       </div>
-      <footer class="p-status"><span class="text">Scrolled away from the playhead</span><img class="p-logo" src="../brand/two-booth.svg" alt=""></footer>
+      <footer class="p-status"><span class="text">Scrolled away from the playhead</span><img class="p-logo" src="../brand/two-plugin.svg" alt=""></footer>
     </div>
     <div class="cap">
       <div class="top"><h3>Scrolled away</h3><span class="label">body.scrolled-away</span></div>
@@ -170,7 +170,7 @@
   <div class="state">
     <div class="p-window" data-mode="playback">
       <header class="p-header">
-        <img class="p-wordmark" src="../brand/wordmark-booth.svg" alt="Punch2Pen">
+        <img class="p-wordmark" src="../brand/wordmark-plugin.svg" alt="Punch2Pen">
         <button class="p-pill" data-kind="local" type="button"><span class="dot"></span><span class="name">Local</span><svg class="caret" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4 5 6.5 7.5 4"/></svg></button>
         <span class="p-spacer"></span>
         <span class="p-badge is-play">Play</span>
@@ -188,7 +188,7 @@
           <div class="ln"><span class="keys">Return applies · Esc cancels</span></div>
         </div>
       </div>
-      <footer class="p-status"><span class="text">Following the playhead · click a word to correct it</span><img class="p-logo" src="../brand/two-booth.svg" alt=""></footer>
+      <footer class="p-status"><span class="text">Following the playhead · click a word to correct it</span><img class="p-logo" src="../brand/two-plugin.svg" alt=""></footer>
     </div>
     <div class="cap">
       <div class="top"><h3>Correction</h3><span class="label">data-state="correction"</span></div>

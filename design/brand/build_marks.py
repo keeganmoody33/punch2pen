@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
-"""Builds the Punch2Pen marks as SVG from one set of geometry.
+"""Builds the Punch2Pen marks as SVG.
 
     pip install fonttools brotli   # only needed for the wordmark
+    python3 design/brand/trace_logo.py   # only when the source logo changes
     python3 design/brand/build_marks.py
 
-Marks (drawn from the founder's sketches, 2026-09):
-  fist      2PEN knuckle fist with the lightning bolt behind it (index-card sketch)
-  pen       retractable pen whose clip is a "2" (green-marker sketch)
-  two       the outlined "2" on its own: app icon, favicon, plugin corner
-  bolt      the lightning bolt glyph
-  wordmark  PUNCH2PEN set in Archivo 75/900, outlined to paths, green 2
+Marks:
+  fist      the founder's 2PEN logo (source/logo-legal-pad.webp), vector-traced
+            by trace_logo.py: black keyline, white fist and bolt, red P E N and badge
+  pen       retractable pen whose clip is a red "2" (the green-marker sketch, recolored)
+  two       the red 2 badge from the logo: app icon, favicon, plugin corner
+  bolt      the lightning bolt glyph, white with a black keyline like the logo
+  wordmark  PUNCH2PEN in Archivo 75/900, outlined to paths, the 2 set as the badge
 
-Each mark is written for two grounds:
-  -booth  graphite ground (plugin, site)   outline ink, fill graphite, green-400
-  -pad    paper ground (lyric sheet, print) outline marker black, fill paper, marker green
+Each mark is written for up to three grounds:
+  -booth   graphite ground on the site: red badge, white type
+  -pad     legal-yellow ground (lyric sheet, print): red badge, pen-black type
+  -plugin  graphite ground inside the plugin: the badge goes one-color (white
+           disc, 2 cut through), because a red dot in a DAW means record-armed
 """
 from __future__ import annotations
 
@@ -37,57 +41,45 @@ def tok(path: str) -> str:
     return value
 
 
+FIST = json.loads((HERE / "fist-paths.json").read_text())
+BADGE = FIST["badge"]
+KEYLINE = "#0B0B0C"  # the logo's black: a touch off pure black, like the print
+WHITE = "#FFFFFF"
+
 GROUNDS = {
     "booth": {
         "line": tok("color.ink.base"),
         "fill": tok("color.graphite.850"),
-        "accent": tok("color.green.400"),
+        "accent": tok("color.red.600"),
         "letter": tok("color.ink.base"),
+        "badge": tok("color.red.600"),
     },
     "pad": {
         "line": tok("color.pad.ink"),
-        "fill": tok("color.pad.paper"),
-        "accent": tok("color.green.700"),
+        "fill": WHITE,
+        "accent": tok("color.red.600"),
         "letter": tok("color.pad.ink"),
+        "badge": tok("color.red.600"),
+        "tile": tok("color.pad.paper"),
+    },
+    "plugin": {
+        "line": tok("color.ink.base"),
+        "fill": tok("color.graphite.850"),
+        "accent": tok("color.ink.base"),
+        "letter": tok("color.ink.base"),
+        "badge": None,  # one-color: the 2 is cut through the disc
     },
 }
 
 # --- Geometry --------------------------------------------------------------
 
-# Monoline marker letters, 18 x 26 box, origin top-left. Same hand as the knuckles.
-LETTERS = {
-    "2": "M1.5 7.2C1.5 3 4.8 .6 9 .6s7.6 2.6 7.6 6.6c0 3.4-2.2 5.4-5.8 8.6L1.6 25.4H17",
-    "P": "M2 25.6V.6h8c4.6 0 7 2.7 7 6.7s-2.4 6.9-7 6.9H2",
-    "E": "M16.4.6H2v24.8h14.4M2 13h11.4",
-    "N": "M2 25.8V.6l14.2 25V.2",
-}
-
-# Knuckles: four capsules, left to right, carrying 2 / P / E / N.
-FINGERS = [  # x, width, top, bottom
-    (34, 46, 78, 178),
-    (80, 46, 66, 184),
-    (126, 46, 70, 181),
-    (172, 42, 84, 172),
-]
-THUMB = (100, 156, 126, 46)  # x, y, width, height
-# Bolt behind the fist: the straight top shows above the knuckles, the jag and
-# tip show below, like the index-card sketch.
-BOLT = [(122, 6), (172, 6), (99, 208), (136, 208), (70, 276), (76, 236), (39, 236)]
-# The standalone glyph keeps the classic single-jag proportions.
+# Bolt glyph: the classic single-jag proportions.
 BOLT_GLYPH = [(120, 8), (166, 8), (137, 100), (171, 100), (80, 272), (106, 146), (76, 146)]
 
 
 def bolt_path(points, dx=0.0, dy=0.0, scale=1.0) -> str:
     pts = [((x * scale) + dx, (y * scale) + dy) for x, y in points]
     return "M" + " L".join(f"{x:.1f} {y:.1f}" for x, y in pts) + " Z"
-
-
-def capsule(x, y, w, h) -> str:
-    r = w / 2
-    return (
-        f"M{x} {y + r}A{r} {r} 0 0 1 {x + w} {y + r}"
-        f"V{y + h - r}A{r} {r} 0 0 1 {x} {y + h - r}Z"
-    )
 
 
 def svg(view_w, view_h, body, title) -> str:
@@ -98,29 +90,31 @@ def svg(view_w, view_h, body, title) -> str:
 
 
 def fist(c) -> str:
-    def stroke_w(w):
-        return f'stroke="{c["line"]}" stroke-width="{w}" stroke-linejoin="round" stroke-linecap="round"'
-
-    stroke = stroke_w(7)
-    parts = [f'<path d="{bolt_path(BOLT)}" fill="{c["accent"]}" {stroke}/>']
-    # back of the hand fills the notches between knuckles
-    parts.append(f'<rect x="40" y="100" width="170" height="72" rx="18" fill="{c["fill"]}" {stroke}/>')
-    for x, w, top, bottom in reversed(FINGERS):
-        parts.append(f'<path d="{capsule(x, top, w, bottom - top)}" fill="{c["fill"]}" {stroke}/>')
-    tx, ty, tw, th = THUMB
-    r = th / 2
-    parts.append(
-        f'<path d="M{tx + r} {ty}H{tx + tw - r}A{r} {r} 0 0 1 {tx + tw - r} {ty + th}H{tx + r}'
-        f'A{r} {r} 0 0 1 {tx + r} {ty}Z" fill="{c["fill"]}" {stroke}/>'
+    L = FIST["layers"]
+    w, h = FIST["viewBox"][2:]
+    keyline = KEYLINE if c is not GROUNDS["pad"] else c["line"]
+    body = (
+        f'<path d="{L["outline"]}" fill="{keyline}" fill-rule="evenodd"/>\n'
+        f'<path d="{L["white"]}" fill="{WHITE}" fill-rule="evenodd"/>\n'
+        f'<path d="{L["red"]}" fill="{tok("color.red.600")}" fill-rule="evenodd"/>'
     )
-    for (x, w, top, _), ch in zip(FINGERS, "2PEN"):
-        lx = x + w / 2 - 9.3
-        ly = top + 22
-        parts.append(
-            f'<path d="{LETTERS[ch]}" transform="translate({lx:.1f} {ly})" fill="none" '
-            f'stroke="{c["letter"]}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>'
-        )
-    return svg(240, 280, "\n".join(parts), "Punch2Pen knuckle mark")
+    return svg(w, h, body, "Punch2Pen fist")
+
+
+def badge_group(c, x, y, size) -> str:
+    """The 2 badge at (x, y), size across. Red disc with a white 2, or one-color."""
+    s = size / BADGE["viewBox"][2]
+    t = f'transform="translate({x:.2f} {y:.2f}) scale({s:.4f})"'
+    if c["badge"] is None:
+        return f'<path {t} d="{BADGE["disc"]}{BADGE["two"]}" fill="{c["accent"]}" fill-rule="evenodd"/>'
+    return f'<g {t}><path d="{BADGE["disc"]}" fill="{c["badge"]}"/><path d="{BADGE["two"]}" fill="{WHITE}"/></g>'
+
+
+def path_bounds(d: str):
+    import re
+    nums = [float(n) for n in re.findall(r"-?\d+(?:\.\d+)?", d)]
+    xs, ys = nums[0::2], nums[1::2]
+    return min(xs), min(ys), max(xs), max(ys)
 
 
 # The clip 2: one centreline, drawn twice (outline under, fill over) like the marker sketch.
@@ -152,35 +146,37 @@ def pen(c) -> str:
     return svg("0 -12 360", 112, "\n".join(parts), "Punch2Pen pen mark")
 
 
-TWO_ICON = "M19 23C19 15.5 24.5 11 32 11C39.8 11 45 15.8 45 22.6C45 28.6 41.4 32 35.4 36.6L20 49H46"
-
-
 def two(c, ground=True) -> str:
     parts = []
     if ground:
-        parts.append(f'<rect width="64" height="64" rx="14" fill="{c["fill"]}"/>')
-    parts.append(f'<path d="{TWO_ICON}" fill="none" stroke="{c["line"]}" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>')
-    parts.append(f'<path d="{TWO_ICON}" fill="none" stroke="{c["accent"]}" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>')
+        parts.append(f'<rect width="64" height="64" rx="14" fill="{c.get("tile", c["fill"])}"/>')
+    parts.append(badge_group(c, 7, 7, 50) if ground else badge_group(c, 0, 0, 64))
     return svg(64, 64, "\n".join(parts), "Punch2Pen 2")
 
 
-def favicon(c) -> str:
-    # 16-32px: the outline would muddy, so a solid green 2 on graphite.
+def two_glyph(c) -> str:
+    """The 2 alone, tight to its bounds: an alpha shape for logo shaders."""
+    x0, y0, x1, y1 = path_bounds(BADGE["two"])
+    pad = 4
     return svg(
-        32,
-        32,
-        f'<rect width="32" height="32" rx="7" fill="{c["fill"]}"/>\n'
-        f'<path d="M9.6 11.6C9.6 8 12.3 5.8 16 5.8S22.4 8 22.4 11.3C22.4 14.2 20.6 15.9 17.7 18.2L10 24.6H22.8" '
-        f'fill="none" stroke="{c["accent"]}" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>',
-        "Punch2Pen",
+        f"{x0 - pad:.1f} {y0 - pad:.1f} {x1 - x0 + pad * 2:.1f}",
+        f"{y1 - y0 + pad * 2:.1f}",
+        f'<path d="{BADGE["two"]}" fill="{c["letter"]}"/>',
+        "Punch2Pen 2",
     )
 
 
+def favicon(c) -> str:
+    # 16-32px: the badge alone, edge to edge, reads as a red dot with a 2 in it.
+    return svg(32, 32, badge_group(c, 0, 0, 32), "Punch2Pen")
+
+
 def bolt(c) -> str:
+    keyline = KEYLINE if c is not GROUNDS["pad"] else c["line"]
     return svg(
         110,
         280,
-        f'<path d="{bolt_path(BOLT_GLYPH, dx=-68)}" fill="{c["accent"]}" stroke="{c["line"]}" stroke-width="6" stroke-linejoin="round"/>',
+        f'<path d="{bolt_path(BOLT_GLYPH, dx=-68)}" fill="{WHITE}" stroke="{keyline}" stroke-width="9" stroke-linejoin="round"/>',
         "Punch2Pen bolt",
     )
 
@@ -199,6 +195,7 @@ def archivo_latin() -> bytes:
 
 
 def wordmark_paths(text="PUNCH2PEN", wdth=75, wght=900, cap=100):
+    """Glyph outlines at cap height `cap`, each drawn at x = 0, with its advance."""
     from fontTools.pens.svgPathPen import SVGPathPen
     from fontTools.pens.transformPen import TransformPen
     from fontTools.ttLib import TTFont
@@ -208,53 +205,139 @@ def wordmark_paths(text="PUNCH2PEN", wdth=75, wght=900, cap=100):
     font = instantiateVariableFont(font, {"wdth": wdth, "wght": wght})
     cmap = font.getBestCmap()
     glyphs = font.getGlyphSet()
-    cap_height = font["OS/2"].sCapHeight
-    scale = cap / cap_height
-    tracking = 0.02 * font["head"].unitsPerEm
-    x = 0.0
+    scale = cap / font["OS/2"].sCapHeight
+    tracking = 0.02 * font["head"].unitsPerEm * scale
     out = []
     for ch in text:
         name = cmap[ord(ch)]
         pen = SVGPathPen(glyphs)
-        glyphs[name].draw(TransformPen(pen, (scale, 0, 0, -scale, x * scale, cap)))
-        out.append((ch, pen.getCommands()))
-        x += glyphs[name].width + tracking
-    width = (x - tracking) * scale
-    return out, width, cap
+        glyphs[name].draw(TransformPen(pen, (scale, 0, 0, -scale, 0, cap)))
+        out.append((ch, pen.getCommands(), glyphs[name].width * scale))
+    return out, tracking, cap
 
 
-def wordmark(c, paths, width, cap) -> str:
-    pad = 4
-    body = []
-    for i, (ch, d) in enumerate(paths):
-        color = c["accent"] if ch == "2" else c["letter"]
-        body.append(f'<path d="{d}" fill="{color}"/>')
-    return svg(f"{width + pad * 2:.1f}", cap + pad * 2, f'<g transform="translate({pad} {pad})">' + "\n".join(body) + "</g>", "Punch2Pen")
+def wordmark(c, glyphs, tracking, cap) -> str:
+    """PUNCH2PEN with the 2 set as the badge, a touch taller than the caps."""
+    size = cap * 1.14
+    gap = tracking * 2.5
+    body, x = [], 0.0
+    for i, (ch, d, adv) in enumerate(glyphs):
+        if ch == "2":
+            x += gap - tracking
+            body.append(badge_group(c, x, (cap - size) / 2, size))
+            x += size + gap
+        else:
+            body.append(f'<path transform="translate({x:.2f} 0)" d="{d}" fill="{c["letter"]}"/>')
+            x += adv + tracking
+    width = x - tracking
+    top = (cap - size) / 2 - 2
+    height = size + 4
+    return svg(f"-2 {top:.2f} {width + 4:.2f}", f"{height:.2f}", "\n".join(body), "Punch2Pen")
+
+
+# --- Explorations: marks drawn from how the plugin works --------------------
+# Proposals on the marks board, not adopted. Written to brand/explore/.
+
+
+def punch_range(c) -> str:
+    """[2]: the badge between a DAW's punch-in and punch-out brackets. Also reads
+    as lyric-sheet notation: [Verse 2], a bracketed adlib."""
+    line = c["line"]
+    st = f'fill="none" stroke="{line}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"'
+    body = [
+        f'<path d="M50 14H30V106H50" {st}/>',
+        f'<path d="M150 14H170V106H150" {st}/>',
+        badge_group(c, 64, 24, 72),
+    ]
+    return svg(200, 120, "\n".join(body), "Punch range")
+
+
+# Waveform overview: quiet before the punch, the bolt as the transient, then decay.
+TRANSIENT_BARS = [8, 12, 7, 14, 10, 6, 12, 9, None, 44, 38, 32, 27, 22, 18, 15, 12, 10, 8, 6]
+
+
+def transient(c) -> str:
+    """The bolt is the transient: the punch landing on the waveform."""
+    line = c["line"]
+    keyline = KEYLINE if c is not GROUNDS["pad"] else c["line"]
+    body, x, mid = [], 14.0, 70.0
+    for h in TRANSIENT_BARS:
+        if h is None:
+            # bolt glyph (170 wide units, 264 tall) scaled into the gap
+            scale = 136 / 264
+            bx = x - 76 * scale + 2
+            body.append(
+                f'<path d="{bolt_path(BOLT_GLYPH, dx=bx - 0, dy=mid - 140 * scale, scale=scale)}" fill="{WHITE}" '
+                f'stroke="{keyline}" stroke-width="5" stroke-linejoin="round"/>'
+            )
+            x += 96 * scale + 14
+            continue
+        body.append(f'<path d="M{x:.1f} {mid - h:.1f}V{mid + h:.1f}" stroke="{line}" stroke-width="5" stroke-linecap="round"/>')
+        x += 11
+    return svg(f"{x + 4:.0f}", 140, "\n".join(body), "Transient")
+
+
+def seek_word(c, glyphs_by_char, cap) -> str:
+    """Click a word, move the playhead: the word under a highlighter, a playhead
+    through its first syllable, the timecode on the flag."""
+    s = 64 / cap
+    word, x, parts = "PEN", 36.0, []
+    letters = []
+    for ch in word:
+        d, adv = glyphs_by_char[ch]
+        letters.append(f'<path transform="translate({x:.2f} 40) scale({s:.4f})" d="{d}" fill="{tok("color.pad.ink")}"/>')
+        x += adv * s + 4
+    right = x
+    # a real highlighter: solid legal yellow with pen-black type, on either ground
+    hl = tok("color.pad.paper") if c is not GROUNDS["pad"] else "#F2E27A"
+    parts.append(f'<path d="M26 {40 + 6}L{right + 8:.1f} {40 + 2}L{right + 10:.1f} {40 + 70}L24 {40 + 72}Z" fill="{hl}"/>')
+    parts += letters
+    # playhead: line, flag, timecode
+    ph = 30
+    parts.append(f'<path d="M{ph} 22V122" stroke="{c["line"]}" stroke-width="3"/>')
+    parts.append(f'<path d="M{ph - 8} 6H{ph + 62}V22H{ph + 8}L{ph} 30L{ph - 8} 22Z" fill="{c["line"]}"/>')
+    tc, tx = "0:42.1", ph - 1.0
+    ts = 11 / cap
+    for ch in tc:
+        d, adv = glyphs_by_char[ch]
+        parts.append(f'<path transform="translate({tx:.2f} 9.5) scale({ts:.4f})" d="{d}" fill="{c.get("tile", c["fill"]) if c is not GROUNDS["pad"] else WHITE}"/>')
+        tx += adv * ts + 0.8
+    return svg(f"{right + 24:.0f}", 130, "\n".join(parts), "Seek word")
 
 
 def main():
     out = HERE
     written = []
+
+    def write(name, text):
+        (out / name).write_text(text)
+        written.append(name)
+
+    for ground in ("booth", "pad"):
+        c = GROUNDS[ground]
+        for name, fn in [("fist", fist), ("pen", pen), ("bolt", bolt)]:
+            write(f"{name}-{ground}.svg", fn(c))
+        # The 2 alone: a clean alpha shape for logo shaders (gem smoke).
+        write(f"two-glyph-{ground}.svg", two_glyph(c))
     for ground, c in GROUNDS.items():
-        for name, fn in [("fist", fist), ("pen", pen), ("two", two), ("bolt", bolt)]:
-            p = out / f"{name}-{ground}.svg"
-            p.write_text(fn(c))
-            written.append(p.name)
-    (out / "favicon.svg").write_text(favicon(GROUNDS["booth"]))
-    written.append("favicon.svg")
-    # The 2 without its tile: a clean alpha shape for logo shaders (gem smoke, heatmap).
-    for ground, c in GROUNDS.items():
-        p = out / f"two-glyph-{ground}.svg"
-        p.write_text(two(c, ground=False))
-        written.append(p.name)
+        write(f"two-{ground}.svg", two(c))
+    write("favicon.svg", favicon(GROUNDS["booth"]))
     try:
-        paths, width, cap = wordmark_paths()
+        glyphs, tracking, cap = wordmark_paths()
         for ground, c in GROUNDS.items():
-            p = out / f"wordmark-{ground}.svg"
-            p.write_text(wordmark(c, paths, width, cap))
-            written.append(p.name)
+            write(f"wordmark-{ground}.svg", wordmark(c, glyphs, tracking, cap))
+        extra, _, _ = wordmark_paths(text="0:42.1PEN")
+        by_char = {ch: (d, adv) for ch, d, adv in extra}
     except ModuleNotFoundError:
+        by_char = None
         print("fonttools not installed: skipped wordmark (pip install fonttools brotli)")
+    (out / "explore").mkdir(exist_ok=True)
+    for ground in ("booth", "pad"):
+        c = GROUNDS[ground]
+        write(f"explore/punch-range-{ground}.svg", punch_range(c))
+        write(f"explore/transient-{ground}.svg", transient(c))
+        if by_char:
+            write(f"explore/seek-word-{ground}.svg", seek_word(c, by_char, cap))
     print("wrote", ", ".join(written))
 
 

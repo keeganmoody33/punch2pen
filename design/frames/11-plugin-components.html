@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=1440">
-<meta name="paper:artboard" content="Plugin / 11 Components" data-width="1440" data-height="2555">
+<meta name="paper:artboard" content="Plugin / 11 Components" data-width="1440" data-height="2612">
 <title>Plugin Components · Punch2Pen</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap">
 <link rel="stylesheet" href="../tokens/tokens.css">
@@ -30,7 +30,7 @@
   .status-table .r .why { padding: 0 20px; font-size: 12.5px; color: var(--ink-3); }
 </style>
 </head>
-<body class="board" style="--board-h: 2555px">
+<body class="board" style="--board-h: 2612px">
 
 <header class="board-head">
   <div class="lead">
@@ -67,7 +67,7 @@
         <button class="p-icon-btn" type="button" title="Dictionary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2.5h7.5a2 2 0 0 1 2 2v9H5a2 2 0 0 1-2-2z"/><path d="M3 11.5a2 2 0 0 1 2-2h7.5"/></svg></button>
         <button class="p-icon-btn" type="button" title="Pen it"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2.5 13.5 5 6 12.5 3 13l.5-3z"/><path d="M9.5 4 12 6.5"/></svg></button>
       </div>
-      <p class="note">Flow Grid, Dictionary, Pen it. Grey at rest, green wash when on.</p>
+      <p class="note">Flow Grid, Dictionary, Pen it. Grey at rest, white on a raised plate when on. Nothing in the plugin lights red unless it is recording.</p>
     </div>
   </div>
   <div class="grid3">
@@ -79,18 +79,18 @@
 
 <!-- Words -->
 <section class="section">
-  <div class="section-head"><h2>Words</h2><p>A word is a span with a sample start and end. Its state is a class. The plate is ink, never green, so the highlight reads the same on every screen.</p></div>
+  <div class="section-head"><h2>Words</h2><p>A word is a span with a sample start and end. Its state is a class. The plate is ink, never red, so the highlight reads the same on every screen. Red in a transcript is the pen: a correction.</p></div>
   <div class="words">
     <div class="word-cell"><span class="label">Upcoming</span><div class="demo soft" style="opacity:.68"><span class="p-word">should</span></div><p class="note">Opacity 0.68.</p></div>
     <div class="word-cell"><span class="label">Past</span><div class="demo soft" style="opacity:.38"><span class="p-word">wall</span></div><p class="note">Opacity 0.38; 0.52 inside the title line.</p></div>
     <div class="word-cell"><span class="label">Under the playhead</span><div class="demo"><span class="p-word is-active">lands</span></div><p class="note">Ink plate, radius 3. Holds between timestamps.</p></div>
     <div class="word-cell"><span class="label">Syllable fill <span class="status proposed" style="margin-left:6px">Proposed</span></span><div class="demo"><span class="p-word is-active has-syllables"><span class="p-syl is-sung">un</span><span class="p-syl is-sung">der</span><span class="p-syl">stood</span></span></div><p class="note">Sung syllables take the plate.</p></div>
     <div class="word-cell"><span class="label">Provisional</span><div class="demo"><span class="p-word">drop</span><span class="p-cursor"></span></div><p class="note">While recording. Red cursor, no plate.</p></div>
-    <div class="word-cell"><span class="label">Correcting</span><div class="demo"><span class="p-word is-correcting">topp</span></div><p class="note">Dashed green outline while the sheet is open.</p></div>
-    <div class="word-cell"><span class="label">Corrected</span><div class="demo"><span class="p-word is-corrected">booth</span></div><p class="note">Dotted green underline, every match in the take.</p></div>
+    <div class="word-cell"><span class="label">Correcting</span><div class="demo"><span class="p-word is-correcting">topp</span></div><p class="note">Dashed red-pen outline while the sheet is open.</p></div>
+    <div class="word-cell"><span class="label">Corrected</span><div class="demo"><span class="p-word is-corrected">booth</span></div><p class="note">Red-pen underline, every match in the take. Pro corrections train the model: the red pen is the learning loop, made visible.</p></div>
     <div class="word-cell"><span class="label">From your dictionary <span class="status proposed" style="margin-left:6px">Proposed</span></span><div class="demo"><span class="p-word is-dictionary">run it back</span></div><p class="note">Soft solid underline: the profile knew this one.</p></div>
     <div class="word-cell"><span class="label">Adlib <span class="status proposed" style="margin-left:6px">Proposed</span></span><div class="demo soft"><span class="p-word">should</span><span class="p-word is-adlib">yeah</span></div><p class="note">Parentheses, italic, 0.82 em. Never the title.</p></div>
-    <div class="word-cell"><span class="label">Seek <span class="status proposed" style="margin-left:6px">Proposed</span></span><div class="demo"><span class="p-word is-seek">understood</span></div><p class="note">Green wash for 200 ms after a click moves the playhead.</p></div>
+    <div class="word-cell"><span class="label">Seek <span class="status proposed" style="margin-left:6px">Proposed</span></span><div class="demo"><span class="p-word is-seek">understood</span></div><p class="note">Yellow highlighter for 200 ms after a click moves the playhead.</p></div>
   </div>
   <div class="row tight" style="align-items:flex-start">
     <div class="specimen" style="width:400px; min-height:150px; position:relative">

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=1440">
-<meta name="paper:artboard" content="Brand / 05 Marks" data-width="1440" data-height="2263">
+<meta name="paper:artboard" content="Brand / 05 Marks" data-width="1440" data-height="3160">
 <title>Marks · Punch2Pen</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap">
 <link rel="stylesheet" href="../tokens/tokens.css">
@@ -22,9 +22,19 @@
   .sizes .it { display: flex; flex-direction: column; gap: 10px; align-items: center; }
   .sizes .it span { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
   .clear { position: relative; width: 300px; height: 330px; display: grid; place-items: center; background: var(--bg-chrome); border-radius: var(--radius-md); }
-  .clear .zone { position: absolute; inset: 30px; border: 1px dashed rgba(67,199,163,.5); border-radius: 4px; }
+  .clear .zone { position: absolute; inset: 30px; border: 1px dashed var(--accent-line); border-radius: 4px; }
   .clear img { width: 200px; position: relative; }
   .donts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  .explore { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+  .ex { display: flex; flex-direction: column; gap: 12px; }
+  .ex .pair { display: grid; grid-template-rows: 150px 110px; gap: 8px; }
+  .ex .pair > div { border-radius: var(--radius-md); display: grid; place-items: center; }
+  .ex .pair .b { background: var(--bg-chrome); border: 1px solid var(--line); }
+  .ex .pair .p { background: var(--pad-paper); }
+  .ex .row1 { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .ex b { font-size: 15px; }
+  .ex p { font-size: 13px; color: var(--ink-3); line-height: 1.45; }
+  .fake-status { width: 220px; height: 30px; border-radius: 4px; background: var(--bg-chrome); border: 1px solid var(--line-strong); display: flex; align-items: center; justify-content: space-between; padding: 0 10px; font-family: var(--mono); font-size: 9.5px; letter-spacing: .12em; color: var(--ink-3); }
   .dont { display: flex; flex-direction: column; gap: 12px; }
   .dont .art { height: 170px; border-radius: var(--radius-md); background: var(--bg-chrome); display: grid; place-items: center; position: relative; overflow: hidden; }
   .dont .art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top right, transparent calc(50% - 1.5px), rgba(255,69,58,.8) calc(50% - 1.5px), rgba(255,69,58,.8) calc(50% + 1.5px), transparent calc(50% + 1.5px)); }
@@ -32,28 +42,29 @@
   .dont p { font-size: 12.5px; color: var(--ink-3); line-height: 1.45; }
 </style>
 </head>
-<body class="board" style="--board-h: 2263px">
+<body class="board" style="--board-h: 3160px">
 
 <header class="board-head">
   <div class="lead">
     <p class="eyebrow">Brand · Marks</p>
-    <h1>Drawn from the sketches</h1>
-    <p class="dek">The knuckle fist with the bolt is the index-card sketch. The pen whose clip is a 2 is the green-marker sketch. The outlined 2 is the hinge of the name and scales down to a favicon. All are generated from one script so the geometry lives in one place.</p>
+    <h1>The 2PEN logo, as a system</h1>
+    <p class="dek">The founder’s logo is the primary mark, traced to vector by <code class="code">brand/trace_logo.py</code> rather than redrawn. Its red 2 badge is the hinge of the name: icon, favicon, and the 2 in the wordmark. The pen whose clip is a 2 carries over from the first sketches, now in red. Inside the plugin the badge goes one-color, because a red dot in a DAW means record-armed.</p>
   </div>
   <div class="board-meta"><img src="../brand/fist-booth.svg" alt=""><span>Frame 05 · 1440 wide</span></div>
 </header>
 
 <section class="marks">
-  <div class="tile booth"><span class="label">Primary · knuckle fist</span><div class="art"><img src="../brand/fist-booth.svg" alt="" style="width:230px"></div><div class="cap"><b>fist-booth.svg</b><span>Graphite ground</span></div></div>
-  <div class="tile pad"><span class="label">Primary · knuckle fist</span><div class="art"><img src="../brand/fist-pad.svg" alt="" style="width:230px"></div><div class="cap"><b>fist-pad.svg</b><span>Paper ground</span></div></div>
+  <div class="tile booth"><span class="label">Primary · the 2PEN fist</span><div class="art"><img src="../brand/fist-booth.svg" alt="" style="height:300px"></div><div class="cap"><b>fist-booth.svg</b><span>Graphite ground · traced from the logo</span></div></div>
+  <div class="tile pad"><span class="label">Primary · the 2PEN fist</span><div class="art"><img src="../brand/fist-pad.svg" alt="" style="height:300px"></div><div class="cap"><b>fist-pad.svg</b><span>Legal pad ground</span></div></div>
   <div class="tile booth" style="min-height:240px"><span class="label">Secondary · the 2-clip pen</span><div class="art"><img src="../brand/pen-booth.svg" alt="" style="width:440px"></div><div class="cap"><b>pen-booth.svg</b><span>Wide spaces: footers, merch, loaders</span></div></div>
-  <div class="tile pad" style="min-height:240px"><span class="label">Secondary · the 2-clip pen</span><div class="art"><img src="../brand/pen-pad.svg" alt="" style="width:440px"></div><div class="cap"><b>pen-pad.svg</b><span>Paper ground</span></div></div>
-  <div class="tile booth" style="min-height:200px"><span class="label">Wordmark</span><div class="art"><img src="../brand/wordmark-booth.svg" alt="Punch2Pen" style="width:520px"></div><div class="cap"><b>wordmark-booth.svg</b><span>Archivo 75/900 outlined · green 2</span></div></div>
-  <div class="tile pad" style="min-height:200px"><span class="label">Wordmark</span><div class="art"><img src="../brand/wordmark-pad.svg" alt="Punch2Pen" style="width:520px"></div><div class="cap"><b>wordmark-pad.svg</b><span>Marker green 2 on paper</span></div></div>
+  <div class="tile pad" style="min-height:240px"><span class="label">Secondary · the 2-clip pen</span><div class="art"><img src="../brand/pen-pad.svg" alt="" style="width:440px"></div><div class="cap"><b>pen-pad.svg</b><span>Legal pad ground</span></div></div>
+  <div class="tile booth" style="min-height:200px"><span class="label">Wordmark</span><div class="art"><img src="../brand/wordmark-booth.svg" alt="Punch2Pen" style="width:520px"></div><div class="cap"><b>wordmark-booth.svg</b><span>Archivo 75/900 outlined · the 2 is the badge</span></div></div>
+  <div class="tile pad" style="min-height:200px"><span class="label">Wordmark</span><div class="art"><img src="../brand/wordmark-pad.svg" alt="Punch2Pen" style="width:520px"></div><div class="cap"><b>wordmark-pad.svg</b><span>Pen black, red badge</span></div></div>
+  <div class="tile booth" style="min-height:200px; grid-column: span 2; background: var(--bg-pane)"><span class="label">Inside the plugin · one-color</span><div class="art"><img src="../brand/wordmark-plugin.svg" alt="Punch2Pen" style="width:420px"><img src="../brand/two-plugin.svg" alt="" style="width:88px"></div><div class="cap"><b>wordmark-plugin.svg · two-plugin.svg</b><span>White disc, the 2 cut through. The only red in the plugin is the REC dot and the red pen.</span></div></div>
 </section>
 
 <section class="section">
-  <div class="section-head"><h2>The 2 · icon sizes</h2><p>Outlined above 32 px, solid below it so the counter stays open.</p></div>
+  <div class="section-head"><h2>The 2 · icon sizes</h2><p>The badge from the logo, traced, not redrawn: a red disc with the white 2. It holds down to 16 px because the disc carries the shape.</p></div>
   <div class="row" style="align-items:flex-end; gap:64px">
     <div class="sizes">
       <div class="it"><img src="../brand/two-booth.svg" alt="" width="160"><span>160 · app, plugin bundle</span></div>
@@ -61,11 +72,11 @@
       <div class="it"><img src="../brand/two-booth.svg" alt="" width="32"><span>32</span></div>
       <div class="it"><img src="../brand/favicon.svg" alt="" width="32"><span>32 · favicon</span></div>
       <div class="it"><img src="../brand/favicon.svg" alt="" width="16"><span>16</span></div>
-      <div class="it"><img src="../brand/two-booth.svg" alt="" width="18"><span>18 · status bar</span></div>
+      <div class="it"><img src="../brand/two-plugin.svg" alt="" width="18"><span>18 · plugin status bar</span></div>
     </div>
     <div class="sizes">
       <div class="it"><img src="../brand/bolt-booth.svg" alt="" width="64"><span>Bolt glyph</span></div>
-      <div class="it"><img src="../brand/bolt-pad.svg" alt="" width="64" style="background:var(--pad-paper); border-radius:6px; padding:6px"><span>On paper</span></div>
+      <div class="it"><img src="../brand/bolt-pad.svg" alt="" width="64" style="background:var(--pad-paper); border-radius:6px; padding:6px"><span>On the pad</span></div>
     </div>
   </div>
 </section>
@@ -74,21 +85,30 @@
   <div class="row" style="gap:56px; flex-wrap:nowrap; align-items:flex-start">
     <div class="col">
       <div class="section-head"><h2>Clear space</h2></div>
-      <div class="clear"><span class="zone"></span><img src="../brand/fist-booth.svg" alt=""></div>
-      <p class="note">Keep one knuckle width (the height of the 2 on the first finger) clear on every side. Minimum size: 48 px tall on screen, 16 mm in print. Below that, use the 2.</p>
+      <div class="clear"><span class="zone"></span><img src="../brand/fist-booth.svg" alt="" style="width:auto; height:250px"></div>
+      <p class="note">Keep one badge width (the red 2) clear on every side. Minimum size: 64 px tall on screen, 20 mm in print. Below that, use the 2 badge.</p>
     </div>
     <div class="col" style="flex:1">
       <div class="section-head"><h2>Don’t</h2></div>
       <div class="donts">
-        <div class="dont"><div class="art"><svg viewBox="0 0 110 280" width="50" aria-hidden="true"><path d="M52 8 L98 8 L69 100 L103 100 L12 272 L38 146 L8 146 Z" fill="#FF453A" stroke="#F3F4F6" stroke-width="6" stroke-linejoin="round"/></svg></div><b>Recolor the bolt red</b><p>Red means recording. The bolt is always green.</p></div>
+        <div class="dont"><div class="art"><div class="fake-status"><span>FOLLOWING</span><img src="../brand/two-booth.svg" alt="" width="18"></div></div><b>Put the red badge in the plugin</b><p>In a DAW a red dot reads as record-armed. Use two-plugin.svg and wordmark-plugin.svg.</p></div>
         <div class="dont"><div class="art"><img src="../brand/wordmark-booth.svg" alt="" style="width:120px; transform: scaleX(1.5)"></div><b>Stretch the wordmark</b><p>Scale it proportionally. Pick the fist or the 2 for tight spots.</p></div>
-        <div class="dont"><div class="art"><span style="font-family:var(--sans); font-weight:700; font-size:22px; color:#2A6F5D">punch2pen</span></div><b>Use marker green as text on graphite</b><p>2.6:1. On dark grounds the green is 400.</p></div>
-        <div class="dont"><div class="art"><img src="../brand/fist-booth.svg" alt="" style="width:110px; transform: rotate(-24deg)"></div><b>Tilt or redraw the fist</b><p>It punches straight at the viewer. Regenerate from build_marks.py.</p></div>
+        <div class="dont"><div class="art"><span style="font-family:var(--sans); font-weight:700; font-size:22px; color:#AC2623">punch2pen</span></div><b>Use brand red as text on graphite</b><p>2.3:1 on chrome. Brand red is a fill; text on dark grounds is red-300.</p></div>
+        <div class="dont"><div class="art"><svg viewBox="0 0 110 280" width="50" aria-hidden="true"><path d="M52 8 L98 8 L69 100 L103 100 L12 272 L38 146 L8 146 Z" fill="#FF453A" stroke="#0B0B0C" stroke-width="9" stroke-linejoin="round"/></svg></div><b>Mix REC red into the brand</b><p>The bolt is white. #FF453A is the REC dot and nothing else.</p></div>
       </div>
     </div>
   </div>
 </section>
 
-<footer class="board-foot"><span>Punch2Pen design system</span><span>Source: design/brand/build_marks.py · python3 design/brand/build_marks.py</span></footer>
+<section class="section">
+  <div class="section-head"><h2>Explorations <span class="status proposed" style="margin-left:8px; vertical-align:middle">Proposed</span></h2><p>Marks drawn from how the plugin works, not adopted. Each could be a sub-brand, a loader, a merch line, or a feature’s icon. Generated by the same script into <code class="code">brand/explore/</code>.</p></div>
+  <div class="explore">
+    <div class="ex"><div class="pair"><div class="b"><img src="../brand/explore/punch-range-booth.svg" alt="" height="110"></div><div class="p"><img src="../brand/explore/punch-range-pad.svg" alt="" height="80"></div></div><div class="row1"><b>Punch range · [2]</b></div><p>The badge between a DAW’s punch-in and punch-out brackets: the take the pen is writing. It also reads as lyric-sheet notation, [Verse 2] or a bracketed adlib. Fits the transport, the record flow, a “Punch-in” feature name.</p></div>
+    <div class="ex"><div class="pair"><div class="b"><img src="../brand/explore/transient-booth.svg" alt="" height="110"></div><div class="p"><img src="../brand/explore/transient-pad.svg" alt="" height="80"></div></div><div class="row1"><b>Transient</b></div><p>A waveform overview where the bolt is the transient: quiet before, the punch, then decay. The logo’s bolt, read as audio. Works as a loader (bars animate, bolt lands) and ties the fist to what the engine hears.</p></div>
+    <div class="ex"><div class="pair"><div class="b"><img src="../brand/explore/seek-word-booth.svg" alt="" height="110"></div><div class="p"><img src="../brand/explore/seek-word-pad.svg" alt="" height="80"></div></div><div class="row1"><b>Seek word</b></div><p>A word under the yellow highlighter with the playhead through it and the timecode on the flag. The product’s unlock in one picture: click a word, move the playhead. A natural icon for the ARA seek feature and for launch posts.</p></div>
+  </div>
+</section>
+
+<footer class="board-foot"><span>Punch2Pen design system</span><span>Source: design/brand/trace_logo.py, build_marks.py · python3 design/brand/build_marks.py</span></footer>
 </body>
 </html>

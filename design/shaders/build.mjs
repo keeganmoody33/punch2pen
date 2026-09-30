@@ -10,12 +10,12 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const tokens = JSON.parse(readFileSync(join(here, '..', 'tokens', 'tokens.json'), 'utf8'));
 
-// Flatten the colors the presets use into T['graphite-900'], T['green-400'], T.wait …
+// Flatten the colors the presets use into T['graphite-900'], T['red-600'], T.wait …
 const get = (path) => path.split('.').reduce((n, k) => n?.[k], tokens);
 const resolve = (v) => (typeof v === 'string' && /^\{.+\}$/.test(v) ? resolve(get(v.slice(1, -1)).$value) : v);
 const T = {};
 for (const [k, v] of Object.entries(tokens.color.graphite)) if (!k.startsWith('$')) T[`graphite-${k}`] = v.$value;
-for (const [k, v] of Object.entries(tokens.color.green)) if (!k.startsWith('$')) T[`green-${k}`] = v.$value;
+for (const [k, v] of Object.entries(tokens.color.red)) if (!k.startsWith('$')) T[`red-${k}`] = v.$value;
 for (const [k, v] of Object.entries(tokens.semantic)) if (!k.startsWith('$')) T[k] = resolve(v.$value);
 writeFileSync(
   join(here, 'src', 'tokens.generated.js'),

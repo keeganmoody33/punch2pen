@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=1440">
-<meta name="paper:artboard" content="Foundations / 02 Color" data-width="1440" data-height="2713">
+<meta name="paper:artboard" content="Foundations / 02 Color" data-width="1440" data-height="3062">
 <title>Color · Punch2Pen</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap">
 <link rel="stylesheet" href="../tokens/tokens.css">
@@ -23,7 +23,7 @@
   .origin .go { margin-top: 38px; }
   .origin .sw { width: 170px; }
   .origin .go { color: var(--ink-4); font-family: var(--mono); font-size: 20px; }
-  .rules { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  .rules { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
   .rule { padding: 20px; border-radius: var(--radius-md); background: var(--bg-pane); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
   .rule .big { font-family: var(--display); font-stretch: var(--display-stretch); font-weight: 850; font-size: 28px; text-transform: uppercase; line-height: 1; }
   .rule p { font-size: 13px; color: var(--ink-3); line-height: 1.45; }
@@ -35,27 +35,27 @@
   table.contrast td.r { font-family: var(--mono); color: var(--ink); }
 </style>
 </head>
-<body class="board" style="--board-h: 2713px">
+<body class="board" style="--board-h: 3062px">
 
 <header class="board-head">
   <div class="lead">
     <p class="eyebrow">Foundations · Color</p>
-    <h1>Marker green on graphite</h1>
-    <p class="dek">The green is sampled from the green-marker sketches, white-balanced against the paper, then lifted to stay the same hue on the dark chrome. The graphite is what the plugin ships today. One red, one amber, one green, each with one job.</p>
+    <h1>Brick red on graphite</h1>
+    <p class="dek">The red and the legal yellow come from the founder’s 2PEN logo. The graphite is what the plugin ships today. Brand red is a fill with white type, the way the 2 badge is drawn. White means live, yellow is the highlighter, and the REC dot is the only red that glows.</p>
   </div>
   <div class="board-meta"><img src="../brand/fist-booth.svg" alt=""><span>Frame 02 · 1440 wide</span></div>
 </header>
 
 <section class="section">
-  <div class="section-head"><h2>Where the green came from</h2><p>Photo pixels are warm from room light. Scaling each channel so the index card reads white gives the marker’s real color, hue 164.</p></div>
+  <div class="section-head"><h2>Where the red came from</h2><p>Measured from <code class="code">brand/source/logo-legal-pad.webp</code>: the median of 84,398 red pixels is #AF2724. The token is #AC2623, the value picked from the logo, within three levels per channel. The same hue is lifted to read as text on graphite.</p></div>
   <div class="origin">
-    <div class="sw"><div class="chip" style="background:#31755B; color:#fff">#31755B</div><b>Photo sample</b><span>Bolt fill on the index card, as photographed.</span></div>
+    <div class="sw"><div class="chip" style="background:#AF2724; color:#fff">#AF2724</div><b>Logo median</b><span>The 2 badge and P E N, as drawn.</span></div>
     <span class="go">→</span>
-    <div class="sw"><div class="chip" style="background:#2A6F5D; color:#fff">#2A6F5D</div><b>green-700 · Marker</b><span>White-balanced to the paper. Brand ink on paper, 5.7:1.</span></div>
+    <div class="sw"><div class="chip" style="background:#AC2623; color:#fff">#AC2623</div><b>red-600 · Brand</b><span>Fills with white type, 6.9:1. Brand ink on the pad, 6.0:1.</span></div>
     <span class="go">→</span>
-    <div class="sw"><div class="chip" style="background:#43C7A3; color:#0B1F18">#43C7A3</div><b>green-400 · Accent</b><span>Same hue lifted for graphite. 7.3:1 on chrome.</span></div>
+    <div class="sw"><div class="chip" style="background:#22242A; color:#EA7E7B; box-shadow: inset 0 0 0 1px var(--line-strong)">#EA7E7B</div><b>red-300 · Accent</b><span>Same hue lifted for text on graphite. 5.7:1 on chrome.</span></div>
     <span class="go">→</span>
-    <div class="sw"><div class="chip" style="background:#0B1F18; color:#43C7A3; box-shadow: inset 0 0 0 1px var(--line-strong)">#0B1F18</div><b>green-950 · On green</b><span>Text on a green button, 8.1:1.</span></div>
+    <div class="sw"><div class="chip" style="background:#AC2623; color:#fff; font-family:var(--sans); font-size:14px">Get the plugin</div><b>accent-ink · #FFFFFF</b><span>White on the brand fill, like the 2 on its badge.</span></div>
   </div>
 </section>
 
@@ -80,19 +80,19 @@
 </section>
 
 <section class="section">
-  <div class="section-head"><h2>Green · hue 164</h2><p>400 is the accent on graphite. 700 is the marker, used on paper. Everything else is for washes, hovers, and charts.</p></div>
+  <div class="section-head"><h2>Red · hue 1</h2><p>600 is the brand: fills and the pad. 300 is the accent as text on graphite. 500 is the fill hover. The rest are for washes and charts.</p></div>
   <div class="swatches g11">
-    <div class="sw tall"><div class="chip" style="background:#E1F4EF"></div><b>50</b><span>#E1F4EF</span></div>
-    <div class="sw tall"><div class="chip" style="background:#BBE7DB"></div><b>100</b><span>#BBE7DB</span></div>
-    <div class="sw tall"><div class="chip" style="background:#8CD9C4"></div><b>200</b><span>#8CD9C4</span></div>
-    <div class="sw tall"><div class="chip" style="background:#64CEB2"></div><b>300</b><span>#64CEB2 hover</span></div>
-    <div class="sw tall star"><div class="chip" style="background:#43C7A3"></div><b>400</b><span>#43C7A3 accent</span></div>
-    <div class="sw tall"><div class="chip" style="background:#3DA488"></div><b>500</b><span>#3DA488</span></div>
-    <div class="sw tall"><div class="chip" style="background:#32856F"></div><b>600</b><span>#32856F</span></div>
-    <div class="sw tall star"><div class="chip" style="background:#2A6F5D"></div><b>700</b><span>#2A6F5D marker</span></div>
-    <div class="sw tall"><div class="chip" style="background:#21594A"></div><b>800</b><span>#21594A</span></div>
-    <div class="sw tall"><div class="chip" style="background:#153C32"></div><b>900</b><span>#153C32</span></div>
-    <div class="sw tall"><div class="chip" style="background:#0B1F18"></div><b>950</b><span>#0B1F18 on green</span></div>
+    <div class="sw tall"><div class="chip" style="background:#FBEAE9"></div><b>50</b><span>#FBEAE9</span></div>
+    <div class="sw tall"><div class="chip" style="background:#F7D0CF"></div><b>100</b><span>#F7D0CF</span></div>
+    <div class="sw tall"><div class="chip" style="background:#F1A9A7"></div><b>200</b><span>#F1A9A7 hover</span></div>
+    <div class="sw tall star"><div class="chip" style="background:#EA7E7B"></div><b>300</b><span>#EA7E7B accent</span></div>
+    <div class="sw tall"><div class="chip" style="background:#DE615E"></div><b>400</b><span>#DE615E</span></div>
+    <div class="sw tall"><div class="chip" style="background:#CF3430"></div><b>500</b><span>#CF3430 fill hover</span></div>
+    <div class="sw tall star"><div class="chip" style="background:#AC2623"></div><b>600</b><span>#AC2623 brand</span></div>
+    <div class="sw tall"><div class="chip" style="background:#8C1F1D"></div><b>700</b><span>#8C1F1D</span></div>
+    <div class="sw tall"><div class="chip" style="background:#691917"></div><b>800</b><span>#691917 glow cap</span></div>
+    <div class="sw tall"><div class="chip" style="background:#461210"></div><b>900</b><span>#461210</span></div>
+    <div class="sw tall"><div class="chip" style="background:#290B0A"></div><b>950</b><span>#290B0A</span></div>
   </div>
 </section>
 
@@ -100,30 +100,33 @@
   <div class="row" style="gap:56px">
     <div class="col" style="flex:1">
       <div class="section-head"><h2>Signals</h2></div>
-      <div class="swatches" style="grid-template-columns: repeat(3, minmax(0,1fr))">
-        <div class="sw"><div class="chip" style="background:#FF453A; color:#fff">REC</div><b>--rec · #FF453A</b><span>Recording. The only red in product UI.</span></div>
+      <div class="swatches" style="grid-template-columns: repeat(4, minmax(0,1fr))">
+        <div class="sw"><div class="chip" style="background:#22242A; color:#F3F4F6; box-shadow: inset 0 0 0 1px var(--line)"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#FF453A;margin-right:8px"></span>REC</div><b>--rec · #FF453A</b><span>A dot or a badge. Never text, never a glow anywhere else.</span></div>
         <div class="sw"><div class="chip" style="background:#D7B07A; color:#1E1E1E">WAIT</div><b>--wait · #D7B07A</b><span>Engine not connected, caution copy, pending sync.</span></div>
-        <div class="sw"><div class="chip" style="background:#43C7A3; color:#0B1F18">PLAY</div><b>--play = --accent</b><span>PLAY, LIVE, corrected, synced. Green means the pen is live.</span></div>
+        <div class="sw"><div class="chip" style="background:#22242A; color:#F3F4F6; box-shadow: inset 0 0 0 1px var(--line)">PLAY</div><b>--play = --ink</b><span>PLAY, LIVE, synced, the playhead. White means the pen is live.</span></div>
+        <div class="sw"><div class="chip" style="background:#14151A; box-shadow: inset 0 0 0 1px var(--line)"><span style="font-family:var(--sans); font-size:15px; color:#F3F4F6; padding:2px 6px; border-radius:3px; background:rgba(249,242,188,.16); box-shadow:0 0 0 1px rgba(249,242,188,.62)">booth</span></div><b>--highlight</b><span>Legal yellow at 16% on graphite. Seek flash, dictionary words.</span></div>
       </div>
     </div>
-    <div class="col" style="flex:1.4">
+    <div class="col" style="flex:1.2">
       <div class="section-head"><h2>Pad</h2></div>
       <div class="swatches g5">
-        <div class="sw"><div class="chip" style="background:#FBFAF7"></div><b>paper</b><span>#FBFAF7</span></div>
-        <div class="sw"><div class="chip" style="background:#F1EFE8"></div><b>shade</b><span>#F1EFE8</span></div>
-        <div class="sw"><div class="chip" style="background:#FBFAF7; background-image: repeating-linear-gradient(180deg, transparent 0 15px, #A9C6DE 15px 16px)"></div><b>rule</b><span>#A9C6DE blue rules</span></div>
-        <div class="sw"><div class="chip" style="background:#FBFAF7; box-shadow: inset 0 -38px 0 -36px #E07A6C, inset 0 0 0 1px var(--line)"></div><b>redline</b><span>#E07A6C header rule</span></div>
-        <div class="sw"><div class="chip" style="background:#1C1917; color:#FBFAF7">Aa</div><b>ink</b><span>#1C1917 marker black</span></div>
+        <div class="sw"><div class="chip" style="background:#F9F2BC"></div><b>paper</b><span>#F9F2BC legal yellow. Logo reads #FAF2BB.</span></div>
+        <div class="sw"><div class="chip" style="background:#EEE4A4"></div><b>shade</b><span>#EEE4A4 under a sheet</span></div>
+        <div class="sw"><div class="chip" style="background:#F9F2BC; background-image: repeating-linear-gradient(180deg, transparent 0 15px, #A7D0D2 15px 16px)"></div><b>rule</b><span>#A7D0D2 blue rules. Logo core near #A2CFC8.</span></div>
+        <div class="sw"><div class="chip" style="background:#F9F2BC; color:#AC2623; font-family:var(--sans); font-style:italic; font-size:16px">(yeah)</div><b>accent</b><span>#AC2623 adlibs, ticks, header rule</span></div>
+        <div class="sw"><div class="chip" style="background:#1C1917; color:#F9F2BC">Aa</div><b>ink</b><span>#1C1917 pen black</span></div>
       </div>
     </div>
   </div>
 </section>
 
 <section class="section">
-  <div class="section-head"><h2>Rules</h2></div>
+  <div class="section-head"><h2>Rules</h2><p>One color, one job. The plugin lives inside a DAW, where red already means record, so it spends red more carefully than the site does.</p></div>
   <div class="rules">
-    <div class="rule"><span class="big" style="color:var(--rec)">Red is REC</span><p>Recording badge, header underline, stream cursor, the R key hint. Nothing else. A struck-out word is grey. The index card’s red header rule is decoration on paper and never a control.</p></div>
-    <div class="rule"><span class="big" style="color:var(--accent)">Green is live</span><p>Accent, primary action, PLAY and LIVE, corrected and synced. One primary green button per surface.</p></div>
+    <div class="rule"><span class="big" style="display:flex;align-items:center;gap:12px"><span style="width:16px;height:16px;border-radius:50%;background:var(--rec)"></span>REC is a dot</span><p>#FF453A for the REC badge and dot, the stream cursor, the R key hint. Brighter and more orange than the brand red so the two never read as one. Nothing else glows red.</p></div>
+    <div class="rule"><span class="big" style="color:var(--accent)">Red is the pen</span><p>On the site: the brand fill with white type, one primary red button per surface. In the plugin: only the red pen, a correction being made or made, and the caret. No red buttons or toggles in a DAW.</p></div>
+    <div class="rule"><span class="big">White is live</span><p>PLAY, LIVE, synced, the playhead, focus rings, the plugin’s primary button. Neutral on purpose, so it can sit next to REC without competing.</p></div>
+    <div class="rule"><span class="big" style="color:var(--pad-paper)">Yellow is the highlighter</span><p>Legal yellow laid over words: the seek flash after a click moves the playhead, dictionary words, selection. At full strength it is the pad itself.</p></div>
     <div class="rule"><span class="big" style="color:var(--wait)">Amber is waiting</span><p>WAIT, the engine banner, pending sync, proposed tags on these boards.</p></div>
     <div class="rule"><span class="big">Ink is the plate</span><p>The word under the playhead is an ink plate on graphite, never a color fill, so the highlight survives any screen and any color vision.</p></div>
   </div>
@@ -134,19 +137,22 @@
   <table class="contrast">
     <thead><tr><th>Pair</th><th>Sample</th><th>Ratio</th><th>Use</th></tr></thead>
     <tbody>
-      <tr><td>ink on pane</td><td class="demo"><span style="background:#14151A; color:#F3F4F6">every word</span></td><td class="r">16.57</td><td>Lyrics, titles</td></tr>
+      <tr><td>ink on pane</td><td class="demo"><span style="background:#14151A; color:#F3F4F6">every word</span></td><td class="r">16.57</td><td>Lyrics, titles, PLAY, LIVE</td></tr>
       <tr><td>ink-2 on pane</td><td class="demo"><span style="background:#14151A; color:rgba(243,244,246,.74)">secondary copy</span></td><td class="r">9.39</td><td>Body copy, captions</td></tr>
       <tr><td>ink-3 on chrome</td><td class="demo"><span style="background:#22242A; color:rgba(243,244,246,.54)">BAR · BEAT</span></td><td class="r">5.13</td><td>Labels, status bar</td></tr>
-      <tr><td>accent on chrome</td><td class="demo"><span style="background:#22242A; color:#43C7A3">LIVE</span></td><td class="r">7.34</td><td>Links, LIVE, PLAY</td></tr>
-      <tr><td>on-green on accent</td><td class="demo"><span style="background:#43C7A3; color:#0B1F18">APPLY</span></td><td class="r">8.12</td><td>Primary button</td></tr>
-      <tr><td>rec on chrome</td><td class="demo"><span style="background:#22242A; color:#FF453A">REC</span></td><td class="r">4.55</td><td>REC badge</td></tr>
+      <tr><td>accent on chrome</td><td class="demo"><span style="background:#22242A; color:#EA7E7B">corrected</span></td><td class="r">5.74</td><td>Links on the site, the red pen in the plugin</td></tr>
+      <tr><td>accent-strong on chrome</td><td class="demo"><span style="background:#22242A; color:#DE615E; font-family:var(--display); font-stretch:68%; font-weight:850; font-size:18px; text-transform:uppercase">Pen it.</span></td><td class="r">4.42</td><td>Headline emphasis only, 24 px bold and up (AA large). 4.75 on the site ground.</td></tr>
+      <tr><td>white on brand fill</td><td class="demo"><span style="background:#AC2623; color:#FFFFFF">GET THE PLUGIN</span></td><td class="r">6.87</td><td>Primary button on the site, the 2 badge</td></tr>
+      <tr><td>white on fill hover</td><td class="demo"><span style="background:#CF3430; color:#FFFFFF">GET THE PLUGIN</span></td><td class="r">5.02</td><td>Primary button hover</td></tr>
+      <tr><td>rec on chrome</td><td class="demo"><span style="background:#22242A; color:#FF453A">● REC</span></td><td class="r">4.55</td><td>REC badge</td></tr>
       <tr><td>wait on chrome</td><td class="demo"><span style="background:#22242A; color:#D7B07A">WAIT</span></td><td class="r">7.67</td><td>WAIT badge, banner</td></tr>
-      <tr><td>marker on paper</td><td class="demo"><span style="background:#FBFAF7; color:#2A6F5D">(yeah)</span></td><td class="r">5.70</td><td>Adlibs and brand ink on the Pad</td></tr>
+      <tr><td>brand red on pad</td><td class="demo"><span style="background:#F9F2BC; color:#AC2623">(yeah)</span></td><td class="r">6.04</td><td>Adlibs and brand ink on the Pad</td></tr>
+      <tr><td>pen black on pad</td><td class="demo"><span style="background:#F9F2BC; color:#1C1917">late night in the booth</span></td><td class="r">15.37</td><td>Lyrics on the Pad</td></tr>
       <tr><td>past line (0.38)</td><td class="demo"><span style="background:#14151A; color:rgba(243,244,246,.38)">late night</span></td><td class="r">3.37</td><td>Below AA on purpose (HANDOFF.md value). The title line carries the reading.</td></tr>
     </tbody>
   </table>
 </section>
 
-<footer class="board-foot"><span>Punch2Pen design system</span><span>Source: design/tokens/tokens.json</span></footer>
+<footer class="board-foot"><span>Punch2Pen design system</span><span>Source: design/tokens/tokens.json · logo: brand/source/logo-legal-pad.webp</span></footer>
 </body>
 </html>

@@ -86,7 +86,7 @@ body.board * { box-sizing: border-box; }
   white-space: nowrap;
 }
 .status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.status.shipped { color: var(--play); border-color: rgba(67, 199, 163, 0.4); }
+.status.shipped { color: var(--play); border-color: var(--line-strong); }
 .status.proposed { color: var(--wait); border-color: rgba(215, 176, 122, 0.4); }
 .status.changed { color: var(--ink); }
 
@@ -131,7 +131,7 @@ body.board * { box-sizing: border-box; }
   place-items: center;
   width: 22px; height: 22px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--accent-fill);
   color: var(--accent-ink);
   font-family: var(--mono);
   font-size: 11px;

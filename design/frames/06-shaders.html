@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=1440">
-<meta name="paper:artboard" content="Foundations / 06 Shaders" data-width="1440" data-height="2989">
+<meta name="paper:artboard" content="Foundations / 06 Shaders" data-width="1440" data-height="3008">
 <title>Shaders · Punch2Pen</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap">
 <link rel="stylesheet" href="../tokens/tokens.css">
@@ -44,7 +44,7 @@
   table.budget td:first-child { color: var(--ink); font-weight: 650; }
 </style>
 </head>
-<body class="board" style="--board-h: 2989px">
+<body class="board" style="--board-h: 3008px">
 
 <header class="board-head">
   <div class="lead">
@@ -58,9 +58,9 @@
 <section class="section">
   <div class="section-head"><h2>What’s new at Paper</h2><p>First-release dates from the npm package history; features from Paper’s build log.</p></div>
   <div class="news">
-    <div class="n"><span class="d">Sep 2026 · build log</span><b>Paper Texture 2.0</b><p>Three-color schemes, wrinkles, and roughness rows for grid-like grain. Becomes the Pad’s card stock.</p></div>
+    <div class="n"><span class="d">Sep 2026 · build log</span><b>Paper Texture 2.0</b><p>Three-color schemes, wrinkles, and roughness rows for grid-like grain. Becomes the legal pad’s paper.</p></div>
     <div class="n"><span class="d">Aug 2026 · v0.0.79</span><b>Lens Distortion</b><p>The newest image filter: dispersion, swirl, bulge. Used once, on the 404.</p></div>
-    <div class="n"><span class="d">Apr 2026 · v0.0.73</span><b>Gem Smoke</b><p>Logo effect. The 2 smokes amber while the engine starts, then green.</p></div>
+    <div class="n"><span class="d">Apr 2026 · v0.0.73</span><b>Gem Smoke</b><p>Logo effect. The 2 smokes amber while the engine starts, then white.</p></div>
     <div class="n"><span class="d">Jan 2026 · v0.0.69</span><b>Halftone CMYK</b><p>Print-style halftone. Reserved for merch and posters; not in product UI.</p></div>
     <div class="n"><span class="d">Nov 2025 · v0.0.64</span><b>Halftone Dots</b><p>Flyer print for share cards and, later, artist photos on the creators page.</p></div>
     <div class="n"><span class="d">Coming soon · build log</span><b>Remote MCP</b><p>When it ships, a cloud session could build this canvas directly instead of handing you a prompt.</p></div>
@@ -76,23 +76,23 @@
     </div>
     <div class="preset">
       <div class="stage" data-p2p-shader="idle-smoke"><img class="fx-fallback" src="../brand/two-glyph-booth.svg" alt=""></div>
-      <div class="meta"><div class="row1"><code>idle-smoke</code><span class="status proposed">Gem Smoke · new</span></div><p>Plugin IDLE, empty take. Same 2, green: the engine answered. Stops when the transport moves.</p><div class="kv"><span><b>speed</b>0.45</span><span><b>cap</b>600 × 600 px</span></div></div>
+      <div class="meta"><div class="row1"><code>idle-smoke</code><span class="status proposed">Gem Smoke · new</span></div><p>Plugin IDLE, empty take. Same 2, white: the engine answered. Never red in the plugin; red glow reads as record-armed. Stops when the transport moves.</p><div class="kv"><span><b>speed</b>0.45</span><span><b>cap</b>600 × 600 px</span></div></div>
     </div>
     <div class="preset">
       <div class="stage paper" data-p2p-shader="pad-card" data-p2p-static></div>
-      <div class="meta"><div class="row1"><code>pad-card</code><span class="status proposed">Paper Texture 2.0 · new</span></div><p>The Pad as card stock under the blue rules: tier cards, lyric sheet, share card.</p><div class="kv"><span><b>speed</b>0 · static</span><span><b>cost</b>one frame</span></div></div>
+      <div class="meta"><div class="row1"><code>pad-card</code><span class="status proposed">Paper Texture 2.0 · new</span></div><p>The legal pad’s paper under the blue rules: tier cards, lyric sheet, share card.</p><div class="kv"><span><b>speed</b>0 · static</span><span><b>cost</b>one frame</span></div></div>
     </div>
     <div class="preset">
       <div class="stage" data-p2p-shader="booth-glow"></div>
-      <div class="meta"><div class="row1"><code>booth-glow</code><span class="status">Grain Gradient</span></div><p>Booth light through grain. Site hero and section grounds. Green corners, never red.</p><div class="kv"><span><b>speed</b>0.35</span><span><b>ramp</b>graphite → green 800</span></div></div>
+      <div class="meta"><div class="row1"><code>booth-glow</code><span class="status">Grain Gradient</span></div><p>A red-lit booth through grain. Site hero and section grounds only, never the plugin.</p><div class="kv"><span><b>speed</b>0.35</span><span><b>ramp</b>graphite → red 800</span></div></div>
     </div>
     <div class="preset">
       <div class="stage" data-p2p-shader="punch-heat"><img class="fx-fallback" src="../brand/fist-booth.svg" alt=""></div>
-      <div class="meta"><div class="row1"><code>punch-heat</code><span class="status">Heatmap</span></div><p>The punch lands: the fist runs white-hot at the knuckles. Site brand band, launch posts.</p><div class="kv"><span><b>speed</b>0.6</span><span><b>ramp</b>green 900 → ink</span></div></div>
+      <div class="meta"><div class="row1"><code>punch-heat</code><span class="status">Heatmap</span></div><p>The punch lands: the fist runs white-hot at the knuckles. Site brand band, launch posts.</p><div class="kv"><span><b>speed</b>0.6</span><span><b>ramp</b>red 900 → brand red → ink</span></div></div>
     </div>
     <div class="preset">
       <div class="stage" data-p2p-shader="flyer-dots" data-p2p-static><img class="fx-fallback" src="../brand/fist-booth.svg" alt=""></div>
-      <div class="meta"><div class="row1"><code>flyer-dots</code><span class="status proposed">Halftone Dots · new</span></div><p>Flyer print in green on graphite. Share cards now, artist photos later.</p><div class="kv"><span><b>speed</b>0 · static</span><span><b>grid</b>hex · gooey</span></div></div>
+      <div class="meta"><div class="row1"><code>flyer-dots</code><span class="status proposed">Halftone Dots · new</span></div><p>Black halftone on legal yellow, like a photocopied show flyer. Share cards now, artist photos later.</p><div class="kv"><span><b>speed</b>0 · static</span><span><b>grid</b>hex · gooey</span></div></div>
     </div>
     <div class="preset wide">
       <div class="stage lost"><div class="lens" data-p2p-shader="lost-lens" data-p2p-static><img class="fx-fallback" src="../brand/wordmark-booth.svg" alt="" style="width:70%"></div><div class="copy404"><span class="label">404</span><b>Nothing here.</b><p>That URL is not a page on this site.</p></div></div>
@@ -106,10 +106,10 @@
   <div class="story">
     <div class="st"><div class="box" data-p2p-shader="wait-smoke"><img class="fx-fallback" src="../brand/two-glyph-booth.svg" alt="" style="position:absolute;inset:0;margin:auto;width:44%"></div><span class="label" style="color:var(--wait)">WAIT · amber</span></div>
     <span class="go">→</span>
-    <div class="st"><div class="box" data-p2p-shader="idle-smoke"><img class="fx-fallback" src="../brand/two-glyph-booth.svg" alt="" style="position:absolute;inset:0;margin:auto;width:44%"></div><span class="label" style="color:var(--play)">IDLE · green</span></div>
+    <div class="st"><div class="box" data-p2p-shader="idle-smoke"><img class="fx-fallback" src="../brand/two-glyph-booth.svg" alt="" style="position:absolute;inset:0;margin:auto;width:44%"></div><span class="label" style="color:var(--play)">IDLE · white</span></div>
     <span class="go">→</span>
     <div class="st"><div class="box still"><span>every word I <em>drop</em></span></div><span class="label">First word · shader off</span></div>
-    <p class="note" style="margin-left:24px; max-width:46ch">The smoke is the engine talking: amber while it starts, green when it answers, gone when you punch. If WebGL2 is missing or motion is reduced, the static 2 shows instead.</p>
+    <p class="note" style="margin-left:24px; max-width:46ch">The smoke is the engine talking: amber while it starts, white when it answers, gone when you punch. If WebGL2 is missing or motion is reduced, the static 2 shows instead.</p>
   </div>
 </section>
 
@@ -122,7 +122,7 @@
       <tr><td>Site</td><td>1 per viewport; the rest static</td><td>Paper default (4K)</td><td>Scrolled off screen, tab hidden</td><td>ShaderMount</td></tr>
       <tr><td>Everywhere</td><td>0 with reduced motion</td><td>—</td><td>prefers-reduced-motion: reduce</td><td>p2p-shaders.js renders one frame and stops</td></tr>
       <tr><td>No WebGL2</td><td>0</td><td>—</td><td>Always</td><td>Nothing mounts; the static SVG or CSS stays</td></tr>
-      <tr><td>Color</td><td colspan="4">Only token colors. Red is never a shader color: red means recording.</td></tr>
+      <tr><td>Color</td><td colspan="4">Only token colors. REC red is never a shader color. Brand red glows on the site only; plugin shaders stay amber and white.</td></tr>
     </tbody>
   </table>
 </section>
