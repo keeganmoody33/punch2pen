@@ -30,6 +30,7 @@ export const T = {
   "ink-4": "rgba(243, 244, 246, 0.30)",
   "accent": "#EA7E7B",
   "accent-hover": "#F1A9A7",
+  "accent-strong": "#DE615E",
   "accent-ink": "#FFFFFF",
   "accent-fill": "#AC2623",
   "accent-fill-hover": "#CF3430",
