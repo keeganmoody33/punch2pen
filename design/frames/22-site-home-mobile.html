@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390">
+<meta name="paper:artboard" content="Site / 22 Home mobile" data-width="390" data-height="4198">
+<title>Home Mobile · Punch2Pen</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap">
+<link rel="stylesheet" href="../tokens/tokens.css">
+<link rel="stylesheet" href="../components/plugin.css">
+<link rel="stylesheet" href="../components/pad.css">
+<link rel="stylesheet" href="../components/site.css">
+<style>
+  body { width: 390px; font-size: 16px; }
+  .s-wrap { width: calc(100% - 32px); }
+  .s-h1 { font-size: 56px; }
+  .s-h2 { font-size: 36px; }
+  .s-lede { font-size: 18px; }
+  .s-section { padding: 56px 0; }
+  .s-section .head { margin-bottom: 28px; }
+  .hero { padding: 40px 0 48px; display: flex; flex-direction: column; gap: 36px; position: relative; overflow: hidden; }
+  .hero .copy { display: flex; flex-direction: column; gap: 20px; }
+  .hero .s-btn { width: 100%; }
+  .hero .shot { position: relative; }
+  .hero .p-window { --plugin-width: 100%; --plugin-height: 430px; position: relative; }
+  .s-grid-2, .s-steps { grid-template-columns: 1fr; gap: 16px; }
+  .s-card { padding: 22px; }
+  .tiers { display: flex; flex-direction: column; gap: 16px; }
+  .s-actions .s-btn { flex: 1 1 100%; }
+  .s-foot { flex-direction: column; align-items: flex-start; padding: 28px 16px 40px; }
+</style>
+</head>
+<body class="s-page">
+
+<nav class="s-nav is-mobile">
+  <img class="wm" src="../brand/wordmark-booth.svg" alt="Punch2Pen">
+  <div class="links"></div>
+  <button class="menu" type="button" aria-label="Menu"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h14M3 10h14M3 14h14"/></svg></button>
+</nav>
+
+<header class="s-wrap hero">
+  <div class="copy">
+    <p class="s-eyebrow">Mac AU + VST3 · Logic</p>
+    <h1 class="s-h1">You punched the line. <em>Don’t rewrite it</em> by ear.</h1>
+    <p class="s-lede">Punch2Pen transcribes vocals inside the session. After a punch-in, the take is already written: word under the playhead, active line as the title.</p>
+    <div class="s-actions"><a class="s-btn primary" href="#download">Download free utility</a><a class="s-btn ghost" href="/pricing">Free, Pro, Studio</a></div>
+    <p class="s-fine">Unsigned pkg from GitHub Release. Gatekeeper will warn. Mac only.</p>
+  </div>
+  <div class="shot">
+    <div class="p-window" data-mode="playback">
+      <header class="p-header">
+        <img class="p-wordmark" src="../brand/wordmark-booth.svg" alt="Punch2Pen">
+        <button class="p-pill" data-kind="local" type="button"><span class="dot"></span><span class="name">Local</span></button>
+        <span class="p-spacer"></span>
+        <span class="p-badge is-play">Play</span>
+      </header>
+      <div class="p-transport"><span>BAR <b>19</b> · BEAT <b>3</b></span><span><b>120</b> BPM</span><span class="p-sync">LIVE</span></div>
+      <div class="p-pane">
+        <div class="p-lines" style="--lines-top: 60px">
+          <div class="p-line is-past"><span class="p-word">punch</span><span class="p-word">it</span><span class="p-word">back</span><span class="p-word">to</span><span class="p-word">the</span><span class="p-word is-corrected">top</span><span class="p-word">I</span><span class="p-word">don’t</span><span class="p-word">miss</span><span class="p-word">the</span><span class="p-word">call</span></div>
+          <div class="p-line is-active"><span class="p-word is-past">every</span><span class="p-word is-past">word</span><span class="p-word is-past">I</span><span class="p-word is-past">drop</span><span class="p-word is-active">lands</span><span class="p-word">right</span><span class="p-word">where</span><span class="p-word">it</span><span class="p-word">should</span></div>
+          <div class="p-line"><span class="p-word">pen</span><span class="p-word">it</span><span class="p-word">down</span><span class="p-word">run</span><span class="p-word">it</span><span class="p-word">back</span><span class="p-word">make</span><span class="p-word">it</span><span class="p-word">understood</span></div>
+        </div>
+      </div>
+      <footer class="p-status"><span class="text">Following the playhead</span><img class="p-logo" src="../brand/two-booth.svg" alt=""></footer>
+    </div>
+  </div>
+</header>
+
+<section class="s-section">
+  <div class="s-wrap" style="display:flex; flex-direction:column; gap:28px">
+    <div style="display:flex; flex-direction:column; gap:14px">
+      <p class="s-eyebrow">The mess</p>
+      <h2 class="s-h2">Punch-in, then the lyric is gone.</h2>
+      <p class="s-body">You drop in on bar 17. The vocal is right. Ten minutes later you are typing what you think you said. Punch2Pen puts the word under the playhead, on the host clock, while you still have the headphones on.</p>
+    </div>
+    <div class="s-grid-2">
+      <div class="s-card"><h3 class="s-h3">Living Transcript</h3><p>Highlight the word under the playhead. The active line is the title. Return to live when you scroll. Click a word to correct it.</p></div>
+      <div class="s-card"><h3 class="s-h3">Local first</h3><p>Free talks to an engine on the Mac. No account. No cloud. Paid is the portable dictionary and the correction loop.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="s-section" id="download">
+  <div class="s-wrap" style="display:flex; flex-direction:column; gap:28px">
+    <div class="head" style="margin:0">
+      <p class="s-eyebrow">Mac download</p>
+      <h2 class="s-h2">Install. Punch. Read it back.</h2>
+      <p class="s-note">The installer is for a Mac. On this phone, send yourself the link.</p>
+    </div>
+    <div class="s-steps">
+      <div class="s-step"><span class="n">1</span><b>Open the pkg</b><p>Quit Logic first. Right-click Open if Gatekeeper blocks it.</p></div>
+      <div class="s-step"><span class="n">2</span><b>Insert on a vocal track</b><p>The editor leaves WAIT once the local engine answers.</p></div>
+      <div class="s-step"><span class="n">3</span><b>Punch in, read it back</b><p>Click a mis-hear to fix every match.</p></div>
+    </div>
+    <div class="s-actions"><button class="s-btn primary" type="button">Copy download link</button><a class="s-btn ghost" href="#">All GitHub Releases</a></div>
+  </div>
+</section>
+
+<section class="s-section">
+  <div class="s-wrap">
+    <div class="head"><p class="s-eyebrow">Free / Pro / Studio</p><h2 class="s-h2">Prices are not set. The split is.</h2></div>
+    <div class="tiers">
+      <div class="pad s-tier"><div class="pad-head"><h3 class="pad-title">Free</h3></div><div class="pad-lines"><div class="pad-line"><span class="tick">✓</span>Local generic speech-to-text</div><div class="pad-line"><span class="tick">·</span>Corrections last this session</div><div class="pad-line"><span class="price">Not published yet</span></div></div></div>
+      <div class="pad s-tier"><div class="pad-head"><h3 class="pad-title">Pro</h3></div><div class="pad-lines"><div class="pad-line"><span class="tick">✓</span>Portable dictionary, cross-DAW</div><div class="pad-line"><span class="tick">·</span>The clock stays in the plugin</div><div class="pad-line"><span class="price">Not published yet</span></div></div></div>
+      <div class="pad s-tier"><div class="pad-head"><h3 class="pad-title">Studio</h3></div><div class="pad-lines"><div class="pad-line"><span class="tick">✓</span>Isolated artist seats for a room</div><div class="pad-line"><span class="tick">·</span>Each dictionary stays with that artist</div><div class="pad-line"><span class="price">Not published yet</span></div></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="s-section">
+  <div class="s-wrap" style="display:flex; flex-direction:column; gap:20px">
+    <p class="s-eyebrow">Interest</p>
+    <h2 class="s-h2">Would you pay for the portable dictionary?</h2>
+    <div class="s-actions"><button class="s-btn primary" type="button">I would pay for it</button><button class="s-btn ghost" type="button">Just looking</button></div>
+    <label class="s-field"><span>Waitlist email (optional)</span><input class="s-input" id="m-email" type="email" placeholder="you@studio.com"></label>
+    <button class="s-btn" type="button">Notify me when Pro exists</button>
+  </div>
+</section>
+
+<footer class="s-foot">
+  <img class="pen" src="../brand/pen-booth.svg" alt="">
+  <nav><a href="/product">Product</a><a href="/pricing">Pricing</a><a href="/for-studios">Studios</a><a href="/creators">Creators</a><a href="/docs">Docs</a><a href="/login">Sign in</a><a href="/privacy">Privacy</a></nav>
+  <span>Punch2Pen · Mac first</span>
+</footer>
+</body>
+</html>

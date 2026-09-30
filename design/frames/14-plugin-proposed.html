@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<meta name="paper:artboard" content="Plugin / 14 Proposed" data-width="1440" data-height="1915">
+<title>Plugin Proposed · Punch2Pen</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap">
+<link rel="stylesheet" href="../tokens/tokens.css">
+<link rel="stylesheet" href="../components/plugin.css">
+<link rel="stylesheet" href="../components/pad.css">
+<link rel="stylesheet" href="_board.css">
+<style>
+  .trio { display: grid; grid-template-columns: repeat(3, 400px); gap: 40px; }
+  .feat { display: flex; flex-direction: column; gap: 16px; }
+  .feat .cap { display: flex; flex-direction: column; gap: 8px; }
+  .feat h3 { font-size: 22px; }
+  .p-grid .bar-row { min-height: 42px; }
+  .p-grid .syl { font-size: 11.5px; align-self: start; margin-top: 3px; }
+  .p-grid .syl.lo { align-self: end; margin-bottom: 3px; margin-top: 0; }
+  .export { display: grid; grid-template-columns: 400px 1fr; gap: 56px; align-items: start; }
+  .pad { width: 100%; }
+</style>
+</head>
+<body class="board" style="--board-h: 1915px">
+
+<header class="board-head">
+  <div class="lead">
+    <p class="eyebrow">Plugin · Proposed</p>
+    <h1>Syllables, your words, the page</h1>
+    <p class="dek">Three pieces the brief asks for that do not ship yet: syllables on the beat, a dictionary that learns your adlibs and phrases, and a way to get the take off the booth computer and into your manager’s hands. Each uses only tokens and parts already in the system.</p>
+  </div>
+  <div class="board-meta"><img src="../brand/fist-booth.svg" alt=""><span>Frame 14 · 1440 wide</span><span class="status proposed">Proposed</span></div>
+</header>
+
+<div class="trio">
+
+  <!-- FLOW GRID -->
+  <div class="feat">
+    <div class="p-window" data-mode="playback">
+      <header class="p-header">
+        <img class="p-wordmark" src="../brand/wordmark-booth.svg" alt="Punch2Pen">
+        <button class="p-pill" data-kind="seat" type="button"><span class="dot"></span><span class="name">Nova</span></button>
+        <span class="p-spacer"></span>
+        <button class="p-icon-btn is-on" type="button" title="Flow Grid"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2.5 4h11M2.5 8h11M2.5 12h11M6 2.5v11M10 2.5v11"/></svg></button>
+        <button class="p-icon-btn" type="button" title="Dictionary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2.5h7.5a2 2 0 0 1 2 2v9H5a2 2 0 0 1-2-2z"/><path d="M3 11.5a2 2 0 0 1 2-2h7.5"/></svg></button>
+        <button class="p-icon-btn" type="button" title="Pen it"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2.5 13.5 5 6 12.5 3 13l.5-3z"/><path d="M9.5 4 12 6.5"/></svg></button>
+        <span class="p-badge is-play">Play</span>
+      </header>
+      <div class="p-transport"><span>BAR <b>19</b> · BEAT <b>3</b></span><span><b>120</b> BPM</span><span><b>00:00:37.012</b></span><span class="p-sync">LIVE</span></div>
+      <div class="p-pane">
+        <div class="p-grid">
+          <div class="beats"><span></span><span class="on">1</span><span>·</span><span>·</span><span>·</span><span class="on">2</span><span>·</span><span>·</span><span>·</span><span class="on">3</span><span>·</span><span>·</span><span>·</span><span class="on">4</span><span>·</span><span>·</span><span>·</span></div>
+          <div class="bar-row is-past"><span class="bar-num">17</span>
+            <span class="syl" style="grid-column:2">late</span><span class="syl stress lo" style="grid-column:4">night</span><span class="syl" style="grid-column:6">in</span><span class="syl lo" style="grid-column:7">the</span><span class="syl stress" style="grid-column:8">booth</span><span class="syl lo" style="grid-column:10">red</span><span class="syl stress" style="grid-column:12">light</span><span class="syl lo" style="grid-column:14">on</span><span class="syl" style="grid-column:15">the</span><span class="syl stress lo" style="grid-column:16">wall</span></div>
+          <div class="bar-row is-past"><span class="bar-num">18</span>
+            <span class="syl stress" style="grid-column:2">punch</span><span class="syl lo" style="grid-column:3">it</span><span class="syl stress" style="grid-column:4">back</span><span class="syl lo" style="grid-column:6">to</span><span class="syl" style="grid-column:7">the</span><span class="syl stress lo" style="grid-column:8">top</span><span class="syl" style="grid-column:10">I</span><span class="syl lo" style="grid-column:11">don’t</span><span class="syl stress" style="grid-column:12">miss</span><span class="syl lo" style="grid-column:14">the</span><span class="syl stress" style="grid-column:16">call</span></div>
+          <div class="bar-row is-active"><span class="bar-num">19</span>
+            <span class="syl is-sung" style="grid-column:2">ev</span><span class="syl is-sung lo" style="grid-column:3">ery</span><span class="syl stress is-sung" style="grid-column:4">word</span><span class="syl is-sung lo" style="grid-column:6">I</span><span class="syl stress is-sung" style="grid-column:7">drop</span><span class="syl stress is-sung lo" style="grid-column:10">lands</span><span class="syl" style="grid-column:12">right</span><span class="syl stress lo" style="grid-column:13">where</span><span class="syl" style="grid-column:15">it</span><span class="syl stress lo" style="grid-column:16">should</span>
+            <span class="head" style="left: calc(28px + (100% - 28px) * 0.58)"></span></div>
+          <div class="bar-row"><span class="bar-num">20</span>
+            <span class="syl stress" style="grid-column:2">pen</span><span class="syl lo" style="grid-column:3">it</span><span class="syl stress" style="grid-column:4">down</span><span class="syl stress lo" style="grid-column:6">run</span><span class="syl" style="grid-column:7">it</span><span class="syl stress lo" style="grid-column:8">back</span><span class="syl" style="grid-column:10">make</span><span class="syl lo" style="grid-column:11">it</span><span class="syl" style="grid-column:12">un</span><span class="syl lo" style="grid-column:13">der</span><span class="syl stress" style="grid-column:14">stood</span><span class="syl is-adlib lo" style="grid-column:16">(yeah)</span></div>
+          <div class="bar-row"><span class="bar-num">21</span>
+            <span class="syl" style="grid-column:2">sec</span><span class="syl lo" style="grid-column:3">ond</span><span class="syl stress" style="grid-column:4">verse</span><span class="syl lo" style="grid-column:6">same</span><span class="syl stress" style="grid-column:8">booth</span><span class="syl lo" style="grid-column:10">the</span><span class="syl stress" style="grid-column:11">take</span><span class="syl lo" style="grid-column:12">is</span><span class="syl" style="grid-column:13">get</span><span class="syl lo" style="grid-column:14">ting</span><span class="syl stress" style="grid-column:16">tight</span></div>
+          <div class="bar-row"><span class="bar-num">22</span>
+            <span class="syl" style="grid-column:2">one</span><span class="syl lo" style="grid-column:3">more</span><span class="syl stress" style="grid-column:4">pass</span><span class="syl lo" style="grid-column:6">on</span><span class="syl" style="grid-column:7">the</span><span class="syl stress lo" style="grid-column:8">hook</span><span class="syl is-adlib" style="grid-column:12">(skrrt)</span></div>
+        </div>
+      </div>
+      <footer class="p-status"><span class="text">Bar 19 · 16ths at 120 BPM · click a cell to jump there</span><img class="p-logo" src="../brand/two-booth.svg" alt=""></footer>
+    </div>
+    <div class="cap">
+      <h3>Flow Grid</h3>
+      <p class="note">One row per bar, sixteen cells per bar in 4/4, placed by each syllable’s onset against the host BPM. Stressed syllables are bold; neighbours stagger up and down so they never collide. Sung syllables take the ink plate; the green line is the playhead. <b>Needs syllable onsets from the engine.</b></p>
+    </div>
+  </div>
+
+  <!-- DICTIONARY -->
+  <div class="feat">
+    <div class="p-window" data-mode="idle">
+      <header class="p-header">
+        <img class="p-wordmark" src="../brand/wordmark-booth.svg" alt="Punch2Pen">
+        <button class="p-pill" data-kind="seat" type="button"><span class="dot"></span><span class="name">Nova</span></button>
+        <span class="p-spacer"></span>
+        <button class="p-icon-btn" type="button" title="Flow Grid"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2.5 4h11M2.5 8h11M2.5 12h11M6 2.5v11M10 2.5v11"/></svg></button>
+        <button class="p-icon-btn is-on" type="button" title="Dictionary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2.5h7.5a2 2 0 0 1 2 2v9H5a2 2 0 0 1-2-2z"/><path d="M3 11.5a2 2 0 0 1 2-2h7.5"/></svg></button>
+        <button class="p-icon-btn" type="button" title="Pen it"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2.5 13.5 5 6 12.5 3 13l.5-3z"/><path d="M9.5 4 12 6.5"/></svg></button>
+        <span class="p-badge">Idle</span>
+      </header>
+      <div class="p-transport"><span>BAR <b>22</b> · BEAT <b>4</b></span><span><b>120</b> BPM</span><span><b>00:00:43.880</b></span></div>
+      <div class="p-pane">
+        <div class="p-dict">
+          <div class="top"><input class="p-input" id="dict-q" placeholder="Search your words" aria-label="Search dictionary"><span class="p-eyebrow">214 entries</span></div>
+          <div class="top" style="border-bottom:0; padding-top:10px; padding-bottom:4px"><div class="p-chips"><button class="p-chip" aria-pressed="true" type="button">All</button><button class="p-chip" aria-pressed="false" type="button">Words</button><button class="p-chip" aria-pressed="false" type="button">Adlibs</button><button class="p-chip" aria-pressed="false" type="button">Phrases</button></div></div>
+          <div class="list">
+            <div class="p-entry"><span class="heard">yeah yeah</span><span class="to">→</span><span class="meant">(yeah)</span><span class="meta"><span class="p-tag adlib">Adlib</span>11×</span></div>
+            <div class="p-entry"><span class="heard">skirt</span><span class="to">→</span><span class="meant">(skrrt)</span><span class="meta"><span class="p-tag adlib">Adlib</span>6×</span></div>
+            <div class="p-entry"><span class="heard">boot</span><span class="to">→</span><span class="meant">booth</span><span class="meta"><span class="p-tag">Word</span>4×</span></div>
+            <div class="p-entry"><span class="heard">run a back</span><span class="to">→</span><span class="meant">run it back</span><span class="meta"><span class="p-tag phrase">Phrase</span>3×</span></div>
+            <div class="p-entry"><span class="heard">topp</span><span class="to">→</span><span class="meant">top</span><span class="meta"><span class="p-tag">Word</span>2×</span></div>
+            <div class="p-entry"><span class="heard">under stood</span><span class="to">→</span><span class="meant">understood</span><span class="meta"><span class="p-tag">Word</span>1×</span></div>
+            <div class="p-entry"><span class="heard">call it a nite</span><span class="to">→</span><span class="meant">call it a night</span><span class="meta"><span class="p-tag phrase">Phrase</span>1×</span></div>
+          </div>
+        </div>
+      </div>
+      <footer class="p-status"><span class="text">Nova dictionary · biases every pass on this seat · <span class="ok">synced</span></span><img class="p-logo" src="../brand/two-booth.svg" alt=""></footer>
+    </div>
+    <div class="cap">
+      <h3>Dictionary</h3>
+      <p class="note">Every correction becomes an entry: what the engine heard, what you meant, how often. Adlibs and phrases are first-class, so your “(skrrt)” stops coming back as “skirt”. Signed in, it trains the seat’s profile; free, the same list is session-only and says so in the status bar.</p>
+    </div>
+  </div>
+
+  <!-- PEN IT -->
+  <div class="feat">
+    <div class="p-window" data-mode="idle">
+      <header class="p-header">
+        <img class="p-wordmark" src="../brand/wordmark-booth.svg" alt="Punch2Pen">
+        <button class="p-pill" data-kind="seat" type="button"><span class="dot"></span><span class="name">Nova</span></button>
+        <span class="p-spacer"></span>
+        <button class="p-icon-btn" type="button" title="Flow Grid"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2.5 4h11M2.5 8h11M2.5 12h11M6 2.5v11M10 2.5v11"/></svg></button>
+        <button class="p-icon-btn" type="button" title="Dictionary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2.5h7.5a2 2 0 0 1 2 2v9H5a2 2 0 0 1-2-2z"/><path d="M3 11.5a2 2 0 0 1 2-2h7.5"/></svg></button>
+        <button class="p-icon-btn is-on" type="button" title="Pen it"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2.5 13.5 5 6 12.5 3 13l.5-3z"/><path d="M9.5 4 12 6.5"/></svg></button>
+        <span class="p-badge">Idle</span>
+      </header>
+      <div class="p-transport"><span>BAR <b>22</b> · BEAT <b>4</b></span><span><b>120</b> BPM</span><span><b>00:00:43.880</b></span></div>
+      <div class="p-pane">
+        <div class="p-lines" style="--lines-top: 150px; opacity:.5">
+          <div class="p-line"><span class="p-word">every</span><span class="p-word">word</span><span class="p-word">I</span><span class="p-word">drop</span><span class="p-word">lands</span><span class="p-word">right</span><span class="p-word">where</span><span class="p-word">it</span><span class="p-word">should</span></div>
+          <div class="p-line"><span class="p-word">pen</span><span class="p-word">it</span><span class="p-word">down</span><span class="p-word">run</span><span class="p-word">it</span><span class="p-word">back</span><span class="p-word">make</span><span class="p-word">it</span><span class="p-word">understood</span></div>
+          <div class="p-line"><span class="p-word">second</span><span class="p-word">verse</span><span class="p-word">same</span><span class="p-word">booth</span><span class="p-word">the</span><span class="p-word">take</span><span class="p-word">is</span><span class="p-word">getting</span><span class="p-word">tight</span></div>
+        </div>
+      </div>
+      <div class="p-menu" style="top:40px">
+        <span class="p-eyebrow">Pen it · bars 17–22</span>
+        <button type="button" class="is-hover">Copy lyrics<span>⌘C</span></button>
+        <button type="button">Copy with bars and times</button>
+        <button type="button">Save as text<span>.txt</span></button>
+        <button type="button">Save lyric sheet<span>.pdf</span></button>
+        <hr>
+        <button type="button">Send to manager<span>link</span></button>
+      </div>
+      <footer class="p-status"><span class="text">48 words in this take · 2 corrected</span><img class="p-logo" src="../brand/two-booth.svg" alt=""></footer>
+    </div>
+    <div class="cap">
+      <h3>Pen it</h3>
+      <p class="note">The whole reason the product exists: the take leaves the booth written down. Copy and files work on the free tier because they stay on the Mac. A share link needs the profile API, so it follows sign-in.</p>
+    </div>
+  </div>
+</div>
+
+<section class="section">
+  <div class="section-head"><h2>The lyric sheet</h2><p>What “Save lyric sheet” produces, on the Pad surface from the index-card sketch. Bar and time sit in the left gutter so an engineer or manager can find any line in the session.</p></div>
+  <div class="export">
+    <div class="col">
+      <span class="label">Rules</span>
+      <ul class="legend" style="padding:0; margin:0">
+        <li><span class="pin">1</span><div><strong>The gutter carries the clock</strong><span class="d">Bar number and m:ss.s in a left gutter, mono, so any line can be found in the session.</span></div></li>
+        <li><span class="pin">2</span><div><strong>Lyrics sit on the blue rules</strong><span class="d">Sans, 19 px, marker black. One bar per line, as sung.</span></div></li>
+        <li><span class="pin">3</span><div><strong>Adlibs in marker green</strong><span class="d">Parenthesised and italic, so a feature artist or engineer sees them at a glance.</span></div></li>
+        <li><span class="pin">4</span><div><strong>Signed like the card</strong><span class="d">Title over the red header rule, the fist in the corner, the wordmark in the footer. No price, no plan name.</span></div></li>
+      </ul>
+    </div>
+    <div class="pad">
+      <div class="pad-head">
+        <div>
+          <h3 class="pad-title">Late night (verse 1)</h3>
+          <div class="pad-meta"><span>120 BPM</span><span>4/4</span><span>Bars 17–22</span><span>Take 3</span><span>Nova</span></div>
+        </div>
+        <img class="pad-mark" src="../brand/fist-pad.svg" alt="">
+      </div>
+      <div class="pad-lines">
+        <div class="pad-line is-section"><span class="when"><b></b><span></span></span>Verse</div>
+        <div class="pad-line"><span class="when"><b>17</b><span>0:32.0</span></span>late night in the booth red light on the wall</div>
+        <div class="pad-line"><span class="when"><b>18</b><span>0:34.0</span></span>punch it back to the top I don’t miss the call</div>
+        <div class="pad-line"><span class="when"><b>19</b><span>0:36.0</span></span>every word I drop lands right where it should</div>
+        <div class="pad-line"><span class="when"><b>20</b><span>0:38.0</span></span>pen it down run it back make it understood<span class="adlib">(yeah)</span></div>
+        <div class="pad-line"><span class="when"><b>21</b><span>0:40.0</span></span>second verse same booth the take is getting tight</div>
+        <div class="pad-line"><span class="when"><b>22</b><span>0:42.0</span></span>one more pass on the hook and we call it a night<span class="adlib">(skrrt)</span></div>
+        <div class="pad-line"></div>
+      </div>
+      <div class="pad-foot"><span>Penned 2026-09-30 · 48 words · 2 corrected</span><img src="../brand/wordmark-pad.svg" alt="Punch2Pen"></div>
+    </div>
+  </div>
+</section>
+
+<footer class="board-foot"><span>Punch2Pen design system</span><span>Nova, Take 3, and dictionary entries are example data</span></footer>
+</body>
+</html>
