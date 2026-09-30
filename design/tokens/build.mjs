@@ -66,7 +66,8 @@ const out = `/*
 
   Direction: the 2PEN logo. Brick red and a legal-yellow pad on Open graphite.
   Mono is the punch (clock, labels). Sans is the words. Archivo is the poster.
-  Brand red is a fill with white type. REC (#FF453A) is a dot or badge only.
+  Brand red is a fill with white type. REC (#FF453A) colors the recording state
+  and nothing else.
   PLAY and LIVE are white. Focus rings are white.
 */
 :root {

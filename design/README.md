@@ -19,7 +19,7 @@ The brand red is `#AC2623`, picked from the logo; the median of the logo file's 
 
 The rules that fall out of it:
 
-- **REC is a dot.** `#FF453A` for the REC dot and badge, brighter and more orange than the brand red. Nothing else glows red.
+- **REC is recording.** `#FF453A` colors the recording state and nothing else: the REC badge (label and pulsing dot), the header line while recording, the stream cursor, the R key hint. Brighter and more orange than the brand red, and never used outside recording.
 - **Red is the brand and the pen.** On the site: the brand fill, one primary red button per surface. In the plugin: only corrections (the red pen) and the caret. A red button or toggle in a DAW reads as record-arm, so the plugin's primary button, toggles and badge are white.
 - **White is live:** PLAY, LIVE, synced, the playhead, focus rings.
 - **Yellow is the highlighter:** legal yellow over words on graphite for the seek flash and dictionary words.
@@ -40,6 +40,7 @@ design/
 │   └── tokens.css           generated
 ├── brand/
 │   ├── source/              the founder's logo file (the trace source)
+│   ├── fonts/               Archivo (SIL OFL), pinned by sha256 for the wordmark
 │   ├── trace_logo.py        logo → fist-paths.json (vector layers + the 2 badge)
 │   ├── build_marks.py       every mark from the trace and one geometry file
 │   ├── *.svg                fist, pen, two, bolt, wordmark (-booth / -pad / -plugin), favicon

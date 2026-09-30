@@ -16,6 +16,12 @@
 .s-page * { box-sizing: border-box; }
 .s-page a { color: var(--accent); text-decoration: none; }
 .s-page a:hover { text-decoration: underline; text-underline-offset: 0.18em; }
+/* Keyboard focus: a white ring, so it never depends on the browser default and
+   never reads as a red link. Inputs draw their own focus border instead. */
+.s-page :is(a, button, summary, [role="button"], [tabindex]):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
 .s-wrap { width: min(var(--site-max), calc(100% - 48px)); margin: 0 auto; }
 
 /* Nav */

@@ -16,6 +16,7 @@ const resolve = (v) => (typeof v === 'string' && /^\{.+\}$/.test(v) ? resolve(ge
 const T = {};
 for (const [k, v] of Object.entries(tokens.color.graphite)) if (!k.startsWith('$')) T[`graphite-${k}`] = v.$value;
 for (const [k, v] of Object.entries(tokens.color.red)) if (!k.startsWith('$')) T[`red-${k}`] = v.$value;
+for (const [k, v] of Object.entries(tokens.color.shader)) if (!k.startsWith('$')) T[`shader-${k}`] = v.$value;
 for (const [k, v] of Object.entries(tokens.semantic)) if (!k.startsWith('$')) T[k] = resolve(v.$value);
 writeFileSync(
   join(here, 'src', 'tokens.generated.js'),

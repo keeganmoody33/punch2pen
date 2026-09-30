@@ -110,7 +110,7 @@
 
   <div class="rules" aria-label="Color rules">
     <div class="rule"><div class="chip" style="background:#AC2623"></div><b>Red is the brand and the pen</b><span>#AC2623 fills with white type on the site. In the plugin, only corrections: the red pen.</span></div>
-    <div class="rule"><div class="chip" style="background:#FF453A; border-radius:50%"></div><b>REC is a dot</b><span>#FF453A for the REC dot and badge. Nothing else glows red.</span></div>
+    <div class="rule"><div class="chip" style="background:#FF453A; border-radius:50%"></div><b>REC is recording</b><span>#FF453A colors the recording state: badge, dot, cursor, R hint. Nowhere else.</span></div>
     <div class="rule"><div class="chip" style="background:#F3F4F6"></div><b>White is live</b><span>PLAY, LIVE, the playhead, focus. The word under the playhead is an ink plate.</span></div>
     <div class="rule"><div class="chip" style="background:#F9F2BC"></div><b>Yellow is the highlighter</b><span>Seek flash and dictionary words on graphite. At full strength, the pad.</span></div>
     <div class="rule"><div class="chip" style="background:#D7B07A"></div><b>Amber is waiting</b><span>WAIT, the engine banner, pending sync.</span></div>
@@ -145,12 +145,19 @@ name, data-width and data-height.
      variables from design/tokens/tokens.css and the classes from
      design/components/*.css and design/frames/_board.css.
    - Place the SVGs from design/brand/ as vectors, not bitmaps.
+   - Elements with data-p2p-shader="&lt;preset&gt;" are Paper Shaders. Make each one a
+     native Paper shader layer (the same library Paper uses; S opens the shaders
+     menu). Take the shader and its parameters from that preset in
+     design/shaders/src/presets.js, and use the element's data-image (or the
+     preset's image) as the logo or image input. If you can't create shader
+     layers through the MCP, put a frame named "SHADER · &lt;preset&gt;" in that spot
+     and list all of them when you finish so I can add them by hand.
    - Display text is Archivo from Google Fonts at width 68, weight 850. UI text is
      the system sans (SF Pro) and mono (SF Mono).
    - Compare your artboard with design/renders/&lt;same name&gt;.webp and fix any
      differences before starting the next one.
 3. Lay artboards out left to right in three rows, 200 px apart:
-   row 1: 01–05 (foundations and brand), row 2: 10–14 (plugin), row 3: 20–23 (site).
+   row 1: 01–06 (foundations, brand, shaders), row 2: 10–14 (plugin), row 3: 20–23 (site).
 4. Stop after each row and tell me which artboards are done.</pre>
     </div>
   </section>
@@ -159,7 +166,7 @@ name, data-width and data-height.
     <div class="head"><h2 id="g1">Foundations and brand</h2><p>Where the red came from, the three faces, the scales, the marks traced from the logo, and the shaders.</p></div>
     <div class="grid">
       <article class="card"><a class="thumb" href="frames/01-cover.html"><img src="renders/01-cover.webp" alt="Cover board" loading="lazy"></a><div class="meta"><div class="row1"><span class="num">01 · 1440 × 900</span></div><b>Cover</b><p>Wordmark, the tagline, the frame index.</p><div class="links"><a href="frames/01-cover.html">Open frame</a></div></div></article>
-      <article class="card"><a class="thumb" href="frames/02-color.html"><img src="renders/02-color.webp" alt="Color board" loading="lazy"></a><div class="meta"><div class="row1"><span class="num">02 · 1440 × 3062</span></div><b>Color</b><p>Logo sample to brand red to accent, graphite, the red ramp, signals, the legal pad, the color rules, measured contrast.</p><div class="links"><a href="frames/02-color.html">Open frame</a></div></div></article>
+      <article class="card"><a class="thumb" href="frames/02-color.html"><img src="renders/02-color.webp" alt="Color board" loading="lazy"></a><div class="meta"><div class="row1"><span class="num">02 · 1440 × 3079</span></div><b>Color</b><p>Logo sample to brand red to accent, graphite, the red ramp, signals, the legal pad, the color rules, measured contrast.</p><div class="links"><a href="frames/02-color.html">Open frame</a></div></div></article>
       <article class="card"><a class="thumb" href="frames/03-type.html"><img src="renders/03-type.webp" alt="Type board" loading="lazy"></a><div class="meta"><div class="row1"><span class="num">03 · 1440 × 2621</span></div><b>Type</b><p>Archivo for the poster, system sans for the words, mono for the clock. Plugin and site scales.</p><div class="links"><a href="frames/03-type.html">Open frame</a></div></div></article>
       <article class="card"><a class="thumb" href="frames/04-space-motion.html"><img src="renders/04-space-motion.webp" alt="Space and motion board" loading="lazy"></a><div class="meta"><div class="row1"><span class="num">04 · 1440 × 2133</span></div><b>Space, radius, motion</b><p>4-based spacing, five radii, three shadows, and motion timed to the music.</p><div class="links"><a href="frames/04-space-motion.html">Open frame</a></div></div></article>
       <article class="card"><a class="thumb" href="frames/05-marks.html"><img src="renders/05-marks.webp" alt="Marks board" loading="lazy"></a><div class="meta"><div class="row1"><span class="num">05 · 1440 × 3160</span><span class="tag">New</span></div><b>Marks</b><p>The traced 2PEN fist, the 2-clip pen, the red 2 badge, the badge wordmark, the one-color plugin marks. Sizes, clear space, don’ts, and three proposed marks from how the plugin works.</p><div class="links"><a href="frames/05-marks.html">Open frame</a></div></div></article>

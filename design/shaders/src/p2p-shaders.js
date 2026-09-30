@@ -97,7 +97,14 @@ async function resolveImage(def, src) {
   if (!src) return undefined;
   if (!def.process) return loadImage(src);
   const blob = await def.process(src);
-  return loadImage(URL.createObjectURL(blob));
+  const url = URL.createObjectURL(blob);
+  // The loaded image keeps its pixels; the URL is only needed until then, so
+  // release it here or every remount of WAIT/IDLE leaks one blob.
+  try {
+    return await loadImage(url);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 function toUniforms(def, params, image) {

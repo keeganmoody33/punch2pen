@@ -24,7 +24,6 @@ from __future__ import annotations
 import io
 import json
 import os
-import subprocess
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -183,15 +182,21 @@ def bolt(c) -> str:
 
 # --- Wordmark: Archivo 75/900 outlined -------------------------------------
 
-ARCHIVO_CSS = "https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap"
-UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
+# Archivo (SIL OFL 1.1, brand/fonts/OFL.txt), vendored so every regeneration
+# draws from the same outlines. This is the variable Latin subset Google Fonts
+# served on 2026-09-30 for Archivo:wdth,wght@62..125,100..900.
+ARCHIVO = HERE / "fonts" / "archivo-latin-var.woff2"
+ARCHIVO_SHA256 = "4c98b9d490d1698ec95f2ff17a6c7d0e72691864c0c5d7bc2a2c161b45afe5ad"
 
 
 def archivo_latin() -> bytes:
-    css = subprocess.run(["curl", "-sS", "-A", UA, ARCHIVO_CSS], check=True, capture_output=True).stdout.decode()
-    # last @font-face block is the basic Latin subset
-    url = css.split("/* latin */")[-1].split("url(")[1].split(")")[0]
-    return subprocess.run(["curl", "-sS", url], check=True, capture_output=True).stdout
+    import hashlib
+
+    data = ARCHIVO.read_bytes()
+    digest = hashlib.sha256(data).hexdigest()
+    if digest != ARCHIVO_SHA256:
+        raise SystemExit(f"{ARCHIVO.name}: sha256 {digest}, expected {ARCHIVO_SHA256}")
+    return data
 
 
 def wordmark_paths(text="PUNCH2PEN", wdth=75, wght=900, cap=100):

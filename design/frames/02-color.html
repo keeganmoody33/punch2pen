@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=1440">
-<meta name="paper:artboard" content="Foundations / 02 Color" data-width="1440" data-height="3062">
+<meta name="paper:artboard" content="Foundations / 02 Color" data-width="1440" data-height="3079">
 <title>Color · Punch2Pen</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap">
 <link rel="stylesheet" href="../tokens/tokens.css">
@@ -35,13 +35,13 @@
   table.contrast td.r { font-family: var(--mono); color: var(--ink); }
 </style>
 </head>
-<body class="board" style="--board-h: 3062px">
+<body class="board" style="--board-h: 3079px">
 
 <header class="board-head">
   <div class="lead">
     <p class="eyebrow">Foundations · Color</p>
     <h1>Brick red on graphite</h1>
-    <p class="dek">The red and the legal yellow come from the founder’s 2PEN logo. The graphite is what the plugin ships today. Brand red is a fill with white type, the way the 2 badge is drawn. White means live, yellow is the highlighter, and the REC dot is the only red that glows.</p>
+    <p class="dek">The red and the legal yellow come from the founder’s 2PEN logo. The graphite is what the plugin ships today. Brand red is a fill with white type, the way the 2 badge is drawn. White means live, yellow is the highlighter, and REC red belongs to the recording state alone.</p>
   </div>
   <div class="board-meta"><img src="../brand/fist-booth.svg" alt=""><span>Frame 02 · 1440 wide</span></div>
 </header>
@@ -101,7 +101,7 @@
     <div class="col" style="flex:1">
       <div class="section-head"><h2>Signals</h2></div>
       <div class="swatches" style="grid-template-columns: repeat(4, minmax(0,1fr))">
-        <div class="sw"><div class="chip" style="background:#22242A; color:#F3F4F6; box-shadow: inset 0 0 0 1px var(--line)"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#FF453A;margin-right:8px"></span>REC</div><b>--rec · #FF453A</b><span>A dot or a badge. Never text, never a glow anywhere else.</span></div>
+        <div class="sw"><div class="chip" style="background:#22242A; color:#F3F4F6; box-shadow: inset 0 0 0 1px var(--line)"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#FF453A;margin-right:8px"></span>REC</div><b>--rec · #FF453A</b><span>The recording state only: badge, dot, cursor, R hint, header line. Never anywhere else.</span></div>
         <div class="sw"><div class="chip" style="background:#D7B07A; color:#1E1E1E">WAIT</div><b>--wait · #D7B07A</b><span>Engine not connected, caution copy, pending sync.</span></div>
         <div class="sw"><div class="chip" style="background:#22242A; color:#F3F4F6; box-shadow: inset 0 0 0 1px var(--line)">PLAY</div><b>--play = --ink</b><span>PLAY, LIVE, synced, the playhead. White means the pen is live.</span></div>
         <div class="sw"><div class="chip" style="background:#14151A; box-shadow: inset 0 0 0 1px var(--line)"><span style="font-family:var(--sans); font-size:15px; color:#F3F4F6; padding:2px 6px; border-radius:3px; background:rgba(249,242,188,.16); box-shadow:0 0 0 1px rgba(249,242,188,.62)">booth</span></div><b>--highlight</b><span>Legal yellow at 16% on graphite. Seek flash, dictionary words.</span></div>
@@ -123,7 +123,7 @@
 <section class="section">
   <div class="section-head"><h2>Rules</h2><p>One color, one job. The plugin lives inside a DAW, where red already means record, so it spends red more carefully than the site does.</p></div>
   <div class="rules">
-    <div class="rule"><span class="big" style="display:flex;align-items:center;gap:12px"><span style="width:16px;height:16px;border-radius:50%;background:var(--rec)"></span>REC is a dot</span><p>#FF453A for the REC badge and dot, the stream cursor, the R key hint. Brighter and more orange than the brand red so the two never read as one. Nothing else glows red.</p></div>
+    <div class="rule"><span class="big" style="display:flex;align-items:center;gap:12px"><span style="width:16px;height:16px;border-radius:50%;background:var(--rec)"></span>REC is recording</span><p>#FF453A colors the recording state and nothing else: the REC badge and its pulsing dot, the header line while recording, the stream cursor, the R key hint. Brighter and more orange than the brand red so the two never read as one.</p></div>
     <div class="rule"><span class="big" style="color:var(--accent)">Red is the pen</span><p>On the site: the brand fill with white type, one primary red button per surface. In the plugin: only the red pen, a correction being made or made, and the caret. No red buttons or toggles in a DAW.</p></div>
     <div class="rule"><span class="big">White is live</span><p>PLAY, LIVE, synced, the playhead, focus rings, the plugin’s primary button. Neutral on purpose, so it can sit next to REC without competing.</p></div>
     <div class="rule"><span class="big" style="color:var(--pad-paper)">Yellow is the highlighter</span><p>Legal yellow laid over words: the seek flash after a click moves the playhead, dictionary words, selection. At full strength it is the pad itself.</p></div>

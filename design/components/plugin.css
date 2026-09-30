@@ -34,6 +34,13 @@
 }
 .p-window * { box-sizing: border-box; }
 .p-window button { font: inherit; color: inherit; }
+/* Keyboard focus: a white ring on every control, never red (red reads as record
+   in a DAW). Inputs draw their own focus border instead. */
+.p-window :is(button, a, [role="button"], [role="menuitem"], [role="option"], [tabindex]):focus-visible,
+.p-word:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
 
 /* ── Header ─────────────────────────────────────────────── */
 .p-header {
