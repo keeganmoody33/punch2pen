@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap">
 <link rel="stylesheet" href="../tokens/tokens.css">
 <link rel="stylesheet" href="../components/plugin.css">
+<link rel="stylesheet" href="../components/shaders.css">
 <link rel="stylesheet" href="_board.css">
 <style>
   .states { display: grid; grid-template-columns: repeat(3, 400px); gap: 64px 40px; }
@@ -47,6 +48,7 @@
       <div class="p-banner">Waiting for engine connection</div>
       <div class="p-pane">
         <div class="p-hint">
+          <div class="fx-mark" style="--fx-size:150px" data-p2p-shader="wait-smoke" data-image="../brand/two-glyph-booth.svg"><img class="fx-fallback" src="../brand/two-glyph-booth.svg" alt=""></div>
           <div class="title">Waiting for the local engine</div>
           <div class="sub">Transcription runs on this Mac. The engine starts on its own after install. If this stays on WAIT, check that the Whisper model is in place.</div>
         </div>
@@ -55,7 +57,7 @@
     </div>
     <div class="cap">
       <div class="top"><h3>Disconnected</h3><span class="label">data-state="disconnected"</span></div>
-      <p class="note">Amber is WAIT and only WAIT. The banner blinks at 1.2 s. The editor loads with the engine down; auto-launch runs in the background.</p>
+      <p class="note">Amber is WAIT and only WAIT. The 2 smokes amber (Gem Smoke) while the engine starts; the banner blinks at 1.2 s. Auto-launch runs in the background.</p>
     </div>
   </div>
 
@@ -71,7 +73,7 @@
       <div class="p-transport"><span>BAR <b>17</b> · BEAT <b>1</b></span><span><b>120</b> BPM</span><span><b>00:00:32.000</b></span></div>
       <div class="p-pane">
         <div class="p-hint">
-          <img class="mark" src="../brand/fist-booth.svg" alt="">
+          <div class="fx-mark" style="--fx-size:150px" data-p2p-shader="idle-smoke" data-image="../brand/two-glyph-booth.svg"><img class="fx-fallback" src="../brand/two-glyph-booth.svg" alt=""></div>
           <div class="title">Arm the track and record</div>
           <div class="sub">Hit <span class="key">R</span> in the DAW and punch in. The words land here on the host clock while you still have the headphones on.</div>
         </div>
@@ -80,7 +82,7 @@
     </div>
     <div class="cap">
       <div class="top"><h3>Idle</h3><span class="label">data-state="idle"</span></div>
-      <p class="note">Connected and stopped. The fist is the empty state, the only place the full mark appears inside the plugin. With words present, the line at or before the playhead is the title.</p>
+      <p class="note">Connected and stopped. The same 2 turns green: the engine answered. The shader is disposed when the transport moves or the first word lands, so it never runs while music plays.</p>
     </div>
   </div>
 
@@ -197,5 +199,6 @@
 </div>
 
 <footer class="board-foot"><span>Punch2Pen design system</span><span>Tokens: design/tokens/tokens.css · Components: design/components/plugin.css</span></footer>
+<script type="module">import { autoMount } from '../shaders/p2p-shaders.js'; autoMount();</script>
 </body>
 </html>

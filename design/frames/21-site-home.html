@@ -3,13 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=1440">
-<meta name="paper:artboard" content="Site / 21 Home desktop" data-width="1440" data-height="3072">
+<meta name="paper:artboard" content="Site / 21 Home desktop" data-width="1440" data-height="3673">
 <title>Home Desktop · Punch2Pen</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap">
 <link rel="stylesheet" href="../tokens/tokens.css">
 <link rel="stylesheet" href="../components/plugin.css">
 <link rel="stylesheet" href="../components/pad.css">
 <link rel="stylesheet" href="../components/site.css">
+<link rel="stylesheet" href="../components/shaders.css">
 <style>
   body { width: 1440px; }
   .hero { position: relative; overflow: hidden; padding: 96px 0 112px; }
@@ -25,6 +26,8 @@
   .interest { display: grid; grid-template-columns: 1fr 1fr; gap: 72px; align-items: start; }
   .interest form { display: flex; flex-direction: column; gap: 16px; }
   .interest .row { display: flex; gap: 12px; }
+  .band-in { display: grid; grid-template-columns: 440px 1fr; gap: 72px; align-items: center; }
+  .band .heat { --fx-size: 440px; border-radius: var(--radius-lg); overflow: hidden; background: var(--bg-deep); }
 </style>
 </head>
 <body class="s-page">
@@ -36,6 +39,7 @@
 </nav>
 
 <header class="hero">
+  <div class="fx" data-p2p-shader="booth-glow"></div>
   <img class="bolt" src="../brand/bolt-booth.svg" alt="">
   <div class="s-wrap">
     <div class="copy">
@@ -122,7 +126,7 @@
       <h2 class="s-h2">Prices are not set. The split is.</h2>
     </div>
     <div class="tiers">
-      <div class="pad s-tier">
+      <div class="pad s-tier has-fx"><div class="fx" data-p2p-shader="pad-card" data-p2p-static data-p2p-params='{"seed": 3}'></div>
         <div class="pad-head"><h3 class="pad-title">Free</h3></div>
         <div class="pad-lines">
           <div class="pad-line"><span class="tick">✓</span>Local generic speech-to-text</div>
@@ -131,7 +135,7 @@
           <div class="pad-line"><span class="price">Not published yet</span></div>
         </div>
       </div>
-      <div class="pad s-tier">
+      <div class="pad s-tier has-fx"><div class="fx" data-p2p-shader="pad-card" data-p2p-static data-p2p-params='{"seed": 6}'></div>
         <div class="pad-head"><h3 class="pad-title">Pro</h3></div>
         <div class="pad-lines">
           <div class="pad-line"><span class="tick">✓</span>Login and portable dictionary</div>
@@ -140,7 +144,7 @@
           <div class="pad-line"><span class="price">Not published yet</span></div>
         </div>
       </div>
-      <div class="pad s-tier">
+      <div class="pad s-tier has-fx"><div class="fx" data-p2p-shader="pad-card" data-p2p-static data-p2p-params='{"seed": 9}'></div>
         <div class="pad-head"><h3 class="pad-title">Studio</h3></div>
         <div class="pad-lines">
           <div class="pad-line"><span class="tick">✓</span>Isolated artist seats for a room</div>
@@ -169,10 +173,23 @@
   </div>
 </section>
 
+<section class="s-section band">
+  <div class="s-wrap band-in">
+    <div class="fx-mark heat" data-p2p-shader="punch-heat"><img class="fx-fallback" src="../brand/fist-booth.svg" alt=""></div>
+    <div style="display:flex; flex-direction:column; gap:24px">
+      <p class="s-eyebrow">Punch2Pen</p>
+      <h2 class="s-h1" style="font-size:96px">Punch in.<br><em>Pen</em> it.</h2>
+      <p class="s-lede">After a punch-in, the take is already written.</p>
+      <div class="s-actions"><a class="s-btn primary" href="#download">Download free utility</a></div>
+    </div>
+  </div>
+</section>
+
 <footer class="s-foot">
   <span>Punch2Pen · Mac first · never a browser engine</span>
   <nav><a href="/product">Product</a><a href="/pricing">Pricing</a><a href="/for-studios">Studios</a><a href="/creators">Creators</a><a href="/docs">Docs</a><a href="/login">Sign in</a><a href="/privacy">Privacy</a><a href="https://github.com/keeganmoody33/punch2pen">Source</a></nav>
   <img class="pen" src="../brand/pen-booth.svg" alt="">
 </footer>
+<script type="module">import { autoMount } from '../shaders/p2p-shaders.js'; autoMount();</script>
 </body>
 </html>

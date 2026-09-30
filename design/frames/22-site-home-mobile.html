@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="../components/plugin.css">
 <link rel="stylesheet" href="../components/pad.css">
 <link rel="stylesheet" href="../components/site.css">
+<link rel="stylesheet" href="../components/shaders.css">
 <style>
   body { width: 390px; font-size: 16px; }
   .s-wrap { width: calc(100% - 32px); }
@@ -39,6 +40,7 @@
 </nav>
 
 <header class="s-wrap hero">
+  <div class="fx" data-p2p-shader="booth-glow" style="left:-16px; right:-16px"></div>
   <div class="copy">
     <p class="s-eyebrow">Mac AU + VST3 · Logic</p>
     <h1 class="s-h1">You punched the line. <em>Don’t rewrite it</em> by ear.</h1>
@@ -101,9 +103,9 @@
   <div class="s-wrap">
     <div class="head"><p class="s-eyebrow">Free / Pro / Studio</p><h2 class="s-h2">Prices are not set. The split is.</h2></div>
     <div class="tiers">
-      <div class="pad s-tier"><div class="pad-head"><h3 class="pad-title">Free</h3></div><div class="pad-lines"><div class="pad-line"><span class="tick">✓</span>Local generic speech-to-text</div><div class="pad-line"><span class="tick">·</span>Corrections last this session</div><div class="pad-line"><span class="price">Not published yet</span></div></div></div>
-      <div class="pad s-tier"><div class="pad-head"><h3 class="pad-title">Pro</h3></div><div class="pad-lines"><div class="pad-line"><span class="tick">✓</span>Portable dictionary, cross-DAW</div><div class="pad-line"><span class="tick">·</span>The clock stays in the plugin</div><div class="pad-line"><span class="price">Not published yet</span></div></div></div>
-      <div class="pad s-tier"><div class="pad-head"><h3 class="pad-title">Studio</h3></div><div class="pad-lines"><div class="pad-line"><span class="tick">✓</span>Isolated artist seats for a room</div><div class="pad-line"><span class="tick">·</span>Each dictionary stays with that artist</div><div class="pad-line"><span class="price">Not published yet</span></div></div></div>
+      <div class="pad s-tier has-fx"><div class="fx" data-p2p-shader="pad-card" data-p2p-static data-p2p-params='{"seed": 3}'></div><div class="pad-head"><h3 class="pad-title">Free</h3></div><div class="pad-lines"><div class="pad-line"><span class="tick">✓</span>Local generic speech-to-text</div><div class="pad-line"><span class="tick">·</span>Corrections last this session</div><div class="pad-line"><span class="price">Not published yet</span></div></div></div>
+      <div class="pad s-tier has-fx"><div class="fx" data-p2p-shader="pad-card" data-p2p-static data-p2p-params='{"seed": 6}'></div><div class="pad-head"><h3 class="pad-title">Pro</h3></div><div class="pad-lines"><div class="pad-line"><span class="tick">✓</span>Portable dictionary, cross-DAW</div><div class="pad-line"><span class="tick">·</span>The clock stays in the plugin</div><div class="pad-line"><span class="price">Not published yet</span></div></div></div>
+      <div class="pad s-tier has-fx"><div class="fx" data-p2p-shader="pad-card" data-p2p-static data-p2p-params='{"seed": 9}'></div><div class="pad-head"><h3 class="pad-title">Studio</h3></div><div class="pad-lines"><div class="pad-line"><span class="tick">✓</span>Isolated artist seats for a room</div><div class="pad-line"><span class="tick">·</span>Each dictionary stays with that artist</div><div class="pad-line"><span class="price">Not published yet</span></div></div></div>
     </div>
   </div>
 </section>
@@ -123,5 +125,6 @@
   <nav><a href="/product">Product</a><a href="/pricing">Pricing</a><a href="/for-studios">Studios</a><a href="/creators">Creators</a><a href="/docs">Docs</a><a href="/login">Sign in</a><a href="/privacy">Privacy</a></nav>
   <span>Punch2Pen · Mac first</span>
 </footer>
+<script type="module">import { autoMount } from '../shaders/p2p-shaders.js'; autoMount();</script>
 </body>
 </html>

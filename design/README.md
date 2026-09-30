@@ -25,6 +25,7 @@ The rules that fall out of it:
 - **Ink is the plate:** the word under the playhead is an ink plate, never a color fill.
 - **Mono is the punch** (clock, labels), **sans is the words**, **Archivo is the poster** (site and brand only; the DAW loads no webfonts).
 - **The Pad** is the index card from the sketch: red header rule, blue lines, marker ink. It's where words land when they leave the booth.
+- **Shaders are Paper's own** ([Paper Shaders](https://shaders.paper.design), Apache-2.0): one moving shader per screen, token colors only, never red, and nothing moves in the plugin while music plays.
 
 ## What's here
 
@@ -41,7 +42,13 @@ design/
 ├── components/
 │   ├── plugin.css           Living Transcript parts (p-*)
 │   ├── site.css             punch2pen.com parts (s-*)
-│   └── pad.css              the index-card surface
+│   ├── pad.css              the index-card surface
+│   └── shaders.css          shader layers and their fallbacks (fx, fx-mark)
+├── shaders/
+│   ├── src/                 runtime (no React) + brand presets from tokens.json
+│   ├── build.mjs            → p2p-shaders.js, one offline ESM file (111 KB, 44 KB gzip)
+│   ├── p2p-shaders.js       vendored build: Paper Shaders 0.0.81, six shaders
+│   └── NOTICE, LICENSE-paper-shaders.txt
 ├── frames/                  one HTML file per Paper artboard
 ├── renders/                 WebP of every frame (for review and Paper comparison)
 └── tools/render.mjs         re-measure frames and re-render
@@ -54,6 +61,7 @@ design/
 | 03 | Type | |
 | 04 | Space, radius, motion | |
 | 05 | Marks | New |
+| 06 | Shaders: what's new at Paper, seven presets, plugin smoke, budget | Proposed |
 | 10 | Plugin anatomy | Shipped behavior, proposed parts marked |
 | 11 | Plugin components | Shipped behavior, proposed parts marked |
 | 12 | Plugin states (6) | Shipped behavior |
@@ -70,7 +78,8 @@ design/
 node design/tokens/build.mjs            # tokens.css + contrast report
 pip install fonttools brotli            # once, for the wordmark
 python3 design/brand/build_marks.py     # every SVG in design/brand/
-node design/tools/render.mjs            # needs playwright; then convert PNG → renders/*.webp
+(cd design/shaders && npm ci && node build.mjs)   # p2p-shaders.js from src/ + tokens.json
+node design/tools/render.mjs            # needs playwright; serves design/ over HTTP; then PNG → renders/*.webp
 ```
 
 ## Mapping to shipped code
@@ -104,6 +113,7 @@ Proposed features, drawn but not built:
 - **Syllable fill and the Flow Grid** (frames 11, 14). They need syllable onsets from the engine; today the engine returns word start and end.
 - **Dictionary panel** with word, adlib, and phrase entries (frame 14).
 - **Pen it**: copy, .txt, PDF lyric sheet on the Pad, share link for signed-in profiles (frame 14).
+- **Shaders** (frame 06): Gem Smoke on the 2 in the plugin's WAIT (amber) and empty IDLE (green) states, disposed when the transport moves or words arrive; Paper Texture 2.0 under the Pad (tier cards, lyric sheet); Grain Gradient behind the site hero; Heatmap on the fist in a closing band; Halftone Dots for share cards; Lens Distortion on the 404.
 
 ## Open threads
 
@@ -112,6 +122,8 @@ Proposed features, drawn but not built:
 3. **Syllable timing.** Check what the transcription path can return before building the grid.
 4. **Implement the restyle.** Swap tokens in `plugin/Source/ui/public/index.html` and `site/public/site.css`, add the SVGs, update `HANDOFF.md`'s token table.
 5. **Activation is unmeasured.** The site sends six PostHog events. The plugin, engine, and profile API send none, so install, first punch, first correction, and sign-in are invisible (frame 23). Any instrumentation needs an opt-in the free tier can keep honest.
-6. **Marks are v1.** They are faithful vector readings of the sketches. Iterate them in Paper, then carry the changes back into `build_marks.py`.
+6. **Shaders in the real plugin and site.** The site needs one module script and the data attributes. The plugin has to embed `p2p-shaders.js` in the WebView (it loads nothing remote), and the C++ bridge has to dispose the smoke when the transport moves. WKWebView has WebGL2 on current macOS (Safari 15 and later); confirm it inside Logic on the target Macs.
+7. **Remote MCP.** Paper lists it as coming soon. Once it ships, a cloud session could build the canvas itself instead of handing you a prompt.
+8. **Marks are v1.** They are faithful vector readings of the sketches. Iterate them in Paper, then carry the changes back into `build_marks.py`.
 
 Example data in the frames (the profile "Nova", "Room 4", take numbers, dictionary counts) is made up and labelled as such on each board. Lyrics are the original demo verse from the plugin's preview mode.

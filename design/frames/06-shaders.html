@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<meta name="paper:artboard" content="Foundations / 06 Shaders" data-width="1440" data-height="2989">
+<title>Shaders · Punch2Pen</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap">
+<link rel="stylesheet" href="../tokens/tokens.css">
+<link rel="stylesheet" href="../components/shaders.css">
+<link rel="stylesheet" href="_board.css">
+<style>
+  .news { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .news .n { display: flex; flex-direction: column; gap: 6px; padding: 16px 18px; border-radius: var(--radius-md); background: var(--bg-pane); border: 1px solid var(--line); }
+  .news .n .d { font-family: var(--mono); font-size: 11px; color: var(--accent); letter-spacing: .08em; }
+  .news .n b { font-size: 16px; }
+  .news .n p { font-size: 13px; color: var(--ink-3); line-height: 1.45; }
+  .presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+  .preset { display: flex; flex-direction: column; border-radius: var(--radius-md); overflow: hidden; background: var(--bg-pane); border: 1px solid var(--line); }
+  .preset .stage { position: relative; height: 300px; background: var(--bg-pane); border-bottom: 1px solid var(--line); overflow: hidden; }
+  .preset .stage.paper { background: var(--pad-paper); }
+  .preset .stage .fx-fallback { position: absolute; inset: 0; margin: auto; width: 44%; }
+  .preset.wide { grid-column: 1 / -1; }
+  .preset .stage.lost { height: 240px; display: grid; grid-template-columns: 1.3fr 1fr; align-items: center; }
+  .preset .stage.lost .lens { position: relative; height: 100%; }
+  .preset .stage.lost .copy404 { display: flex; flex-direction: column; gap: 8px; padding-right: 48px; }
+  .preset .stage.lost .copy404 b { font-family: var(--display); font-stretch: var(--display-stretch); font-weight: 850; font-size: 56px; line-height: .9; text-transform: uppercase; }
+  .preset .stage.lost .copy404 p { font-size: 15px; color: var(--ink-2); }
+  .preset .meta { display: flex; flex-direction: column; gap: 8px; padding: 16px 18px 18px; }
+  .preset .row1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .preset .row1 code { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--ink); }
+  .preset p { font-size: 13px; color: var(--ink-3); line-height: 1.45; }
+  .preset .kv { display: flex; gap: 16px; flex-wrap: wrap; font-family: var(--mono); font-size: 11px; color: var(--ink-2); letter-spacing: .04em; }
+  .preset .kv span b { color: var(--ink-3); font-weight: 600; margin-right: 6px; }
+  .story { display: flex; align-items: center; gap: 22px; }
+  .story .st { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  .story .st .box { position: relative; width: 190px; height: 190px; border-radius: var(--radius-md); background: var(--bg-pane); border: 1px solid var(--line); overflow: hidden; }
+  .story .st .box.still { display: grid; place-items: center; font-size: 15px; font-weight: 700; color: var(--ink); }
+  .story .st .box.still em { font-style: normal; background: var(--ink); color: var(--bg-deep); border-radius: 3px; padding: 0 .14em; }
+  .story .go { color: var(--accent); font-family: var(--mono); font-size: 22px; font-weight: 700; }
+  table.budget { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.budget th { text-align: left; font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); padding: 0 16px 10px 0; font-weight: 700; }
+  table.budget td { padding: 12px 16px 12px 0; border-top: 1px solid var(--line); color: var(--ink-2); vertical-align: top; }
+  table.budget td:first-child { color: var(--ink); font-weight: 650; }
+</style>
+</head>
+<body class="board" style="--board-h: 2989px">
+
+<header class="board-head">
+  <div class="lead">
+    <p class="eyebrow">Foundations · Shaders</p>
+    <h1>Paper Shaders, on brand</h1>
+    <p class="dek">Paper’s own WebGL shaders (Apache-2.0, v0.0.81), mounted without React from one vendored file, <code class="code">design/shaders/p2p-shaders.js</code>: 111 KB, 44 KB gzipped, no network. Every color comes from the tokens. Two rules: one moving shader per screen, and nothing moves in the plugin while the music does.</p>
+  </div>
+  <div class="board-meta"><img src="../brand/fist-booth.svg" alt=""><span>Frame 06 · 1440 wide</span><span class="status proposed">Proposed</span></div>
+</header>
+
+<section class="section">
+  <div class="section-head"><h2>What’s new at Paper</h2><p>First-release dates from the npm package history; features from Paper’s build log.</p></div>
+  <div class="news">
+    <div class="n"><span class="d">Sep 2026 · build log</span><b>Paper Texture 2.0</b><p>Three-color schemes, wrinkles, and roughness rows for grid-like grain. Becomes the Pad’s card stock.</p></div>
+    <div class="n"><span class="d">Aug 2026 · v0.0.79</span><b>Lens Distortion</b><p>The newest image filter: dispersion, swirl, bulge. Used once, on the 404.</p></div>
+    <div class="n"><span class="d">Apr 2026 · v0.0.73</span><b>Gem Smoke</b><p>Logo effect. The 2 smokes amber while the engine starts, then green.</p></div>
+    <div class="n"><span class="d">Jan 2026 · v0.0.69</span><b>Halftone CMYK</b><p>Print-style halftone. Reserved for merch and posters; not in product UI.</p></div>
+    <div class="n"><span class="d">Nov 2025 · v0.0.64</span><b>Halftone Dots</b><p>Flyer print for share cards and, later, artist photos on the creators page.</p></div>
+    <div class="n"><span class="d">Coming soon · build log</span><b>Remote MCP</b><p>When it ships, a cloud session could build this canvas directly instead of handing you a prompt.</p></div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Seven presets</h2><p>Live below. Names are what you put in <code class="code">data-p2p-shader</code>. Params live in <code class="code">design/shaders/src/presets.js</code>.</p></div>
+  <div class="presets">
+    <div class="preset">
+      <div class="stage" data-p2p-shader="wait-smoke"><img class="fx-fallback" src="../brand/two-glyph-booth.svg" alt=""></div>
+      <div class="meta"><div class="row1"><code>wait-smoke</code><span class="status proposed">Gem Smoke · new</span></div><p>Plugin WAIT. The 2 in amber smoke while the local engine starts.</p><div class="kv"><span><b>speed</b>0.45</span><span><b>cap</b>600 × 600 px</span></div></div>
+    </div>
+    <div class="preset">
+      <div class="stage" data-p2p-shader="idle-smoke"><img class="fx-fallback" src="../brand/two-glyph-booth.svg" alt=""></div>
+      <div class="meta"><div class="row1"><code>idle-smoke</code><span class="status proposed">Gem Smoke · new</span></div><p>Plugin IDLE, empty take. Same 2, green: the engine answered. Stops when the transport moves.</p><div class="kv"><span><b>speed</b>0.45</span><span><b>cap</b>600 × 600 px</span></div></div>
+    </div>
+    <div class="preset">
+      <div class="stage paper" data-p2p-shader="pad-card" data-p2p-static></div>
+      <div class="meta"><div class="row1"><code>pad-card</code><span class="status proposed">Paper Texture 2.0 · new</span></div><p>The Pad as card stock under the blue rules: tier cards, lyric sheet, share card.</p><div class="kv"><span><b>speed</b>0 · static</span><span><b>cost</b>one frame</span></div></div>
+    </div>
+    <div class="preset">
+      <div class="stage" data-p2p-shader="booth-glow"></div>
+      <div class="meta"><div class="row1"><code>booth-glow</code><span class="status">Grain Gradient</span></div><p>Booth light through grain. Site hero and section grounds. Green corners, never red.</p><div class="kv"><span><b>speed</b>0.35</span><span><b>ramp</b>graphite → green 800</span></div></div>
+    </div>
+    <div class="preset">
+      <div class="stage" data-p2p-shader="punch-heat"><img class="fx-fallback" src="../brand/fist-booth.svg" alt=""></div>
+      <div class="meta"><div class="row1"><code>punch-heat</code><span class="status">Heatmap</span></div><p>The punch lands: the fist runs white-hot at the knuckles. Site brand band, launch posts.</p><div class="kv"><span><b>speed</b>0.6</span><span><b>ramp</b>green 900 → ink</span></div></div>
+    </div>
+    <div class="preset">
+      <div class="stage" data-p2p-shader="flyer-dots" data-p2p-static><img class="fx-fallback" src="../brand/fist-booth.svg" alt=""></div>
+      <div class="meta"><div class="row1"><code>flyer-dots</code><span class="status proposed">Halftone Dots · new</span></div><p>Flyer print in green on graphite. Share cards now, artist photos later.</p><div class="kv"><span><b>speed</b>0 · static</span><span><b>grid</b>hex · gooey</span></div></div>
+    </div>
+    <div class="preset wide">
+      <div class="stage lost"><div class="lens" data-p2p-shader="lost-lens" data-p2p-static><img class="fx-fallback" src="../brand/wordmark-booth.svg" alt="" style="width:70%"></div><div class="copy404"><span class="label">404</span><b>Nothing here.</b><p>That URL is not a page on this site.</p></div></div>
+      <div class="meta"><div class="row1"><code>lost-lens</code><span class="status proposed">Lens Distortion · newest</span></div><p>The 404 page: the wordmark bent through a lens beside the page’s real copy. Static, one frame.</p><div class="kv"><span><b>speed</b>0 · static</span><span><b>bulge</b>0.3</span><span><b>count</b>40</span></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>The plugin smoke, start to first word</h2><p>One mark, one shader, three moments. The shader is disposed when words arrive, so it never competes with the Living Transcript or the DAW.</p></div>
+  <div class="story">
+    <div class="st"><div class="box" data-p2p-shader="wait-smoke"><img class="fx-fallback" src="../brand/two-glyph-booth.svg" alt="" style="position:absolute;inset:0;margin:auto;width:44%"></div><span class="label" style="color:var(--wait)">WAIT · amber</span></div>
+    <span class="go">→</span>
+    <div class="st"><div class="box" data-p2p-shader="idle-smoke"><img class="fx-fallback" src="../brand/two-glyph-booth.svg" alt="" style="position:absolute;inset:0;margin:auto;width:44%"></div><span class="label" style="color:var(--play)">IDLE · green</span></div>
+    <span class="go">→</span>
+    <div class="st"><div class="box still"><span>every word I <em>drop</em></span></div><span class="label">First word · shader off</span></div>
+    <p class="note" style="margin-left:24px; max-width:46ch">The smoke is the engine talking: amber while it starts, green when it answers, gone when you punch. If WebGL2 is missing or motion is reduced, the static 2 shows instead.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Budget</h2><p>Rules the runtime enforces, and rules the plugin bridge has to enforce.</p></div>
+  <table class="budget">
+    <thead><tr><th>Surface</th><th>Moving shaders</th><th>Pixel cap</th><th>Stops when</th><th>Enforced by</th></tr></thead>
+    <tbody>
+      <tr><td>Plugin</td><td>At most 1, only in WAIT or an empty IDLE</td><td>600 × 600 physical px, pixel ratio 1</td><td>Transport plays or records, the first word arrives, the editor closes</td><td>Bridge disposes it; ShaderMount pauses when hidden</td></tr>
+      <tr><td>Site</td><td>1 per viewport; the rest static</td><td>Paper default (4K)</td><td>Scrolled off screen, tab hidden</td><td>ShaderMount</td></tr>
+      <tr><td>Everywhere</td><td>0 with reduced motion</td><td>—</td><td>prefers-reduced-motion: reduce</td><td>p2p-shaders.js renders one frame and stops</td></tr>
+      <tr><td>No WebGL2</td><td>0</td><td>—</td><td>Always</td><td>Nothing mounts; the static SVG or CSS stays</td></tr>
+      <tr><td>Color</td><td colspan="4">Only token colors. Red is never a shader color: red means recording.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer class="board-foot"><span>Powered by Paper Shaders · shaders.paper.design</span><span>Runtime: design/shaders · build: cd design/shaders &amp;&amp; npm ci &amp;&amp; node build.mjs</span></footer>
+<script type="module">import { autoMount } from '../shaders/p2p-shaders.js'; autoMount();</script>
+</body>
+</html>

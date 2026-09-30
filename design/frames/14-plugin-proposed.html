@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="../tokens/tokens.css">
 <link rel="stylesheet" href="../components/plugin.css">
 <link rel="stylesheet" href="../components/pad.css">
+<link rel="stylesheet" href="../components/shaders.css">
 <link rel="stylesheet" href="_board.css">
 <style>
   .trio { display: grid; grid-template-columns: repeat(3, 400px); gap: 40px; }
@@ -157,10 +158,12 @@
         <li><span class="pin">1</span><div><strong>The gutter carries the clock</strong><span class="d">Bar number and m:ss.s in a left gutter, mono, so any line can be found in the session.</span></div></li>
         <li><span class="pin">2</span><div><strong>Lyrics sit on the blue rules</strong><span class="d">Sans, 19 px, marker black. One bar per line, as sung.</span></div></li>
         <li><span class="pin">3</span><div><strong>Adlibs in marker green</strong><span class="d">Parenthesised and italic, so a feature artist or engineer sees them at a glance.</span></div></li>
-        <li><span class="pin">4</span><div><strong>Signed like the card</strong><span class="d">Title over the red header rule, the fist in the corner, the wordmark in the footer. No price, no plan name.</span></div></li>
+        <li><span class="pin">4</span><div><strong>Card stock, not a flat fill</strong><span class="d">Paper Texture 2.0 under the rules: fiber, a soft fold, roughness rows. Rendered once; the PDF bakes it in.</span></div></li>
+        <li><span class="pin">5</span><div><strong>Signed like the card</strong><span class="d">Title over the red header rule, the fist in the corner, the wordmark in the footer. No price, no plan name.</span></div></li>
       </ul>
     </div>
-    <div class="pad">
+    <div class="pad has-fx">
+      <div class="fx" data-p2p-shader="pad-card" data-p2p-static></div>
       <div class="pad-head">
         <div>
           <h3 class="pad-title">Late night (verse 1)</h3>
@@ -184,5 +187,6 @@
 </section>
 
 <footer class="board-foot"><span>Punch2Pen design system</span><span>Nova, Take 3, and dictionary entries are example data</span></footer>
+<script type="module">import { autoMount } from '../shaders/p2p-shaders.js'; autoMount();</script>
 </body>
 </html>

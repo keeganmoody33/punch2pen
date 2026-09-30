@@ -39,20 +39,42 @@ name, data-width and data-height.
      variables from design/tokens/tokens.css and the classes from
      design/components/*.css and design/frames/_board.css.
    - Place the SVGs from design/brand/ as vectors, not bitmaps.
+   - Elements with data-p2p-shader="<preset>" are Paper Shaders. Make each one a
+     native Paper shader layer (the same library Paper uses; S opens the shaders
+     menu). Take the shader and its parameters from that preset in
+     design/shaders/src/presets.js, and use the element's data-image (or the
+     preset's image) as the logo or image input. If you can't create shader
+     layers through the MCP, put a frame named "SHADER · <preset>" in that spot
+     and list all of them when you finish so I can add them by hand.
    - Display text is Archivo from Google Fonts at width 68, weight 850. UI text is
      the system sans (SF Pro) and mono (SF Mono).
    - Compare your artboard with design/renders/<same name>.webp and fix any
      differences before starting the next one.
 3. Lay artboards out left to right in three rows, 200 px apart:
-   row 1: 01–05 (foundations and brand), row 2: 10–14 (plugin), row 3: 20–23 (site).
+   row 1: 01–06 (foundations, brand, shaders), row 2: 10–14 (plugin), row 3: 20–23 (site).
 4. Stop after each row and tell me which artboards are done.
 ```
 
 ## If it stalls
 
 - Paper's docs say long agent sessions are the most common cause of trouble. Restart Claude Code and say "continue from artboard NN".
-- Paper's docs also mention MCP usage limits on some plans. Fourteen artboards is a lot of tool calls. If you hit the limit, the rows are independent, so finish the rest in another session.
+- Paper's docs also mention MCP usage limits on some plans. Fifteen artboards is a lot of tool calls. If you hit the limit, the rows are independent, so finish the rest in another session.
+- Shaders: update Paper Desktop first (About → Check for updates). The pad-card preset uses Paper Texture 2.0's newer parameters (three colors, wrinkles, roughness rows), which Paper's build log dates to September 2026.
 - If an artboard drifts from its render, point the agent at the one element that differs. Don't regenerate the whole artboard.
+
+## Shaders by hand, if needed
+
+In Paper, press **S**, pick the shader, and copy the values from `design/shaders/src/presets.js`. The presets and where they go are on artboard 06.
+
+| Preset | Paper shader | Input |
+|---|---|---|
+| `wait-smoke` | Gem Smoke | `brand/two-glyph-booth.svg` |
+| `idle-smoke` | Gem Smoke | `brand/two-glyph-booth.svg` |
+| `pad-card` | Paper Texture | none |
+| `booth-glow` | Grain Gradient | none |
+| `punch-heat` | Heatmap | `brand/fist-booth.svg` |
+| `flyer-dots` | Halftone Dots | `brand/fist-pad.svg` |
+| `lost-lens` | Lens Distortion | `brand/wordmark-booth.svg` |
 
 ## After it's in Paper
 

@@ -242,6 +242,11 @@ def main():
             written.append(p.name)
     (out / "favicon.svg").write_text(favicon(GROUNDS["booth"]))
     written.append("favicon.svg")
+    # The 2 without its tile: a clean alpha shape for logo shaders (gem smoke, heatmap).
+    for ground, c in GROUNDS.items():
+        p = out / f"two-glyph-{ground}.svg"
+        p.write_text(two(c, ground=False))
+        written.append(p.name)
     try:
         paths, width, cap = wordmark_paths()
         for ground, c in GROUNDS.items():

@@ -1,0 +1,13 @@
+{
+  "name": "punch2pen-shaders",
+  "private": true,
+  "type": "module",
+  "description": "Builds the vendored Paper Shaders runtime for the Punch2Pen plugin and site.",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "@paper-design/shaders": "0.0.81",
+    "esbuild": "0.25.10"
+  }
+}
