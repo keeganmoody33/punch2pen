@@ -12,8 +12,8 @@ The first pass used a marker green sampled from the founder's sketches. When the
 
 | Where | Before | Now |
 |---|---|---|
-| Plugin UI (`#21`, latest) | "Open": graphite, teal `#7AD4C0` | Graphite kept. Red only for REC and the red pen; live states are white |
-| Site + `plugin/Source/ui/HANDOFF.md` (`#32`) | "Booth paper": warm black, vermillion `#E4452F`, serif lyrics | Superseded. HANDOFF's token table is now stale |
+| Plugin UI (`#21`) | "Open": graphite, teal `#7AD4C0` | Shipped in `plugin/Source/ui/public/index.html`: graphite kept, red only for REC and the red pen, live states white |
+| Site + `plugin/Source/ui/HANDOFF.md` (`#32`) | "Booth paper": warm black, vermillion `#E4452F`, serif lyrics | Shipped in `site/public/site.css` (Archivo headlines, brand-red fills, tier cards on the Pad). HANDOFF's token table updated |
 
 The brand red is `#AC2623`, picked from the logo; the median of the logo file's 84,398 red pixels is `#AF2724`. It is a fill with white type (6.9:1), the way the 2 badge is drawn, and brand ink on the legal pad (6.0:1). As text on graphite it lifts to `#EA7E7B` (5.7:1 on chrome). The pad is `#F9F2BC` with `#A7D0D2` rules. Every text pair passes WCAG AA; the one deliberate exception is past lyric lines at 0.38 opacity (frame 02 has the table).
 
@@ -104,7 +104,7 @@ The shipped editor (`plugin/Source/ui/public/index.html`) binds to IDs. The sema
 | `.p-pop` · `.p-row` | `#profile-popover` · `.profile-row` / `.seat-row` |
 | `.p-status` · `.p-logo` | `#status-bar` · `#logo-mark` |
 
-## Changes from what ships
+## Restyle (shipped)
 
 Restyle only. The C++ ↔ JS contract, IDs, states, and `Dcta / P2pn / aufx` stay.
 
@@ -113,7 +113,7 @@ Restyle only. The C++ ↔ JS contract, IDs, states, and `Dcta / P2pn / aufx` sta
 - Corrected words take a red-pen underline; dictionary words and the seek flash take the yellow highlighter.
 - The struck-out word in the correction sheet is grey, not red.
 - The free-tier nudge in the status bar wraps to two lines instead of truncating at 400 px.
-- Mobile site: the download button becomes "Copy download link", since the pkg is Mac-only.
+- Mobile site: the download button becomes "Copy download link", since the pkg is Mac-only. **Not built yet** (it is a `site.js` behavior change, not a restyle).
 
 Proposed features, drawn but not built:
 
@@ -128,7 +128,7 @@ Proposed features, drawn but not built:
 1. **Paper import.** You run [PAPER.md](PAPER.md) on your Mac.
 2. **ARA 2 or not.** Click-to-jump depends on it. This is an engineering call before it's a design call.
 3. **Syllable timing.** Check what the transcription path can return before building the grid.
-4. **Implement the restyle.** Swap tokens in `plugin/Source/ui/public/index.html` and `site/public/site.css`, add the SVGs, update `HANDOFF.md`'s token table.
+4. **Restyle shipped.** Tokens, outlined wordmark and 2 badge are in `plugin/Source/ui/public/index.html`; `site/public/site.css` and every page header carry the 2PEN system; `HANDOFF.md` is current. Left: the mobile "Copy download link" behavior, and a look inside Logic's WKWebView.
 5. **Activation is unmeasured.** The site sends six PostHog events. The plugin, engine, and profile API send none, so install, first punch, first correction, and sign-in are invisible (frame 23). Any instrumentation needs an opt-in the free tier can keep honest.
 6. **Shaders in the real plugin and site.** The site needs one module script and the data attributes. The plugin has to embed `p2p-shaders.js` in the WebView (it loads nothing remote), and the C++ bridge has to dispose the smoke when the transport moves. WKWebView has WebGL2 on current macOS (Safari 15 and later); confirm it inside Logic on the target Macs.
 7. **Remote MCP.** Paper lists it as coming soon. Once it ships, a cloud session could build the canvas itself instead of handing you a prompt.

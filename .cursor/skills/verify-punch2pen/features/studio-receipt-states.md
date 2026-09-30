@@ -1,6 +1,6 @@
 # Studio Receipt states
 
-Studio Receipt is the plugin face: a 400×600 (resizable) WebView with five `body[data-state]` values, a `[ PUNCH2PEN ]` wordmark, and a correction overlay. This feature proves the HTML contract and documents the live DAW states. It does not restyle the UI.
+Studio Receipt is the plugin face: a 400×600 (resizable) WebView with five `body[data-state]` values, an outlined Punch2Pen wordmark (`#app-title`, SVG), and a correction overlay. This feature proves the HTML contract and documents the live DAW states. It does not restyle the UI.
 
 ## Sub-features
 
@@ -29,7 +29,7 @@ Preconditions:
 - You are not changing CSS, tokens, or copy.
 - No DAW automation is available in this repo.
 
-- **HTML contract.** Run `.cursor/skills/verify-punch2pen/scripts/control-punch2pen drive studio-receipt-contract`. Exit code `0`. Report lists IDs `app-title`, `status-badge`, `connection-banner`, `transcript-container`, `correction-overlay`, `correction-input`, `correction-submit`, `correction-cancel`, `logo-mark` and states `disconnected`, `idle`, `recording`, `playback`, `correction`. Wordmark source contains `[ PUNCH`.
+- **HTML contract.** Run `.cursor/skills/verify-punch2pen/scripts/control-punch2pen drive studio-receipt-contract`. Exit code `0`. Report lists IDs `app-title`, `status-badge`, `connection-banner`, `transcript-container`, `correction-overlay`, `correction-input`, `correction-submit`, `correction-cancel`, `logo-mark` and states `disconnected`, `idle`, `recording`, `playback`, `correction`. `#app-title` carries `role="img" aria-label="Punch2Pen"`.
 - **Static preview (optional).** Open the same HTML file. Initial `body[data-state]` is `disconnected`, badge `WAIT`, banner visible. In the page console, `setState('idle')` shows IDLE and hides the banner. This is preview-only; do not file it as WKWebView-in-DAW proof.
 - **Live DAW states (Mac, manual).** After `control-punch2pen cleanup` (free 7483), install the plugin, start one engine, insert punch2pen, then walk WAIT → IDLE → REC → PLAY → correction. Screenshot each `data-state` with `#app-title` visible. If no DAW is installed, record SKIP per state with the missing host path — do not use JUCE AudioPluginHost unless you are prepared to operate it by hand (no recipe exists).
 - **Proof.** Save the contract report under `artifacts/<run-id>/studio-receipt-contract.txt`. Manual screenshots, if any, go in the same directory. Feature ID `studio-receipt-states`.
