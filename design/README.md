@@ -20,7 +20,7 @@ The brand red is `#AC2623`, picked from the logo; the median of the logo file's 
 The rules that fall out of it:
 
 - **REC is recording.** `#FF453A` colors the recording state and nothing else: the REC badge (label and pulsing dot), the header line while recording, the stream cursor, the R key hint. Brighter and more orange than the brand red, and never used outside recording.
-- **Red is the brand and the pen.** On the site: the brand fill, one primary red button per surface. In the plugin: only corrections (the red pen) and the caret. A red button or toggle in a DAW reads as record-arm, so the plugin's primary button, toggles and badge are white.
+- **Red is the brand and the pen.** On the site: the brand fill, one primary red button per surface. In the plugin: only corrections (the red pen) and the caret. A red button or toggle in a DAW reads as record-arm, so the plugin's primary button, toggles and badge are white. Decided by the founder, 2026-09-30.
 - **White is live:** PLAY, LIVE, synced, the playhead, focus rings.
 - **Yellow is the highlighter:** legal yellow over words on graphite for the seek flash and dictionary words.
 - **Amber is waiting:** WAIT, the engine banner, pending sync.
@@ -133,7 +133,6 @@ Proposed features, drawn but not built:
 6. **Shaders in the real plugin and site.** The site needs one module script and the data attributes. The plugin has to embed `p2p-shaders.js` in the WebView (it loads nothing remote), and the C++ bridge has to dispose the smoke when the transport moves. WKWebView has WebGL2 on current macOS (Safari 15 and later); confirm it inside Logic on the target Macs.
 7. **Remote MCP.** Paper lists it as coming soon. Once it ships, a cloud session could build the canvas itself instead of handing you a prompt.
 8. **Logo master file.** The fist is traced from a 1969 × 2000 WebP. A larger master in `brand/source/` plus `trace_logo.py` gives sharper print curves.
-9. **No red in the plugin chrome** is a proposal, not a given: the plugin's buttons, toggles and badge go white so red never reads as record-arm. Reverse it by pointing `.p-btn.primary` back at `--accent-fill`.
-10. **Explorations** (frame 05): Punch range [2], Transient, Seek word. Adopt, iterate, or kill each.
+9. **Explorations** (frame 05): Punch range [2], Transient, Seek word. Adopt, iterate, or kill each.
 
 Example data in the frames (the profile "Nova", "Room 4", take numbers, dictionary counts) is made up and labelled as such on each board. Lyrics are the original demo verse from the plugin's preview mode.
