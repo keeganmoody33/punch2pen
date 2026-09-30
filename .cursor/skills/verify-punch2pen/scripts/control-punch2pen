@@ -366,8 +366,8 @@ for state in states:
     if f'"{state}"' not in html and f"'{state}'" not in html:
         print("FAIL missing state name:", state)
         sys.exit(1)
-if "[ PUNCH" not in html:
-    print("FAIL wordmark [ PUNCH not found")
+if 'id="app-title" role="img" aria-label="Punch2Pen"' not in html:
+    print("FAIL outlined wordmark #app-title (aria-label Punch2Pen) not found")
     sys.exit(1)
 if "Waiting for engine connection" not in html:
     print("FAIL connection banner copy missing")
@@ -375,7 +375,7 @@ if "Waiting for engine connection" not in html:
 print("studio-receipt-contract: PASS")
 print("ids:", ", ".join(required_ids))
 print("states:", ", ".join(states))
-print("wordmark: [ PUNCH2PEN ] present")
+print("wordmark: outlined Punch2Pen SVG in #app-title")
 print("path:", sys.argv[1])
 PY
   printf 'studio-receipt-states\ndrive studio-receipt-contract\n' > "$evid/feature-id.txt"

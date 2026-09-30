@@ -6,8 +6,10 @@ highlights the word under the playhead, treats the active line as the title,
 renders a Temporal Hierarchy (past / active / upcoming), scrolls in sync with
 the DAW, and offers **Return to Live** when the user scrolls away.
 
-Vibe: **Open** — dark, DAW-native, not a toy. **Booth paper:** mono chrome
-(the punch), serif lyrics (the pen), stamp vermillion. Not the teal #21 restyle.
+Vibe: **2PEN on graphite** — dark, DAW-native, not a toy. The system lives in
+`design/` (tokens, marks, components, Paper frames); this page applies it. Mono
+is the punch (chrome, clock, labels), sans is the words. Red is only REC and the
+red pen; white is live; yellow is the highlighter; amber is waiting.
 Default window **400×600** (C++ `setSize`), resizable; the CSS is fluid and
 follows the host.
 
@@ -36,11 +38,11 @@ Identity is untouched: **Dcta / P2pn / aufx**.
 
 | Region | ID | Height | Contents |
 |---|---|---|---|
-| Header | `#header-bar` | 44px | `[ PUNCH2PEN ]` wordmark (`#app-title`), **active-profile pill** (`#profile-pill`; opens the sign-in / seats popover), status badge (`#status-badge`: WAIT / IDLE / REC / PLAY) |
+| Header | `#header-bar` | 44px | outlined wordmark SVG (`#app-title`, `role="img"`, one color), **active-profile pill** (`#profile-pill`; opens the sign-in / seats popover), status badge (`#status-badge`: WAIT / IDLE / REC / PLAY) |
 | Transport strip | `#position-display` | 30px | `BAR n · BEAT n` (`#position-text` with `.bar-num` / `.beat-num`), host BPM and `HH:MM:SS.mmm` (`#host-clock`, `#host-bpm`, `#host-time`), `#sync-indicator` (LIVE / SCROLLED) |
 | Connection banner | `#connection-banner` | auto | “Waiting for engine connection…” — disconnected only |
 | Transcript | `#transcript-container` | flex | `#transcript-scroll` (native scroller) → `#transcript-inner` → `.lyric-line` → `.lyric-word`; empty-state hints; fades; `#return-to-live`; docked `#correction-overlay` |
-| Status bar | `#status-bar` | 30px | `#status-text` (state copy and the non-modal upgrade nudge), `#logo-mark` (placeholder) |
+| Status bar | `#status-bar` | 30px | `#status-text` (state copy and the non-modal upgrade nudge), `#logo-mark` (the one-color 2 badge, 18px) |
 
 Inside `#transcript-inner` the bridge populates one line per bar (max 8 words):
 
@@ -58,12 +60,12 @@ Inside `#transcript-inner` the bridge populates one line per bar (max 8 words):
 
 | Tier | Line class | Treatment |
 |---|---|---|
-| Past | `.line-past` | serif, ~16px, opacity 0.38 |
-| **Active (title)** | `.line-active` | serif **bold**, ~24px (scales with width via `cqi`), opacity 1 |
-| Upcoming | `.line-upcoming` | serif, ~16px, opacity 0.68 |
+| Past | `.line-past` | sans, ~16px, opacity 0.38 |
+| **Active (title)** | `.line-active` | sans **bold**, ~24px (scales with width via `cqi`), opacity 1 |
+| Upcoming | `.line-upcoming` | sans, ~16px, opacity 0.68 |
 
-Word under the playhead: `.lyric-word.active` — invert plate (paper fill, booth
-ink). Past words inside the active line sit at 0.52. Between two word
+Word under the playhead: `.lyric-word.active` — invert plate (ink fill, graphite
+text). Past words inside the active line sit at 0.52. Between two word
 timestamps the highlight **holds** on the last sung word (no flicker in whisper's
 gaps); after the final word it holds for ~0.75 s.
 
@@ -111,7 +113,7 @@ window.setProfileStatus(json)                     // engine ProfileStatus, strin
 
 `WebViewEditor` folds every engine `ProfileStatus` into `setActiveProfile` (pill)
 and forwards the raw JSON to `setProfileStatus` (popover). The pill reads
-**Local · This Mac · no account** on the free tier, the seat name with a green
+**Local · This Mac · no account** on the free tier, the seat name with a white
 dot when signed in with an active seat, and **No seat** when signed in without one.
 
 ## JS → C++ API (native functions on `window.punch2pen`)
@@ -179,23 +181,29 @@ corrects a word, never blocks, and names no price.
 
 ## Tokens
 
-Booth paper. Same tokens as `site/public/site.css`. Not the teal #21 restyle.
+Values mirror `design/tokens/tokens.json` (generated CSS: `design/tokens/tokens.css`).
+The plugin copies the subset it uses into `:root` because WKWebView loads only
+this one file.
 
 | Token | Value | Job |
 |---|---|---|
-| `--bg-deep` | #100E0C | window / editor chrome behind the WebView |
-| `--bg-pane` | #171411 | transcript |
-| `--bg-chrome` | #1E1A16 | header, transport strip, status bar |
-| `--bg-raised` | #2A241E | pill, popover, sheet, Return to Live |
-| `--ink` | #F3EBDA | paper text |
-| `--accent` | #E4452F | stamp vermillion: wordmark “2”, Apply, checks |
-| `--wait` | #C9A36A | WAIT / engine banner (not REC, not the old gold chip) |
-| `--rec` | #E4452F | REC, stream cursor |
-| `--play` | #6FBF8A | PLAY, LIVE, corrected marker |
+| `--bg-deep` | #1E1E1E | window behind the WebView, inputs |
+| `--bg-pane` | #14151A | transcript |
+| `--bg-chrome` | #22242A | header, transport strip, status bar |
+| `--bg-raised` | #2A2D34 | pill, popover, sheet, Return to Live |
+| `--ink` / `-2` / `-3` / `-4` | #F3F4F6 at 100 / 74 / 54 / 30% | text; `-3` clears 4.5:1 on chrome |
+| `--accent` | #EA7E7B | the red pen: correcting outline, corrected underline, checks, caret |
+| `--focus` | #F3F4F6 | 2px focus ring, never red |
+| `--play` | #F3F4F6 | PLAY, LIVE, active-profile dot |
+| `--wait` | #D7B07A | WAIT, engine banner |
+| `--rec` | #FF453A | REC badge and pulse, header line, stream cursor, R key hint. Nothing else |
+| `--highlight` / `-line` | legal yellow at 16% / 62% | seek flash, dictionary words (proposed) |
 
-Type: chrome in system mono (`ui-monospace`, SF Mono, Menlo…); lyrics and status
-copy in system serif (Iowan / Palatino / Georgia) — the pen. No webfonts from
-the network. Active word is an invert plate, not a colored fill.
+Primary buttons (Apply, Send code, Sign in) are ink on graphite, not red: a red
+button in a DAW reads as record-arm. The struck-out word in the correction sheet
+is grey. Type: chrome in system mono (SF Mono, Menlo…), lyrics and copy in the
+system sans (SF Pro). No webfonts from the network. The wordmark and badge are
+inline SVG, so they need no font either.
 
 ---
 
@@ -209,9 +217,7 @@ Neither runs inside the plugin (`window.__JUCE__.backend` present).
 
 ## Open follow-ups
 
-1. **Logo asset.** `#logo-mark` is still the placeholder. Drop the real asset into
-   `Source/ui/public/assets/` and extend the resource provider.
-2. **Bar labels per line.** `data-bar` is the sung bar: the word's sample
+1. **Bar labels per line.** `data-bar` is the sung bar: the word's sample
    position, the host BPM, and the time signature from `setHostClock`. It is
    not a gutter number. The readout is not a typed BPM and does not invent a frame rate.
-3. **Live DAW visual verification** in Logic's WKWebView is still a human step.
+2. **Live DAW visual verification** in Logic's WKWebView is still a human step.
