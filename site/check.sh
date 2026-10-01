@@ -23,7 +23,10 @@ do
 done
 
 scan_copy() {
-  grep -Rni --exclude-dir=node_modules --exclude-dir=.wrangler "$@" public src
+  # Vendor font bytes and the Paper shader bundle are not site copy.
+  grep -Rni --exclude-dir=node_modules --exclude-dir=.wrangler \
+    --exclude-dir=fonts --exclude-dir=shaders \
+    "$@" public src
 }
 
 if scan_copy -E 'karaoke'; then
@@ -99,5 +102,7 @@ if ! grep -q '"punch2pen.com"' wrangler.jsonc || ! grep -q '"www.punch2pen.com"'
   echo "wrangler custom domains for apex and www must stay" >&2
   fail=1
 fi
+
+node scripts/check-structure.mjs || fail=1
 
 exit "$fail"

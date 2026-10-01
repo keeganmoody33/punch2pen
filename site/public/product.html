@@ -4,131 +4,117 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Product — Punch2Pen</title>
-  <meta name="description" content="Mac VST3 and AU. Logic is the host we run. Living Transcript locked to the DAW clock. Windows, iOS, and untested DAWs are not shipped." />
+  <meta name="description" content="Mac VST3 and AU. Logic is the host we run. Living Transcript locked to the DAW clock. Mac AU and VST3 ship. Windows and iOS do not. Other hosts remain unverified." />
+  <link rel="canonical" href="https://punch2pen.com/product" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Product — Punch2Pen" />
+  <meta property="og:description" content="Mac VST3 and AU. Logic is the host we run. Living Transcript locked to the DAW clock. Mac AU and VST3 ship. Windows and iOS do not. Other hosts remain unverified." />
+  <meta property="og:url" content="https://punch2pen.com/product" />
+  <meta name="twitter:card" content="summary" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/tokens.css" />
   <link rel="stylesheet" href="/site.css" />
 </head>
-<body>
-  <header class="top">
-    <a class="mark" href="/">[ PUNCH<span class="accent">2</span>PEN ]</a>
-    <nav>
+<body class="s-page">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <nav class="s-nav" id="site-nav" aria-label="Main navigation">
+    <a class="wm-link" href="/"><img class="wm" src="/brand/wordmark-booth.svg" alt="Punch2Pen" /></a>
+    <div class="links" id="site-links">
       <a href="/product" aria-current="page">Product</a>
       <a href="/pricing">Pricing</a>
       <a href="/for-studios">Studios</a>
       <a href="/creators">Creators</a>
       <a href="/docs">Docs</a>
       <a href="/login">Sign in</a>
-    </nav>
+    </div>
+    <a class="s-btn primary sm" href="https://github.com/keeganmoody33/punch2pen/releases/latest">Download free</a>
+    <button class="menu" type="button" aria-label="Menu" aria-expanded="false" aria-controls="site-links"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h14M3 10h14M3 14h14"/></svg></button>
+  </nav>
+  <main id="main" tabindex="-1">
+
+  <header class="page-hero">
+    <div class="s-wrap">
+      <p class="s-eyebrow">DAW integration</p>
+      <h1 class="s-h1">In the session. On the host clock.</h1>
+      <p class="s-lede">What ships is a Mac plugin: VST3 and AU, plus a local engine on that Mac. The host we actually run is Logic. The Living Transcript follows the playhead. Free corrections stay in the engine session. Profile sign-in is not available in this build.</p>
+      <div class="s-actions">
+        <a class="s-btn primary" href="https://github.com/keeganmoody33/punch2pen/releases/latest">Download Free Utility</a>
+        <a class="s-btn ghost" href="/docs">Install path</a>
+      </div>
+    </div>
   </header>
 
-  <main class="wrap">
-    <p class="eyebrow">DAW integration</p>
-    <h1>In the session. On the host clock.</h1>
-    <p class="lede">What ships is a Mac plugin: VST3 and AU, plus a local engine on that Mac. The host we actually run is Logic. The Living Transcript follows the playhead. A correction stays in the session, or lands in a signed-in dictionary.</p>
-    <div class="actions">
-      <a class="btn primary" href="https://github.com/keeganmoody33/punch2pen/releases/latest">Download Free Utility</a>
-      <a class="btn ghost" href="/docs">Install path</a>
-    </div>
-
-    <section>
-      <p class="eyebrow">Compatibility</p>
-      <h2>Shipped, run, or not shipped.</h2>
-      <p class="lede">A format on disk is not a supported host. This matrix marks only what this build ships, and the one host we run.</p>
-      <div class="table-scroll">
-        <table class="matrix">
-          <thead>
-            <tr>
-              <th>Surface</th>
-              <th>This build</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>macOS AU</td>
-              <td class="ship">Shipped</td>
-            </tr>
-            <tr>
-              <td>macOS VST3</td>
-              <td class="ship">Shipped</td>
-            </tr>
-            <tr>
-              <td>Logic</td>
-              <td class="host">The host we run</td>
-            </tr>
-            <tr>
-              <td>Windows</td>
-              <td class="no">Not shipped</td>
-            </tr>
-            <tr>
-              <td>iOS</td>
-              <td class="no">Not shipped</td>
-            </tr>
-            <tr>
-              <td>Ableton Live</td>
-              <td class="no">Not shipped</td>
-            </tr>
-            <tr>
-              <td>REAPER</td>
-              <td class="no">Not shipped</td>
-            </tr>
-            <tr>
-              <td>Pro Tools</td>
-              <td class="no">Not shipped</td>
-            </tr>
-            <tr>
-              <td>GarageBand</td>
-              <td class="no">Not shipped</td>
-            </tr>
-          </tbody>
-        </table>
+  <section class="s-section">
+    <div class="s-wrap">
+      <div class="head">
+        <p class="s-eyebrow">Compatibility</p>
+        <h2 class="s-h2">Shipped, run, or not shipped.</h2>
+        <p class="s-body">A format on disk is not a supported host. This matrix marks only what this build ships, and the one host we run.</p>
       </div>
-      <p class="fine" style="margin-top:0.9rem">The installer welcome names Logic, REAPER, and Ableton as hosts the plugin is aimed at. This page marks Logic only, because that is the host we actually run. The plugin is not sandbox-safe, and that same welcome says GarageBand may refuse it.</p>
-    </section>
+      <table class="s-table">
+        <thead>
+          <tr><th>Surface</th><th>This build</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>macOS AU</td><td><span class="s-chip ship">Shipped</span></td></tr>
+          <tr><td>macOS VST3</td><td><span class="s-chip ship">Shipped</span></td></tr>
+          <tr><td>Logic</td><td><span class="s-chip host">The host we use</span></td></tr>
+          <tr><td>Windows</td><td><span class="s-chip no">Not shipped</span></td></tr>
+          <tr><td>iOS</td><td><span class="s-chip no">Not shipped</span></td></tr>
+          <tr><td>Ableton Live</td><td><span class="s-chip no">Not verified</span></td></tr>
+          <tr><td>REAPER</td><td><span class="s-chip no">Not verified</span></td></tr>
+          <tr><td>Pro Tools</td><td><span class="s-chip no">Not shipped</span></td></tr>
+          <tr><td>GarageBand</td><td><span class="s-chip no">Not verified</span></td></tr>
+        </tbody>
+      </table>
+      <p class="s-fine" style="margin-top:20px">The installer welcome names Logic, REAPER, and Ableton as hosts the plugin is aimed at. Logic is the host we use. This website restyle has not been freshly verified inside Logic; other host support remains unverified. The plugin is not sandbox-safe, and that same welcome says GarageBand may refuse it.</p>
+    </div>
+  </section>
 
-    <section>
-      <p class="eyebrow">Technical specs</p>
-      <h2>What the plugin and the engine actually do.</h2>
+  <section class="s-section">
+    <div class="s-wrap">
+      <div class="head">
+        <p class="s-eyebrow">Technical specs</p>
+        <h2 class="s-h2">What the plugin and the engine actually do.</h2>
+      </div>
       <dl class="specs">
         <dt>Identity</dt>
         <dd>Manufacturer <strong>Dcta</strong>, plugin <strong>P2pn</strong>, AU type <strong>aufx</strong>. Bundle ID <code>com.doctaaa.punch2pen</code>. Display name Doctaaa: punch2pen. Those codes stay.</dd>
         <dt>Editor</dt>
         <dd>Studio Receipt, one WebView inside the plugin. Default size 400×600, resizable. States you will see: WAIT while the engine is down, then IDLE, REC, and PLAY.</dd>
         <dt>Capture</dt>
-        <dd>The plugin takes audio only while the host transport reports recording. Playback does not send a new take. It moves the playhead across words you already have.</dd>
+        <dd>The plugin captures audio while the host is playing or recording, including playback of a vocal already on the track. Stopped transport does not capture.</dd>
         <dt>Clock</dt>
         <dd>Word times are sample start and end from the engine. Bar and beat come from the DAW. That clock lives in the plugin. The profile does not store it.</dd>
         <dt>Living Transcript</dt>
         <dd>During playback the word under the playhead is marked, and the active line is the title. Scroll away and you can return to live. While recording, the newest line is the title and the words are still provisional.</dd>
         <dt>Link to the engine</dt>
-        <dd>Local TCP <code>127.0.0.1:7483</code>. The plugin and <code>punch2penEngine</code> handshake, then audio, transport stop, and corrections move on that socket. Nothing in the free utility leaves the Mac.</dd>
+        <dd>Local TCP <code>127.0.0.1:7483</code>. The plugin and <code>punch2penEngine</code> handshake, then audio, transport stop, and corrections move on that socket. Free local transcription sends no audio or correction pairs off the Mac. Initial setup may download the Whisper model.</dd>
         <dt>Model</dt>
         <dd>Local whisper.cpp. The file is <code>~/.punch2pen/models/ggml-base.bin</code>. It is not baked into the pkg. Postinstall downloads it when it is missing; if you are offline, place the file yourself.</dd>
         <dt>Correction</dt>
-        <dd>Click a word. A sheet docks under the transcript. Apply replaces every exact, case-sensitive match in the take and sends the pair to the engine. Cancel or Esc sends nothing. Free keeps the pair in a session dictionary in memory. Pro writes it on the signed-in seat. There is no separate dictionary editor.</dd>
+        <dd>Click a word. A sheet docks under the transcript. Apply replaces every exact, case-sensitive match in the take and sends the pair to the engine. Cancel or Esc sends nothing. Free keeps the pair in a session dictionary in memory. When sign-in is enabled, Pro writes it on the signed-in seat. Sign-in is not available in this build. There is no separate dictionary editor.</dd>
       </dl>
-      <p class="fine" style="margin-top:1.1rem">Install, the nested engine helper, and the dictionary are written out on <a href="/docs">the docs page</a>.</p>
-    </section>
-  </main>
+      <p class="s-fine" style="margin-top:28px">Install, the nested engine helper, and the dictionary are written out on <a href="/docs">the docs page</a>.</p>
+    </div>
+  </section>
 
-  <footer class="foot">
+    </main>
+  <footer class="s-foot">
     <span>Punch2Pen · Mac first · never a browser engine</span>
-    <span>
+    <nav>
       <a href="/product">Product</a>
-      ·
       <a href="/pricing">Pricing</a>
-      ·
       <a href="/for-studios">Studios</a>
-      ·
       <a href="/creators">Creators</a>
-      ·
       <a href="/docs">Docs</a>
-      ·
       <a href="/login">Sign in</a>
-      ·
       <a href="/privacy">Privacy</a>
-      ·
+      <a href="/sitemap">Sitemap</a>
       <a href="https://github.com/keeganmoody33/punch2pen">Source</a>
-    </span>
+    </nav>
+    <img class="pen" src="/brand/pen-booth.svg" alt="" />
   </footer>
+  <script src="/nav.js"></script>
 </body>
 </html>

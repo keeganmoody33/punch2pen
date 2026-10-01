@@ -5,84 +5,107 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>For studios — Punch2Pen</title>
   <meta name="description" content="Workspace seats for A&amp;R and commercial rooms. Each artist’s dictionary stays isolated. No price and no case study." />
+  <link rel="canonical" href="https://punch2pen.com/for-studios" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="For studios — Punch2Pen" />
+  <meta property="og:description" content="Workspace seats for A&amp;R and commercial rooms. Each artist’s dictionary stays isolated. No price and no case study." />
+  <meta property="og:url" content="https://punch2pen.com/for-studios" />
+  <meta name="twitter:card" content="summary" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/tokens.css" />
   <link rel="stylesheet" href="/site.css" />
 </head>
-<body>
-  <header class="top">
-    <a class="mark" href="/">[ PUNCH<span class="accent">2</span>PEN ]</a>
-    <nav>
+<body class="s-page">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <nav class="s-nav" id="site-nav" aria-label="Main navigation">
+    <a class="wm-link" href="/"><img class="wm" src="/brand/wordmark-booth.svg" alt="Punch2Pen" /></a>
+    <div class="links" id="site-links">
       <a href="/product">Product</a>
       <a href="/pricing">Pricing</a>
       <a href="/for-studios" aria-current="page">Studios</a>
       <a href="/creators">Creators</a>
       <a href="/docs">Docs</a>
       <a href="/login">Sign in</a>
-    </nav>
+    </div>
+    <a class="s-btn primary sm" href="https://github.com/keeganmoody33/punch2pen/releases/latest">Download free</a>
+    <button class="menu" type="button" aria-label="Menu" aria-expanded="false" aria-controls="site-links"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h14M3 10h14M3 14h14"/></svg></button>
+  </nav>
+  <main id="main" tabindex="-1">
+
+  <header class="page-hero">
+    <div class="s-wrap">
+      <p class="s-eyebrow">For studios</p>
+      <h1 class="s-h1">A seat per artist. <em>The words stay theirs.</em></h1>
+      <p class="s-lede">Studio is the planned workspace of artist seats for a room that records more than one person. Each seat is one portable dictionary. The artist signed in on that seat is the only one who can read it or train it. Studio and paid sign-in are not available yet.</p>
+      <p class="s-fine">The owner runs the room. The owner does not get the vocal.</p>
+    </div>
   </header>
 
-  <main class="wrap">
-    <p class="eyebrow">A&amp;R and commercial rooms</p>
-    <h1>A seat per artist. The words stay theirs.</h1>
-    <p class="lede">Studio is a workspace of artist seats for a room that records more than one person. Each seat is one portable dictionary. The artist signed in on that seat is the only one who can read it or train it.</p>
-
-    <section>
-      <p class="eyebrow">Isolation</p>
-      <h2>The owner runs the room. The owner does not get the vocal.</h2>
-      <div class="grid-2">
-        <article class="card">
-          <h3>What a seat is</h3>
+  <section class="s-section">
+    <div class="s-wrap">
+      <div class="head">
+        <p class="s-eyebrow">Isolation</p>
+        <h2 class="s-h2">The owner runs the room. The owner does not get the vocal.</h2>
+      </div>
+      <div class="s-grid-2">
+        <article class="s-card">
+          <h3 class="s-h3">What a seat is</h3>
           <p>An email plus a display name. The artist signs in with that email inside the plugin. Corrections they apply write that seat’s dictionary and follow that login. The next artist on the same Mac does not inherit it.</p>
         </article>
-        <article class="card">
-          <h3>What the owner can do</h3>
+        <article class="s-card">
+          <h3 class="s-h3">What the owner can do</h3>
           <p>Add a seat, or revoke one. Revoking marks the seat revoked and keeps the dictionary rows. The owner does not see the pairs and does not train them. An operator can suspend the workspace; those seats drop the plugin back to the free local session.</p>
         </article>
       </div>
-      <p class="fine" style="margin-top:0.9rem">That split is enforced in the profile API, not by a promise on this page. The seat dashboard that does the adding and revoking ships with the API. It is not hosted on this website.</p>
-    </section>
+      <p class="s-fine" style="margin-top:20px">That split is enforced in the profile API, not by a promise on this page. The seat dashboard that does the adding and revoking ships with the API. It is not hosted on this website.</p>
+    </div>
+  </section>
 
-    <section>
-      <p class="eyebrow">The room</p>
-      <h2>Same plugin. Separate dictionaries.</h2>
+  <section class="s-section">
+    <div class="s-wrap">
+      <div class="head">
+        <p class="s-eyebrow">The room</p>
+        <h2 class="s-h2">Same plugin. Separate dictionaries.</h2>
+      </div>
       <ul class="plain">
         <li>A commercial room can put a seat on each artist who punches in, so yesterday’s names and ad-libs do not bias today’s vocal.</li>
         <li>A&amp;R can hand a seat to the artist and still not hold their dictionary.</li>
         <li>The clock stays in the plugin, locked to the DAW in front of them. The seat stores correction pairs, not the timeline.</li>
         <li>Logic on Mac is the host we run. This page does not add a Windows room, an iOS booth, or another DAW.</li>
       </ul>
-    </section>
+    </div>
+  </section>
 
-    <section>
-      <p class="eyebrow">Not on this page</p>
-      <h2>No study, no rate, no number.</h2>
-      <p class="lede">There is no case study, no savings figure, and no published price for a room. The Studio tier is the seat model above. The price cell says the same thing as the others: not published yet.</p>
-      <div class="actions">
-        <a class="btn" href="/pricing">See the three tiers</a>
-        <a class="btn ghost" href="/login">Sign-in is not available yet</a>
+  <section class="s-section">
+    <div class="s-wrap">
+      <div class="head">
+        <p class="s-eyebrow">Not on this page</p>
+        <h2 class="s-h2">No study, no rate, no number.</h2>
+        <p class="s-body">There is no case study, no savings figure, and no published price for a room. The Studio tier is the seat model above. The price cell says the same thing as the others: not published yet.</p>
       </div>
-    </section>
-  </main>
+      <div class="s-actions">
+        <a class="s-btn" href="/pricing">See the three tiers</a>
+        <a class="s-btn ghost" href="/login">Sign-in is not available yet</a>
+      </div>
+    </div>
+  </section>
 
-  <footer class="foot">
+    </main>
+  <footer class="s-foot">
     <span>Punch2Pen · Mac first · never a browser engine</span>
-    <span>
+    <nav>
       <a href="/product">Product</a>
-      ·
       <a href="/pricing">Pricing</a>
-      ·
       <a href="/for-studios">Studios</a>
-      ·
       <a href="/creators">Creators</a>
-      ·
       <a href="/docs">Docs</a>
-      ·
       <a href="/login">Sign in</a>
-      ·
       <a href="/privacy">Privacy</a>
-      ·
+      <a href="/sitemap">Sitemap</a>
       <a href="https://github.com/keeganmoody33/punch2pen">Source</a>
-    </span>
+    </nav>
+    <img class="pen" src="/brand/pen-booth.svg" alt="" />
   </footer>
+  <script src="/nav.js"></script>
 </body>
 </html>

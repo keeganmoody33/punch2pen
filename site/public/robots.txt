@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://punch2pen.com/sitemap.xml

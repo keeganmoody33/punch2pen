@@ -5,71 +5,87 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Sign in — Punch2Pen</title>
   <meta name="description" content="Sign-in is email plus a six-digit code for the portable dictionary. Mail delivery is not configured, so sign-in is not available in this build." />
+  <link rel="canonical" href="https://punch2pen.com/login" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Sign in — Punch2Pen" />
+  <meta property="og:description" content="Sign-in is email plus a six-digit code for the portable dictionary. Mail delivery is not configured, so sign-in is not available in this build." />
+  <meta property="og:url" content="https://punch2pen.com/login" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="robots" content="noindex, follow" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/tokens.css" />
   <link rel="stylesheet" href="/site.css" />
 </head>
-<body>
-  <header class="top">
-    <a class="mark" href="/">[ PUNCH<span class="accent">2</span>PEN ]</a>
-    <nav>
+<body class="s-page">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <nav class="s-nav" id="site-nav" aria-label="Main navigation">
+    <a class="wm-link" href="/"><img class="wm" src="/brand/wordmark-booth.svg" alt="Punch2Pen" /></a>
+    <div class="links" id="site-links">
       <a href="/product">Product</a>
       <a href="/pricing">Pricing</a>
       <a href="/for-studios">Studios</a>
       <a href="/creators">Creators</a>
       <a href="/docs">Docs</a>
       <a href="/login" aria-current="page">Sign in</a>
-    </nav>
+    </div>
+    <a class="s-btn primary sm" href="https://github.com/keeganmoody33/punch2pen/releases/latest">Download free</a>
+    <button class="menu" type="button" aria-label="Menu" aria-expanded="false" aria-controls="site-links"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h14M3 10h14M3 14h14"/></svg></button>
+  </nav>
+  <main id="main" tabindex="-1">
+
+  <header class="page-hero">
+    <div class="s-wrap narrow">
+      <p class="s-eyebrow">Account</p>
+      <h1 class="s-h1">Sign-in is for the dictionary. It is not available in this build.</h1>
+      <p class="s-lede">The account system that exists is email, then a six-digit code, to the Convex profile API. You do that in the plugin, so a portable dictionary can hang on a seat. This website is not that client. It will not take a code, and it does not open a portal.</p>
+    </div>
   </header>
 
-  <main class="wrap narrow">
-    <p class="eyebrow">Account</p>
-    <h1>Sign-in is for the dictionary. It is not available in this build.</h1>
-    <p class="lede">The account system that exists is email, then a six-digit code, to the Convex profile API. You do that in the plugin, so a portable dictionary can hang on a seat. This website is not that client. It will not take a code, and it does not open a portal.</p>
-
-    <div class="callout">
-      <p>Mail delivery on the current deployment is unset. Starting sign-in returns <code>delivery_unconfigured</code>: “Sign-in code delivery is not configured on this deployment.” Until a mail provider is configured, the API will not send a code, and the plugin has nothing to verify.</p>
-    </div>
-
-    <section>
-      <h2>What sign-in is, when delivery exists</h2>
+  <section class="s-section">
+    <div class="s-wrap narrow">
+      <div class="s-callout">
+        <p>Mail delivery on the current deployment is unset. Starting sign-in returns <code>delivery_unconfigured</code>: “Sign-in code delivery is not configured on this deployment.” Until a mail provider is configured, the API will not send a code, and the plugin has nothing to verify.</p>
+      </div>
+      <h2 class="s-h2" style="margin-top:40px">What sign-in is, when delivery exists</h2>
       <ol class="plain">
         <li>The profile pill in the plugin opens the account. With no profile API in the build, the plugin already says sign-in is not available.</li>
         <li>You enter the email on the seat. The default signup mode is invite: if that email has no seat, the API answers <code>not_invited</code>. This page cannot create a seat.</li>
         <li>The API emails a six-digit code. The code is hashed, expires after ten minutes, and allows five attempts. This site does not enable the echo mail provider, which would return a code in the API response for development.</li>
         <li>You type the code in the plugin. A bearer session is stored on that Mac at <code>~/.punch2pen/account.json</code> (mode 0600). There is no password in that file and no password on this page.</li>
       </ol>
-      <p>After that, Apply writes the <a href="/docs#corrections">correction pair</a> onto the active seat’s dictionary. The playhead stays in the plugin, locked to the DAW clock. Workspace owners manage seats on the dashboard that ships with the API. That screen is not hosted here.</p>
-    </section>
+      <p class="s-body" style="margin-top:16px">After that, Apply writes the <a href="/docs#corrections">correction pair</a> onto the active seat’s dictionary. The playhead stays in the plugin, locked to the DAW clock. Workspace owners manage seats on the dashboard that ships with the API. That screen is not hosted here.</p>
+    </div>
+  </section>
 
-    <section>
-      <h2>What you can do instead</h2>
-      <p>The free utility does not need an account. Download it, punch in Logic, and correct words in the session. They will not survive an engine restart, and they will not leave the Mac.</p>
-      <div class="actions">
-        <a class="btn primary" href="https://github.com/keeganmoody33/punch2pen/releases/latest">Download Free Utility</a>
-        <a class="btn ghost" href="/pricing">What Pro is, without a price</a>
+  <section class="s-section">
+    <div class="s-wrap narrow">
+      <div class="head">
+        <h2 class="s-h2">What you can do instead</h2>
+        <p class="s-body">The free utility does not need an account. Download it, punch in Logic, and correct words in the session. They will not survive an engine restart, and they will not leave the Mac.</p>
       </div>
-    </section>
-  </main>
+      <div class="s-actions">
+        <a class="s-btn primary" href="https://github.com/keeganmoody33/punch2pen/releases/latest">Download Free Utility</a>
+        <a class="s-btn ghost" href="/pricing">What Pro is, without a price</a>
+      </div>
+    </div>
+  </section>
 
-  <footer class="foot">
+    </main>
+  <footer class="s-foot">
     <span>Punch2Pen · Mac first · never a browser engine</span>
-    <span>
+    <nav>
       <a href="/product">Product</a>
-      ·
       <a href="/pricing">Pricing</a>
-      ·
       <a href="/for-studios">Studios</a>
-      ·
       <a href="/creators">Creators</a>
-      ·
       <a href="/docs">Docs</a>
-      ·
       <a href="/login">Sign in</a>
-      ·
       <a href="/privacy">Privacy</a>
-      ·
+      <a href="/sitemap">Sitemap</a>
       <a href="https://github.com/keeganmoody33/punch2pen">Source</a>
-    </span>
+    </nav>
+    <img class="pen" src="/brand/pen-booth.svg" alt="" />
   </footer>
+  <script src="/nav.js"></script>
 </body>
 </html>

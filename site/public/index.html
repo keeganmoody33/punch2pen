@@ -4,14 +4,225 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Punch2Pen — stop rewriting lyrics after punch-ins</title>
-  <meta name="description" content="Mac DAW plugin that transcribes vocals in the session. Living Transcript on the DAW clock. Free local utility. Paid profile is the portable dictionary. No prices yet." />
+  <meta name="description" content="Mac DAW plugin that transcribes vocals in the session. Living Transcript on the DAW clock. Free local utility. Planned paid profiles carry the dictionary. No prices yet." />
+  <link rel="canonical" href="https://punch2pen.com/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Punch2Pen — stop rewriting lyrics after punch-ins" />
+  <meta property="og:description" content="Mac DAW plugin that transcribes vocals in the session. Living Transcript on the DAW clock. Free local utility. Planned paid profiles carry the dictionary. No prices yet." />
+  <meta property="og:url" content="https://punch2pen.com/" />
+  <meta name="twitter:card" content="summary" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/tokens.css" />
+  <link rel="stylesheet" href="/pad.css" />
+  <link rel="stylesheet" href="/plugin-frame.css" />
+  <link rel="stylesheet" href="/shaders.css" />
   <link rel="stylesheet" href="/site.css" />
   <script src="/env.js"></script>
 </head>
-<body>
-  <header class="top">
-    <a class="mark" href="/">[ PUNCH<span class="accent">2</span>PEN ]</a>
+<body class="s-page">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <nav class="s-nav" id="site-nav" aria-label="Main navigation">
+    <a class="wm-link" href="/"><img class="wm" src="/brand/wordmark-booth.svg" alt="Punch2Pen" /></a>
+    <div class="links" id="site-links">
+      <a href="/product">Product</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/for-studios">Studios</a>
+      <a href="/creators">Creators</a>
+      <a href="/docs">Docs</a>
+      <a href="/login">Sign in</a>
+    </div>
+    <a class="s-btn primary sm" id="nav-download" href="https://github.com/keeganmoody33/punch2pen/releases/latest">Download free</a>
+    <button class="menu" type="button" aria-label="Menu" aria-expanded="false" aria-controls="site-links">
+      <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h14M3 10h14M3 14h14"/></svg>
+    </button>
+  </nav>
+  <main id="main" tabindex="-1">
+
+  <header class="hero">
+    <div class="fx" data-p2p-shader="booth-glow"></div>
+    <img class="bolt" src="/brand/bolt-booth.svg" alt="" />
+    <div class="s-wrap">
+      <div class="copy">
+        <p class="s-eyebrow">Mac AU + VST3 · Logic</p>
+        <h1 class="s-h1">You punched the line. <em>Don’t rewrite it</em> by ear.</h1>
+        <p class="s-lede">Punch2Pen transcribes vocals inside the session. After a punch-in, the take is already written: word under the playhead, active line as the title. Click a mis-hear. On the free utility the correction stays in that session. The planned Pro profile carries the dictionary; sign-in is not available in this build.</p>
+        <div class="s-actions">
+          <a class="s-btn primary" id="download-btn" href="https://github.com/keeganmoody33/punch2pen/releases/latest"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/></svg>Download Free Utility</a>
+          <a class="s-btn ghost" href="/pricing">Free, Pro, Studio</a>
+        </div>
+        <p class="s-fine">Unsigned pkg from GitHub Release. Gatekeeper will warn. Mac only. No Windows build.</p>
+      </div>
+      <div class="p-window" data-mode="playback">
+        <header class="p-header">
+          <img class="p-wordmark" src="/brand/wordmark-plugin.svg" alt="Punch2Pen" />
+          <span class="p-pill" data-kind="local"><span class="dot"></span><span class="name">Local</span></span>
+          <span class="p-spacer"></span>
+          <span class="p-badge is-play">Play</span>
+        </header>
+        <div class="p-transport"><span>BAR <b>19</b> · BEAT <b>3</b></span><span class="desk-clock"><b>120</b> BPM</span><span class="desk-clock"><b>00:00:37.012</b></span><span class="p-sync">LIVE</span></div>
+        <div class="p-pane">
+          <div class="p-lines" style="--lines-top: 90px">
+            <div class="p-line is-past desk-line"><span class="p-word">late</span><span class="p-word">night</span><span class="p-word">in</span><span class="p-word">the</span><span class="p-word">booth</span><span class="p-word">red</span><span class="p-word">light</span><span class="p-word">on</span><span class="p-word">the</span><span class="p-word">wall</span></div>
+            <div class="p-line is-past"><span class="p-word">punch</span><span class="p-word">it</span><span class="p-word">back</span><span class="p-word">to</span><span class="p-word">the</span><span class="p-word is-corrected">top</span><span class="p-word">I</span><span class="p-word">don’t</span><span class="p-word">miss</span><span class="p-word">the</span><span class="p-word">call</span></div>
+            <div class="p-line is-active"><span class="p-word is-past">every</span><span class="p-word is-past">word</span><span class="p-word is-past">I</span><span class="p-word is-past">drop</span><span class="p-word is-active">lands</span><span class="p-word">right</span><span class="p-word">where</span><span class="p-word">it</span><span class="p-word">should</span></div>
+            <div class="p-line"><span class="p-word">pen</span><span class="p-word">it</span><span class="p-word">down</span><span class="p-word">run</span><span class="p-word">it</span><span class="p-word">back</span><span class="p-word">make</span><span class="p-word">it</span><span class="p-word">understood</span></div>
+            <div class="p-line desk-line"><span class="p-word">second</span><span class="p-word">verse</span><span class="p-word">same</span><span class="p-word">booth</span><span class="p-word">the</span><span class="p-word">take</span><span class="p-word">is</span><span class="p-word">getting</span><span class="p-word">tight</span></div>
+          </div>
+        </div>
+        <footer class="p-status"><span class="text">Following the playhead · click a word to correct it</span><img class="p-logo" src="/brand/two-plugin.svg" alt="" /></footer>
+      </div>
+    </div>
+  </header>
+
+  <section class="s-section">
+    <div class="s-wrap stack">
+      <div class="mess">
+        <div style="display:flex; flex-direction:column; gap:16px">
+          <p class="s-eyebrow">The mess</p>
+          <h2 class="s-h2">Punch-in, then the lyric is gone.</h2>
+        </div>
+        <p class="s-body" style="font-size:20px">You drop in on bar 17. The vocal is right. Ten minutes later you are typing what you think you said, or bouncing stems so someone else can guess. Punch2Pen is the Living Transcript in the plugin: the word under the playhead, on the host clock, while you still have the headphones on.</p>
+      </div>
+      <div class="s-grid-2">
+        <div class="s-card">
+          <span class="icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 6h14M3 10h9M3 14h11"/><rect x="12.5" y="8" width="5" height="4" rx="1" fill="currentColor" stroke="none"/></svg></span>
+          <h3 class="s-h3">Living Transcript</h3>
+          <p>Highlight the word under the playhead. Treat the active line as a title. Past, active, and upcoming sit in a temporal hierarchy. Return to live when you scroll. Click a word to correct it.</p>
+        </div>
+        <div class="s-card">
+          <span class="icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="10" rx="1.5"/><path d="M7 17h6M10 14v3"/></svg></span>
+          <h3 class="s-h3">Local first</h3>
+          <p>Free talks to an engine on the Mac. Generic speech-to-text. No account. No cloud. The correction lives in that session, then it is gone. Paid is the portable dictionary and the correction loop. The playhead stays locked to the DAW clock.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="s-section" id="download">
+    <div class="s-wrap dl">
+      <div style="display:flex; flex-direction:column; gap:40px">
+        <div class="head" style="margin:0">
+          <p class="s-eyebrow">Mac download</p>
+          <h2 class="s-h2">Install the plugin. Punch. Read it back.</h2>
+          <p class="s-body">AU + VST3 + local engine in one unsigned pkg. The Whisper model is not baked into the installer; postinstall fetches it when it is missing. <a href="/docs">Install notes</a>.</p>
+          <p class="s-note phone-only">The installer is for a Mac. On this phone, send yourself the link.</p>
+        </div>
+        <div class="s-steps">
+          <div class="s-step"><span class="n">1</span><b>Open the pkg</b><p>Quit Logic first. Right-click Open if Gatekeeper blocks the unsigned installer.</p></div>
+          <div class="s-step"><span class="n">2</span><b>Insert on a vocal track</b><p>The editor leaves WAIT once the local engine answers.</p></div>
+          <div class="s-step"><span class="n">3</span><b>Punch in, read it back</b><p>Words land on the host clock. Click a mis-hear to fix every match.</p></div>
+        </div>
+      </div>
+      <div class="panel">
+        <label class="s-field">
+          <span>Which DAW are you punching in? (optional)</span>
+          <select class="s-select" id="daw" name="daw">
+            <option value="">Prefer not to say</option>
+            <option value="logic">Logic</option>
+            <option value="ableton">Ableton</option>
+            <option value="reaper">REAPER</option>
+            <option value="pro-tools">Pro Tools</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <p class="s-note">That menu is interest, not a compatibility list. <a href="/product">What actually ships</a>.</p>
+        <div class="s-actions">
+          <a class="s-btn primary desk-only" id="mac-download" href="https://github.com/keeganmoody33/punch2pen/releases/latest">Download Mac pkg</a>
+          <button class="s-btn primary phone-only" type="button" id="copy-download" hidden>Copy download link</button>
+          <a class="s-btn ghost" href="https://github.com/keeganmoody33/punch2pen/releases">All GitHub Releases</a>
+        </div>
+        <p role="status" class="s-note" id="download-status">The button opens the latest GitHub Release. JavaScript checks for a Mac package.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="s-section">
+    <div class="s-wrap">
+      <div class="head">
+        <p class="s-eyebrow">Free / Pro / Studio</p>
+        <h2 class="s-h2">Prices are not set. The split is.</h2>
+      </div>
+      <div class="tiers">
+        <div class="pad s-tier has-fx">
+          <div class="fx" data-p2p-shader="pad-card" data-p2p-static data-p2p-params='{"seed": 3}'></div>
+          <div class="pad-head"><h3 class="pad-title">Free</h3></div>
+          <div class="pad-lines">
+            <div class="pad-line"><span class="tick">✓</span>Local generic speech-to-text</div>
+            <div class="pad-line"><span class="tick">✓</span>No account, no cloud</div>
+            <div class="pad-line"><span class="tick">·</span>Corrections last this session</div>
+            <div class="pad-line"><span class="price">Not published yet</span></div>
+          </div>
+        </div>
+        <div class="pad s-tier has-fx">
+          <div class="fx" data-p2p-shader="pad-card" data-p2p-static data-p2p-params='{"seed": 6}'></div>
+          <div class="pad-head"><h3 class="pad-title">Pro · planned</h3></div>
+          <div class="pad-lines">
+            <div class="pad-line"><span class="tick">✓</span>Login and portable dictionary</div>
+            <div class="pad-line"><span class="tick">✓</span>Correction loop, cross-DAW</div>
+            <div class="pad-line"><span class="tick">·</span>The clock stays in the plugin</div>
+            <div class="pad-line"><span class="price">Not published yet</span></div>
+          </div>
+        </div>
+        <div class="pad s-tier has-fx">
+          <div class="fx" data-p2p-shader="pad-card" data-p2p-static data-p2p-params='{"seed": 9}'></div>
+          <div class="pad-head"><h3 class="pad-title">Studio · planned</h3></div>
+          <div class="pad-lines">
+            <div class="pad-line"><span class="tick">✓</span>Isolated artist seats for a room</div>
+            <div class="pad-line"><span class="tick">✓</span>The owner hands out logins</div>
+            <div class="pad-line"><span class="tick">·</span>Each dictionary stays with that artist</div>
+            <div class="pad-line"><span class="price">Not published yet</span></div>
+          </div>
+        </div>
+      </div>
+      <p class="s-fine" style="margin-top:28px"><a href="/pricing">The full split</a>. The upgrade nudge in the plugin shows up after you actually correct a word. It is not a blocking modal, and it is not a number.</p>
+    </div>
+  </section>
+
+  <section class="s-section" id="interest">
+    <div class="s-wrap interest">
+      <div class="head" style="margin:0">
+        <p class="s-eyebrow">Interest</p>
+        <h2 class="s-h2">Would you pay for the portable dictionary?</h2>
+        <p class="s-body">No SKU. No invented number. If the local punch already saved a session, say so.</p>
+        <div class="s-actions">
+          <button class="s-btn primary" type="button" id="would-pay">I would pay for it</button>
+          <button class="s-btn ghost" type="button" id="just-looking">Just looking</button>
+        </div>
+        <p role="status" class="s-note" id="interest-status"></p>
+      </div>
+      <form id="waitlist">
+        <p class="s-fine" id="waitlist-privacy">If interest recording is enabled, your email is sent to PostHog. <a href="/privacy">Privacy details</a>.</p>
+        <noscript><p class="s-note">Interest recording requires JavaScript. This form is disabled and sends nothing.</p></noscript>
+        <label class="s-field">
+          <span>Waitlist email (optional)</span>
+          <input class="s-input" id="email" name="email" aria-describedby="waitlist-privacy" disabled type="email" autocomplete="email" placeholder="you@studio.com" />
+        </label>
+        <div class="s-actions">
+          <button class="s-btn" type="submit" disabled>Notify me when Pro exists</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="s-section band">
+    <div class="s-wrap band-in">
+      <div class="fx-mark heat" data-p2p-shader="punch-heat" data-image="/brand/fist-booth.svg">
+        <img class="fx-fallback" src="/brand/fist-booth.svg" alt="" />
+      </div>
+      <div style="display:flex; flex-direction:column; gap:24px">
+        <p class="s-eyebrow">Punch2Pen</p>
+        <h2 class="s-h1 punch-title">Punch in.<br /><em>Pen</em> it.</h2>
+        <p class="s-lede">After a punch-in, the take is already written.</p>
+        <div class="s-actions">
+          <a class="s-btn primary" id="band-download" href="#download">Download Free Utility</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+    </main>
+  <footer class="s-foot">
+    <span>Punch2Pen · Mac first · never a browser engine</span>
     <nav>
       <a href="/product">Product</a>
       <a href="/pricing">Pricing</a>
@@ -19,165 +230,17 @@
       <a href="/creators">Creators</a>
       <a href="/docs">Docs</a>
       <a href="/login">Sign in</a>
-    </nav>
-  </header>
-
-  <main class="wrap">
-    <section class="hero" id="top">
-      <div>
-        <p class="eyebrow">Mac AU + VST3 · Logic</p>
-        <h1>You punched the line.<br />Don’t rewrite it by ear.</h1>
-        <p class="lede">Punch2Pen transcribes vocals <strong>inside the session</strong>. After a punch-in, the take is already written — word under the playhead, active line as the title. Click a mis-hear. On the free utility the correction stays in that session. Signed in, it lands in the portable dictionary.</p>
-        <div class="actions">
-          <a class="btn primary" id="download-btn" href="https://github.com/keeganmoody33/punch2pen/releases/latest">Download Free Utility</a>
-          <a class="btn ghost" href="/pricing">Free, Pro, Studio</a>
-        </div>
-        <p class="fine">Unsigned pkg from GitHub Release. Gatekeeper will warn. Mac only. No Windows build.</p>
-      </div>
-
-      <div id="receipt">
-        <p class="eyebrow">Studio Receipt · two real states</p>
-        <div class="split-toggle" role="group" aria-label="Which state of the receipt">
-          <button type="button" id="tier-free" aria-pressed="true">Free local session</button>
-          <button type="button" id="tier-paid" aria-pressed="false">Signed-in dictionary</button>
-        </div>
-        <figure class="plugin-frame">
-          <div class="pf-header">
-            <span>[ PUNCH<span class="accent">2</span>PEN ]</span>
-            <span class="pill" id="receipt-pill">Local</span>
-            <span class="badge">Play</span>
-          </div>
-          <div class="pf-transport">
-            Bar <span class="num">3</span> · Beat <span class="num">2</span>
-            <span class="live">Live</span>
-          </div>
-          <div class="pf-lyrics">
-            <p class="past">late night in the booth</p>
-            <p class="active">punch it back to the <button type="button" class="word" id="receipt-word">topp</button></p>
-            <p class="next">every word I drop lands</p>
-          </div>
-          <div class="pf-sheet" id="receipt-sheet" hidden>
-            <span>topp →</span>
-            <input id="receipt-correction" type="text" value="top" maxlength="64" spellcheck="false" autocomplete="off" aria-label="Corrected spelling" />
-            <button type="button" class="btn primary" id="receipt-apply">Apply</button>
-            <button type="button" class="btn ghost" id="receipt-cancel">Cancel</button>
-          </div>
-          <div class="pf-status" id="receipt-status">Following the playhead · click a word to correct it</div>
-        </figure>
-        <div class="dict-panel" id="dict-panel">
-          <p class="eyebrow">This session</p>
-          <p>No account. Corrections stay in memory on this Mac and drop when the engine restarts. Nothing is written.</p>
-        </div>
-        <p class="fine">Bar and beat are the DAW clock inside the plugin. The switch shows where the same correction lands. The clock does not move into the account.</p>
-        <button type="button" class="btn ghost" id="receipt-replay">Replay the mis-hear</button>
-        <noscript>
-          <p class="fine">Free local session keeps the pair in memory. A signed-in dictionary writes it on the seat. Both states leave bar and beat in the plugin.</p>
-        </noscript>
-      </div>
-    </section>
-
-    <section id="problem">
-      <p class="eyebrow">The mess</p>
-      <h2>Punch-in, then the lyric is gone.</h2>
-      <p class="lede">You drop in on bar 17. The vocal is right. Ten minutes later you are typing what you think you said, or bouncing stems so someone else can guess. DAWs will ship speech-to-text. Punch2Pen is the Living Transcript in the plugin: the word under the playhead, on the host clock, while you still have the headphones on.</p>
-      <div class="grid-2" style="margin-top:1.2rem">
-        <article class="card">
-          <h3>Living Transcript</h3>
-          <p>Highlight the word under the playhead. Treat the active line as a title. Past / active / upcoming sit in a temporal hierarchy. Return to live when you scroll. Click a word to correct it.</p>
-        </article>
-        <article class="card">
-          <h3>Local first</h3>
-          <p>Free / lite talks to an engine on the Mac. Generic speech-to-text. No account. No cloud. The correction lives in that session, then it is gone. Paid is the portable dictionary and the correction loop. The playhead stays locked to the DAW clock.</p>
-        </article>
-      </div>
-    </section>
-
-    <section id="download">
-      <p class="eyebrow">Mac download</p>
-      <h2>Install the plugin. Punch. Read it back.</h2>
-      <p class="lede">AU + VST3 + local engine in one unsigned pkg. Bundle codes stay <strong>Dcta / P2pn / aufx</strong>. The Whisper model is not baked into the installer; postinstall fetches it when it is missing. <a href="/docs">Install notes</a>.</p>
-      <label class="field">
-        <span>Which DAW are you punching in? (optional, for interest). Logic is the host we run.</span>
-        <select id="daw" name="daw">
-          <option value="">Prefer not to say</option>
-          <option value="logic">Logic</option>
-          <option value="ableton">Ableton</option>
-          <option value="reaper">REAPER</option>
-          <option value="pro-tools">Pro Tools</option>
-          <option value="other">Other</option>
-        </select>
-      </label>
-      <p class="fine">That menu is interest, not a compatibility list. <a href="/product">What actually ships</a>.</p>
-      <div class="actions">
-        <a class="btn primary" id="mac-download" href="https://github.com/keeganmoody33/punch2pen/releases/latest">Download Mac pkg</a>
-        <a class="btn" href="https://github.com/keeganmoody33/punch2pen/releases">All GitHub Releases</a>
-      </div>
-      <p class="note" id="download-status">Looking up the latest GitHub Release…</p>
-    </section>
-
-    <section id="plans">
-      <p class="eyebrow">Free / Pro / Studio</p>
-      <h2>Prices are not set. The split is.</h2>
-      <div class="tier-grid">
-        <article class="card">
-          <h3>Free</h3>
-          <p>Local generic speech-to-text. No cloud. No persistent dictionary.</p>
-          <p class="price">Not published yet</p>
-        </article>
-        <article class="card paid">
-          <h3>Pro</h3>
-          <p>Login, portable dictionary, correction loop, cross-DAW. The dictionary follows the seat. The clock stays in the plugin.</p>
-          <p class="price">Not published yet</p>
-        </article>
-        <article class="card">
-          <h3>Studio</h3>
-          <p>Isolated artist seats for a room. The owner hands out logins. Each dictionary stays with that artist.</p>
-          <p class="price">Not published yet</p>
-        </article>
-      </div>
-      <p class="fine" style="margin-top:0.9rem"><a href="/pricing">The full split</a>. The upgrade nudge in the plugin shows up after you actually correct a word — not a blocking modal, and not a number.</p>
-    </section>
-
-    <section id="interest">
-      <p class="eyebrow">Interest</p>
-      <h2>Would you pay for the portable dictionary?</h2>
-      <p class="lede">No SKU. No invented number. If the local punch already saved a session, say so — that is the gate before ads.</p>
-      <div class="actions">
-        <button type="button" class="btn primary" id="would-pay">I would pay for the portable dictionary</button>
-        <button type="button" class="btn" id="just-looking">Just looking</button>
-      </div>
-      <form id="waitlist" style="margin-top:1rem">
-        <label class="field">
-          <span>Waitlist email (optional)</span>
-          <input type="email" id="email" name="email" autocomplete="email" placeholder="you@studio.example" />
-        </label>
-        <button type="submit" class="btn">Notify me when paid / pro exists</button>
-      </form>
-      <p class="note" id="interest-status"></p>
-    </section>
-  </main>
-
-  <footer class="foot">
-    <span>Punch2Pen · Mac first · never a browser engine</span>
-    <span>
-      <a href="/product">Product</a>
-      ·
-      <a href="/pricing">Pricing</a>
-      ·
-      <a href="/for-studios">Studios</a>
-      ·
-      <a href="/creators">Creators</a>
-      ·
-      <a href="/docs">Docs</a>
-      ·
-      <a href="/login">Sign in</a>
-      ·
       <a href="/privacy">Privacy</a>
-      ·
+      <a href="/sitemap">Sitemap</a>
       <a href="https://github.com/keeganmoody33/punch2pen">Source</a>
-    </span>
+    </nav>
+    <img class="pen" src="/brand/pen-booth.svg" alt="" />
   </footer>
-
+  <script src="/nav.js"></script>
   <script src="/site.js"></script>
+  <script type="module">
+    import { autoMount } from "/shaders/p2p-shaders.js";
+    autoMount();
+  </script>
 </body>
 </html>
