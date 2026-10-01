@@ -103,4 +103,6 @@ if ! grep -q '"punch2pen.com"' wrangler.jsonc || ! grep -q '"www.punch2pen.com"'
   fail=1
 fi
 
+node scripts/check-structure.mjs || fail=1
+
 exit "$fail"

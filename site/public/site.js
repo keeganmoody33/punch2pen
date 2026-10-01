@@ -52,6 +52,8 @@
           persistence: "localStorage+cookie",
           capture_pageview: true,
           capture_pageleave: true,
+          autocapture: false,
+          disable_session_recording: true,
         });
         posthogReady = true;
         resolve(true);
@@ -63,24 +65,24 @@
 
   async function loadRelease() {
     try {
-      const res = await fetch(RELEASES, { headers: { Accept: "application/vnd.github+json" } });
+      const res = await fetch(RELEASES, { headers: { Accept: "application/vnd.github+json" }, signal: AbortSignal.timeout(8000) });
       if (!res.ok) throw new Error("release lookup failed");
       const data = await res.json();
       releaseTag = data.tag_name || "";
       const assets = Array.isArray(data.assets) ? data.assets : [];
       const pkg = assets.find((a) => typeof a.name === "string" && a.name.toLowerCase().endsWith(".pkg"));
-      if (pkg && pkg.browser_download_url) {
+      if (pkg && typeof pkg.browser_download_url === "string" && pkg.browser_download_url.startsWith("https://github.com/keeganmoody33/punch2pen/releases/download/")) {
         downloadUrl = pkg.browser_download_url;
         assetName = pkg.name;
-        if (macBtn) macBtn.href = downloadUrl;
+        [macBtn, heroBtn, navBtn].filter(Boolean).forEach(button => { button.href = downloadUrl; });
         setNote(
           statusDownload,
-          `Latest Release ${releaseTag}: ${assetName}. Unsigned. Right-click open if Gatekeeper blocks.`,
+          `Latest Release ${releaseTag}: ${assetName}. Unsigned and not notarized. Review the install notes before opening.`,
           "ok"
         );
       } else {
-        downloadUrl = data.html_url || RELEASE_PAGE;
-        if (macBtn) macBtn.href = downloadUrl;
+        downloadUrl = RELEASE_PAGE;
+        [macBtn, heroBtn, navBtn].filter(Boolean).forEach(button => { button.href = downloadUrl; });
         setNote(
           statusDownload,
           releaseTag
@@ -91,7 +93,7 @@
       }
     } catch (err) {
       downloadUrl = RELEASE_PAGE;
-      if (macBtn) macBtn.href = RELEASE_PAGE;
+      [macBtn, heroBtn, navBtn].filter(Boolean).forEach(button => { button.href = RELEASE_PAGE; });
       setNote(
         statusDownload,
         "Could not read GitHub Releases from here. Button goes to the latest Release page.",
@@ -111,26 +113,22 @@
     if (!assetName) {
       track("download_unavailable", { source, daw: dawValue(), release_tag: releaseTag });
     }
-    if (!sent && statusDownload && source !== "band") {
-      const extra = " Analytics key is not configured, so this click was not sent to PostHog.";
-      const cur = statusDownload.textContent || "";
-      if (cur.indexOf("Analytics key is not configured") === -1) {
-        setNote(statusDownload, cur + extra, "warn");
-      }
-    }
+
   }
 
   if (macBtn) macBtn.addEventListener("click", () => onDownloadClick("mac_pkg", downloadUrl));
-  if (heroBtn) heroBtn.addEventListener("click", () => onDownloadClick("hero", RELEASE_PAGE));
-  if (navBtn) navBtn.addEventListener("click", () => onDownloadClick("nav", RELEASE_PAGE));
-  if (copyBtn) {
+  if (heroBtn) heroBtn.addEventListener("click", () => onDownloadClick("hero", downloadUrl));
+  if (navBtn) navBtn.addEventListener("click", () => onDownloadClick("nav", downloadUrl));
+  if (copyBtn && navigator.clipboard && window.isSecureContext) {
+    copyBtn.hidden = false;
+    document.documentElement.classList.add("can-copy");
     copyBtn.addEventListener("click", async () => {
       onDownloadClick("copy_link", downloadUrl);
       try {
         await navigator.clipboard.writeText(downloadUrl);
         setNote(statusDownload, "Download link copied. Open it on the Mac you record on.", "ok");
       } catch (err) {
-        setNote(statusDownload, "Could not copy from this browser. The release page is " + downloadUrl, "warn");
+        setNote(statusDownload, "Could not copy automatically. Copy the GitHub Releases link: " + downloadUrl, "warn");
       }
     });
   }
@@ -143,7 +141,7 @@
         statusInterest,
         sent
           ? "Recorded. No price was attached — we only needed the signal."
-          : "Wired. PostHog key is missing on this host, so the click stayed in the browser.",
+          : "Interest recording is unavailable here. Your click was not stored.",
         sent ? "ok" : "warn"
       );
     });
@@ -159,6 +157,7 @@
 
   const waitlist = document.getElementById("waitlist");
   if (waitlist) {
+    waitlist.querySelectorAll("input, button").forEach(control => { control.disabled = false; });
     waitlist.addEventListener("submit", (ev) => {
       ev.preventDefault();
       const emailEl = document.getElementById("email");
@@ -174,8 +173,8 @@
       setNote(
         statusInterest,
         sent
-          ? "On the list. We will not invent a price in the follow-up."
-          : "PostHog is not configured, so that email was not stored anywhere.",
+          ? "Your interest was recorded. Pro is not available yet."
+          : "Interest recording is unavailable here. Your email was not stored.",
         sent ? "ok" : "warn"
       );
     });

@@ -4,7 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Punch2Pen — stop rewriting lyrics after punch-ins</title>
-  <meta name="description" content="Mac DAW plugin that transcribes vocals in the session. Living Transcript on the DAW clock. Free local utility. Paid profile is the portable dictionary. No prices yet." />
+  <meta name="description" content="Mac DAW plugin that transcribes vocals in the session. Living Transcript on the DAW clock. Free local utility. Planned paid profiles carry the dictionary. No prices yet." />
+  <link rel="canonical" href="https://punch2pen.com/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Punch2Pen — stop rewriting lyrics after punch-ins" />
+  <meta property="og:description" content="Mac DAW plugin that transcribes vocals in the session. Living Transcript on the DAW clock. Free local utility. Planned paid profiles carry the dictionary. No prices yet." />
+  <meta property="og:url" content="https://punch2pen.com/" />
+  <meta name="twitter:card" content="summary" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/tokens.css" />
   <link rel="stylesheet" href="/pad.css" />
@@ -14,7 +20,8 @@
   <script src="/env.js"></script>
 </head>
 <body class="s-page">
-  <nav class="s-nav" id="site-nav">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <nav class="s-nav" id="site-nav" aria-label="Main navigation">
     <a class="wm-link" href="/"><img class="wm" src="/brand/wordmark-booth.svg" alt="Punch2Pen" /></a>
     <div class="links" id="site-links">
       <a href="/product">Product</a>
@@ -29,6 +36,7 @@
       <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h14M3 10h14M3 14h14"/></svg>
     </button>
   </nav>
+  <main id="main" tabindex="-1">
 
   <header class="hero">
     <div class="fx" data-p2p-shader="booth-glow"></div>
@@ -37,7 +45,7 @@
       <div class="copy">
         <p class="s-eyebrow">Mac AU + VST3 · Logic</p>
         <h1 class="s-h1">You punched the line. <em>Don’t rewrite it</em> by ear.</h1>
-        <p class="s-lede">Punch2Pen transcribes vocals inside the session. After a punch-in, the take is already written: word under the playhead, active line as the title. Click a mis-hear. On the free utility the correction stays in that session. Signed in, it lands in the portable dictionary.</p>
+        <p class="s-lede">Punch2Pen transcribes vocals inside the session. After a punch-in, the take is already written: word under the playhead, active line as the title. Click a mis-hear. On the free utility the correction stays in that session. The planned Pro profile carries the dictionary; sign-in is not available in this build.</p>
         <div class="s-actions">
           <a class="s-btn primary" id="download-btn" href="https://github.com/keeganmoody33/punch2pen/releases/latest"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/></svg>Download Free Utility</a>
           <a class="s-btn ghost" href="/pricing">Free, Pro, Studio</a>
@@ -120,10 +128,10 @@
         <p class="s-note">That menu is interest, not a compatibility list. <a href="/product">What actually ships</a>.</p>
         <div class="s-actions">
           <a class="s-btn primary desk-only" id="mac-download" href="https://github.com/keeganmoody33/punch2pen/releases/latest">Download Mac pkg</a>
-          <button class="s-btn primary phone-only" type="button" id="copy-download">Copy download link</button>
+          <button class="s-btn primary phone-only" type="button" id="copy-download" hidden>Copy download link</button>
           <a class="s-btn ghost" href="https://github.com/keeganmoody33/punch2pen/releases">All GitHub Releases</a>
         </div>
-        <p class="s-note" id="download-status">Looking up the latest GitHub Release…</p>
+        <p role="status" class="s-note" id="download-status">The button opens the latest GitHub Release. JavaScript checks for a Mac package.</p>
       </div>
     </div>
   </section>
@@ -147,7 +155,7 @@
         </div>
         <div class="pad s-tier has-fx">
           <div class="fx" data-p2p-shader="pad-card" data-p2p-static data-p2p-params='{"seed": 6}'></div>
-          <div class="pad-head"><h3 class="pad-title">Pro</h3></div>
+          <div class="pad-head"><h3 class="pad-title">Pro · planned</h3></div>
           <div class="pad-lines">
             <div class="pad-line"><span class="tick">✓</span>Login and portable dictionary</div>
             <div class="pad-line"><span class="tick">✓</span>Correction loop, cross-DAW</div>
@@ -157,7 +165,7 @@
         </div>
         <div class="pad s-tier has-fx">
           <div class="fx" data-p2p-shader="pad-card" data-p2p-static data-p2p-params='{"seed": 9}'></div>
-          <div class="pad-head"><h3 class="pad-title">Studio</h3></div>
+          <div class="pad-head"><h3 class="pad-title">Studio · planned</h3></div>
           <div class="pad-lines">
             <div class="pad-line"><span class="tick">✓</span>Isolated artist seats for a room</div>
             <div class="pad-line"><span class="tick">✓</span>The owner hands out logins</div>
@@ -180,15 +188,17 @@
           <button class="s-btn primary" type="button" id="would-pay">I would pay for it</button>
           <button class="s-btn ghost" type="button" id="just-looking">Just looking</button>
         </div>
-        <p class="s-note" id="interest-status"></p>
+        <p role="status" class="s-note" id="interest-status"></p>
       </div>
       <form id="waitlist">
+        <p class="s-fine" id="waitlist-privacy">If interest recording is enabled, your email is sent to PostHog. <a href="/privacy">Privacy details</a>.</p>
+        <noscript><p class="s-note">Interest recording requires JavaScript. This form is disabled and sends nothing.</p></noscript>
         <label class="s-field">
           <span>Waitlist email (optional)</span>
-          <input class="s-input" id="email" name="email" type="email" autocomplete="email" placeholder="you@studio.com" />
+          <input class="s-input" id="email" name="email" aria-describedby="waitlist-privacy" disabled type="email" autocomplete="email" placeholder="you@studio.com" />
         </label>
         <div class="s-actions">
-          <button class="s-btn" type="submit">Notify me when Pro exists</button>
+          <button class="s-btn" type="submit" disabled>Notify me when Pro exists</button>
         </div>
       </form>
     </div>
@@ -210,6 +220,7 @@
     </div>
   </section>
 
+    </main>
   <footer class="s-foot">
     <span>Punch2Pen · Mac first · never a browser engine</span>
     <nav>
@@ -220,6 +231,7 @@
       <a href="/docs">Docs</a>
       <a href="/login">Sign in</a>
       <a href="/privacy">Privacy</a>
+      <a href="/sitemap">Sitemap</a>
       <a href="https://github.com/keeganmoody33/punch2pen">Source</a>
     </nav>
     <img class="pen" src="/brand/pen-booth.svg" alt="" />

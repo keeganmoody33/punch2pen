@@ -1,0 +1,4 @@
+Inter Latin variable 100–900; source https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap
+Downloaded from https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2
+SHA256 c940764593d0fe5d596be327ca7558855e018039fb78509aa21921fd3644c3e4
+License: Inter-OFL.txt

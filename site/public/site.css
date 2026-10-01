@@ -439,3 +439,36 @@ dl.specs dd { margin: 8px 0 0; color: var(--ink-2); }
   .p-badge.is-rec::before,
   .p-banner::before { animation: none; }
 }
+
+/* Progressive navigation and access helpers; preserve the paper-frame layout. */
+.skip-link { position: fixed; top: -100px; left: 16px; z-index: 10; padding: 12px; background: var(--bg-chrome); color: var(--ink); }
+.skip-link:focus { top: 8px; }
+#main:focus { outline: none; }
+html { scroll-padding-top: 80px; }
+code { overflow-wrap: anywhere; }
+[hidden] { display: none !important; }
+.s-nav .menu, .s-nav .links a { min-height: 44px; }
+.s-nav .links a { display: inline-flex; align-items: center; }
+@media (max-width: 720px) {
+  html:not(.has-navigation) .s-nav { height: auto; min-height: 56px; flex-wrap: wrap; gap: 12px; padding-block: 12px; }
+  html:not(.has-navigation) .s-nav .links { display: flex; width: 100%; flex-wrap: wrap; gap: 8px 16px; margin-left: 0; }
+  html:not(.has-navigation) .s-nav .menu { display: none; }
+  html:not(.can-copy) .desk-only { display: inline-flex !important; }
+}
+
+@font-face {
+  font-family: Inter;
+  src: url('/fonts/inter-latin-var.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+/* Current Paper file uses Inter for words and Menlo for labels. */
+:root { --sans: "Inter", system-ui, sans-serif; --mono: "Menlo", ui-monospace, Consolas, monospace; }
+@media (max-width: 720px) {
+  .hero { padding: 40px 0 48px; }
+  .hero .s-wrap { gap: 36px; }
+}
+@media (max-width: 720px) { .band { display: none; } }
+
+@media (max-width: 720px) { .s-grid-2 { grid-template-columns: 1fr; } }
