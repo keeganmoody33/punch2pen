@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<meta name="paper:artboard" content="Site / 20 Components" data-width="1440" data-height="2629">
+<title>Site Components · Punch2Pen</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap">
+<link rel="stylesheet" href="../tokens/tokens.css">
+<link rel="stylesheet" href="../components/pad.css">
+<link rel="stylesheet" href="../components/site.css">
+<link rel="stylesheet" href="_board.css">
+<style>
+  .navs { display: flex; flex-direction: column; gap: 16px; }
+  .navs .frame { border-radius: var(--radius-md); overflow: hidden; box-shadow: 0 0 0 1px var(--line); }
+  .navs .s-nav { position: relative; }
+  .g3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+  .g2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+  .typeblock { display: flex; flex-direction: column; gap: 18px; padding: 32px; border-radius: var(--radius-md); background: var(--bg-deep); border: 1px solid var(--line); }
+  .matrix { display: flex; flex-direction: column; }
+  .matrix .r { display: grid; grid-template-columns: 200px 1fr; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+</style>
+</head>
+<body class="board" style="--board-h: 2629px">
+
+<header class="board-head">
+  <div class="lead">
+    <p class="eyebrow">Site · Components</p>
+    <h1>punch2pen.com parts</h1>
+    <p class="dek">The site speaks with the plugin’s voice: graphite ground, mono labels, Archivo headlines, one red action. Tiers sit on legal-pad sheets. Every part below maps to a class in <code class="code">design/components/site.css</code>.</p>
+  </div>
+  <div class="board-meta"><img src="../brand/fist-booth.svg" alt=""><span>Frame 20 · 1440 wide</span></div>
+</header>
+
+<section class="section">
+  <div class="section-head"><h2>Navigation</h2><p>Sticky, blurred chrome. Wordmark left, six mono links, one red action. Under 720 px it collapses to wordmark and a menu button.</p></div>
+  <div class="navs">
+    <div class="frame s-page"><nav class="s-nav"><img class="wm" src="../brand/wordmark-booth.svg" alt="Punch2Pen"><div class="links"><a href="/product">Product</a><a href="/pricing" aria-current="page">Pricing</a><a href="/for-studios">Studios</a><a href="/creators">Creators</a><a href="/docs">Docs</a><a href="/login">Sign in</a></div><a class="s-btn primary sm" href="#">Download free</a></nav></div>
+    <div class="frame s-page" style="width:390px"><nav class="s-nav is-mobile"><img class="wm" src="../brand/wordmark-booth.svg" alt="Punch2Pen"><div class="links"></div><button class="menu" type="button" aria-label="Menu"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h14M3 10h14M3 14h14"/></svg></button></nav></div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Headline block</h2><p>Eyebrow in red mono, Archivo headline with at most one red phrase, lede in ink-2, fine print in ink-3.</p></div>
+  <div class="typeblock s-page">
+    <p class="s-eyebrow">For studios</p>
+    <h2 class="s-h1" style="font-size:64px">A seat per artist. <em>The words stay theirs.</em></h2>
+    <p class="s-lede">Studio is a workspace of artist seats for a room that records more than one person. Each seat is one portable dictionary.</p>
+    <p class="s-fine">The owner runs the room. The owner does not get the vocal.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Actions and fields</h2><p>48 px tall on the site. One primary per section.</p></div>
+  <div class="g3 s-page" style="background:transparent">
+    <div class="specimen" style="gap:16px">
+      <span class="label">Buttons</span>
+      <div class="s-actions"><a class="s-btn primary" href="#">Download free utility</a><a class="s-btn ghost" href="#">Free, Pro, Studio</a></div>
+      <div class="s-actions"><button class="s-btn" type="button">Notify me</button><button class="s-btn sm" type="button">Small</button><button class="s-btn is-disabled" type="button">Sending…</button></div>
+    </div>
+    <div class="specimen" style="gap:16px">
+      <span class="label">Fields</span>
+      <label class="s-field"><span>Waitlist email (optional)</span><input class="s-input is-focus" id="sc-email" type="email" value="you@studio.com"></label>
+      <label class="s-field"><span>Which DAW are you punching in?</span><select class="s-select" id="sc-daw"><option>Logic</option></select></label>
+    </div>
+    <div class="specimen" style="gap:14px">
+      <span class="label">Notes and callout</span>
+      <p class="s-note ok">Thanks. You are on the list.</p>
+      <p class="s-note warn">Applications are not open yet. This form is not delivered anywhere.</p>
+      <div class="s-callout"><p>Mail delivery on the current deployment is unset, so sign-in codes are not sent yet.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Cards and tiers</h2><p>Feature cards are graphite. Tier cards are legal-pad sheets: title over the red header rule, one line per fact, price line in mono.</p></div>
+  <div class="g3 s-page" style="background:transparent; align-items:start">
+    <div class="s-card">
+      <span class="icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 6h14M3 10h9M3 14h11"/><rect x="12.5" y="8" width="5" height="4" rx="1" fill="currentColor" stroke="none"/></svg></span>
+      <h3 class="s-h3">Living Transcript</h3>
+      <p>Highlight the word under the playhead. Treat the active line as a title. Click a word to correct it.</p>
+    </div>
+    <div class="pad s-tier"><div class="pad-head"><h3 class="pad-title">Pro</h3></div><div class="pad-lines"><div class="pad-line"><span class="tick">✓</span>Login and portable dictionary</div><div class="pad-line"><span class="tick">✓</span>Correction loop, cross-DAW</div><div class="pad-line"><span class="tick">·</span>The clock stays in the plugin</div><div class="pad-line"><span class="price">Not published yet</span></div></div></div>
+    <div class="specimen" style="gap:4px">
+      <span class="label" style="margin-bottom:8px">Compatibility</span>
+      <div class="matrix s-page" style="background:transparent">
+        <div class="r"><span>macOS AU</span><span><span class="s-chip ship">Shipped</span></span></div>
+        <div class="r"><span>macOS VST3</span><span><span class="s-chip ship">Shipped</span></span></div>
+        <div class="r"><span>Logic</span><span><span class="s-chip host">The host we run</span></span></div>
+        <div class="r"><span>Windows</span><span><span class="s-chip no">Not shipped</span></span></div>
+        <div class="r" style="border-bottom:0"><span>Ableton Live</span><span><span class="s-chip no">Not shipped</span></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Tier table</h2><p>Pricing page. Rows are facts, columns are tiers, the price row says the true thing.</p></div>
+  <div class="s-page" style="background:transparent">
+    <table class="s-table">
+      <thead><tr><th></th><th>Free</th><th>Pro</th><th>Studio</th></tr></thead>
+      <tbody>
+        <tr><td>Speech-to-text</td><td>Local generic model on this Mac.</td><td>The same local engine. The profile adds your dictionary as context for the next pass.</td><td>Same as Pro, once per seat.</td></tr>
+        <tr><td>Dictionary</td><td>Session only. Nothing is written. Restart drops it.</td><td>Portable dictionary. The correction loop writes it. It follows that login.</td><td>One dictionary per artist seat, isolated from the other seats.</td></tr>
+        <tr><td>Clock</td><td>In the plugin, locked to the DAW.</td><td>In the plugin, locked to the DAW.</td><td>In the plugin, locked to the DAW.</td></tr>
+        <tr><td>Price</td><td class="s-mono" style="color:var(--ink-3)">Not published yet</td><td class="s-mono" style="color:var(--ink-3)">Not published yet</td><td class="s-mono" style="color:var(--ink-3)">Not published yet</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Footer</h2></div>
+  <div class="s-page" style="border-radius:var(--radius-md); overflow:hidden; box-shadow: 0 0 0 1px var(--line)">
+    <footer class="s-foot"><span>Punch2Pen · Mac first · never a browser engine</span><nav><a href="#">Product</a><a href="#">Pricing</a><a href="#">Studios</a><a href="#">Creators</a><a href="#">Docs</a><a href="#">Sign in</a><a href="#">Privacy</a><a href="#">Source</a></nav><img class="pen" src="../brand/pen-booth.svg" alt=""></footer>
+  </div>
+</section>
+
+<footer class="board-foot"><span>Punch2Pen design system</span><span>Copy from site/public/*.html</span></footer>
+</body>
+</html>

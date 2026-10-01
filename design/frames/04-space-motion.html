@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<meta name="paper:artboard" content="Foundations / 04 Space, radius, motion" data-width="1440" data-height="2133">
+<title>Space and Motion · Punch2Pen</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap">
+<link rel="stylesheet" href="../tokens/tokens.css">
+<link rel="stylesheet" href="_board.css">
+<style>
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; }
+  .space { display: flex; flex-direction: column; gap: 8px; }
+  .space .r { display: grid; grid-template-columns: 90px 50px 1fr; align-items: center; gap: 14px; }
+  .space .r .tok { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); }
+  .space .r .px { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); text-align: right; }
+  .space .r .bar { height: 12px; background: var(--accent); border-radius: 2px; }
+  .radii { display: flex; gap: 20px; align-items: flex-end; }
+  .radii .it { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+  .radii .box { width: 96px; height: 72px; background: var(--bg-raised); border: 1px solid var(--line-strong); }
+  .radii b { font-family: var(--mono); font-size: 11.5px; }
+  .radii span { font-size: 12px; color: var(--ink-3); }
+  .elev { display: flex; gap: 28px; }
+  .elev .it { display: flex; flex-direction: column; gap: 12px; }
+  .elev .box { width: 180px; height: 110px; border-radius: var(--radius-md); background: var(--bg-raised); border: 1px solid var(--line-strong); }
+  .motion { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .motion .m { padding: 20px; border-radius: var(--radius-md); background: var(--bg-pane); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
+  .motion .m .v { font-family: var(--mono); font-size: 26px; font-weight: 700; color: var(--accent); }
+  .motion .m b { font-size: 14px; }
+  .motion .m p { font-size: 12.5px; color: var(--ink-3); line-height: 1.45; }
+  .curves { display: flex; gap: 24px; }
+  .curves figure { margin: 0; display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: var(--radius-md); background: var(--bg-pane); border: 1px solid var(--line); }
+  .curves figcaption { font-family: var(--mono); font-size: 11px; color: var(--ink-2); letter-spacing: .04em; }
+  .regions { display: flex; gap: 40px; align-items: flex-start; }
+  .stack { width: 240px; display: flex; flex-direction: column; border-radius: var(--radius-md); overflow: hidden; box-shadow: 0 0 0 1px var(--line-strong); font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; color: var(--ink-2); }
+  .stack div { display: flex; align-items: center; justify-content: space-between; padding: 0 12px; border-bottom: 1px solid var(--line); }
+  .grid12 { flex: 1; display: grid; grid-template-columns: repeat(12, 1fr); gap: 24px; height: 200px; padding: 0 0; position: relative; }
+  .grid12 span { background: var(--accent-dim); border-left: 1px solid var(--accent-line); border-right: 1px solid var(--accent-line); }
+</style>
+</head>
+<body class="board" style="--board-h: 2133px">
+
+<header class="board-head">
+  <div class="lead">
+    <p class="eyebrow">Foundations · Space, radius, motion</p>
+    <h1>Tight like a DAW, calm like a page</h1>
+    <p class="dek">A 4-based spacing scale, five radii, three shadows, and motion that follows the music: the plate holds between words, the scroll eases, REC pulses. Nothing moves for decoration.</p>
+  </div>
+  <div class="board-meta"><img src="../brand/fist-booth.svg" alt=""><span>Frame 04 · 1440 wide</span></div>
+</header>
+
+<div class="two">
+  <section class="section">
+    <div class="section-head"><h2>Space</h2></div>
+    <div class="space">
+      <div class="r"><span class="tok">--space-1</span><span class="px">2</span><span class="bar" style="width:2px"></span></div>
+      <div class="r"><span class="tok">--space-2</span><span class="px">4</span><span class="bar" style="width:4px"></span></div>
+      <div class="r"><span class="tok">--space-3</span><span class="px">6</span><span class="bar" style="width:6px"></span></div>
+      <div class="r"><span class="tok">--space-4</span><span class="px">8</span><span class="bar" style="width:8px"></span></div>
+      <div class="r"><span class="tok">--space-5</span><span class="px">12</span><span class="bar" style="width:12px"></span></div>
+      <div class="r"><span class="tok">--space-6</span><span class="px">16</span><span class="bar" style="width:16px"></span></div>
+      <div class="r"><span class="tok">--space-7</span><span class="px">20</span><span class="bar" style="width:20px"></span></div>
+      <div class="r"><span class="tok">--space-8</span><span class="px">24</span><span class="bar" style="width:24px"></span></div>
+      <div class="r"><span class="tok">--space-9</span><span class="px">32</span><span class="bar" style="width:32px"></span></div>
+      <div class="r"><span class="tok">--space-10</span><span class="px">40</span><span class="bar" style="width:40px"></span></div>
+      <div class="r"><span class="tok">--space-11</span><span class="px">56</span><span class="bar" style="width:56px"></span></div>
+      <div class="r"><span class="tok">--space-12</span><span class="px">80</span><span class="bar" style="width:80px"></span></div>
+      <div class="r"><span class="tok">--space-13</span><span class="px">120</span><span class="bar" style="width:120px"></span></div>
+    </div>
+    <p class="note">Plugin lives in 2–24. The site uses 16 and up. Gaps, not margins, separate siblings.</p>
+  </section>
+  <section class="section">
+    <div class="section-head"><h2>Radius</h2></div>
+    <div class="radii">
+      <div class="it"><div class="box" style="border-radius:3px"></div><b>xs · 3</b><span>Word plate</span></div>
+      <div class="it"><div class="box" style="border-radius:5px"></div><b>sm · 5</b><span>Controls</span></div>
+      <div class="it"><div class="box" style="border-radius:8px"></div><b>md · 8</b><span>Cards, sheets</span></div>
+      <div class="it"><div class="box" style="border-radius:12px"></div><b>lg · 12</b><span>Plugin frame</span></div>
+      <div class="it"><div class="box" style="border-radius:999px; width:120px; height:40px"></div><b>pill</b><span>Badge, pill</span></div>
+    </div>
+    <div class="section-head" style="margin-top:24px"><h2>Elevation</h2></div>
+    <div class="elev">
+      <div class="it"><div class="box" style="box-shadow: var(--shadow-pop)"></div><span class="label">--shadow-pop</span><p class="note">Popover, sheet, menu</p></div>
+      <div class="it"><div class="box" style="box-shadow: var(--shadow-frame)"></div><span class="label">--shadow-frame</span><p class="note">Plugin window on the site</p></div>
+      <div class="it"><div class="box" style="background:var(--pad-paper); border:0; border-radius:4px; box-shadow: var(--shadow-sheet)"></div><span class="label">--shadow-sheet</span><p class="note">Pad on graphite</p></div>
+    </div>
+  </section>
+</div>
+
+<section class="section">
+  <div class="section-head"><h2>Motion</h2><p>Timed to the music where it can be. Everything stops under prefers-reduced-motion except the plate following the playhead, which is the product.</p></div>
+  <div class="motion">
+    <div class="m"><span class="v">120 ms</span><b>--t-fast</b><p>Hover color and border, word state changes.</p></div>
+    <div class="m"><span class="v">200 ms</span><b>--t-base</b><p>Sheet and popover rise 6 px and fade in. Seek wash on the clicked word.</p></div>
+    <div class="m"><span class="v">320 ms</span><b>--t-slow</b><p>One synced-scroll step toward the focal line, eased out.</p></div>
+    <div class="m"><span class="v">750 ms</span><b>--t-hold</b><p>The plate holds on the last sung word after the final timestamp. Between words it holds with no timeout.</p></div>
+    <div class="m"><span class="v">1.3 s</span><b>--t-pulse</b><p>REC dot ring. Banner and stream cursor blink in two steps.</p></div>
+    <div class="m"><span class="v">40 · 60%</span><b>--focal-play · --focal-rec</b><p>Where the title line sits in the pane: 40% down in playback, 60% while recording so new words have room below.</p></div>
+  </div>
+  <div class="curves">
+    <figure>
+      <svg width="220" height="140" viewBox="0 0 220 140" fill="none"><rect x="10" y="10" width="200" height="120" stroke="rgba(255,255,255,.08)"/><path d="M10 130 C50 46 50 10 210 10" style="stroke: var(--accent)" stroke-width="2.5"/><circle cx="10" cy="130" r="3" style="fill: var(--accent)"/><circle cx="210" cy="10" r="3" style="fill: var(--accent)"/></svg>
+      <figcaption>--t-ease-out · cubic-bezier(0.2, 0.7, 0.2, 1)</figcaption>
+    </figure>
+    <figure>
+      <svg width="220" height="140" viewBox="0 0 220 140" fill="none"><rect x="10" y="10" width="200" height="120" stroke="rgba(255,255,255,.08)"/><path d="M10 130 C90 130 50 10 210 10" style="stroke: var(--accent)" stroke-width="2.5"/><circle cx="10" cy="130" r="3" style="fill: var(--accent)"/><circle cx="210" cy="10" r="3" style="fill: var(--accent)"/></svg>
+      <figcaption>--t-ease-in-out · cubic-bezier(0.4, 0, 0.2, 1)</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Layout</h2><p>The plugin is a fixed stack around a flexible pane. The site sits on a 12-column grid, 1120 max, 24 gutters, 16 px side gutter on phones.</p></div>
+  <div class="regions">
+    <div class="stack">
+      <div style="height:44px; background:var(--bg-chrome)"><span>HEADER</span><span>44</span></div>
+      <div style="height:30px; background:var(--bg-chrome)"><span>TRANSPORT</span><span>30</span></div>
+      <div style="height:170px; background:var(--bg-pane)"><span>PANE</span><span>flex</span></div>
+      <div style="height:30px; background:var(--bg-chrome); border-bottom:0"><span>STATUS</span><span>30+</span></div>
+    </div>
+    <div class="grid12"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+  </div>
+</section>
+
+<footer class="board-foot"><span>Punch2Pen design system</span><span>Source: design/tokens/tokens.json</span></footer>
+</body>
+</html>

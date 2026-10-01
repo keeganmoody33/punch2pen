@@ -1,0 +1,11 @@
+p2p-shaders.js bundles Paper Shaders, licensed under the Apache License 2.0
+(full text in LICENSE-paper-shaders.txt). Its NOTICE file reads:
+
+    Paper Shaders
+    Copyright 2026 Paper
+
+    Powered by Paper Shaders:
+    https://shaders.paper.design
+
+Punch2Pen's own code in this folder (src/, build.mjs) configures and mounts
+those shaders; the shader programs themselves are unmodified.

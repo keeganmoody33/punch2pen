@@ -1,0 +1,46 @@
+/*
+  Shader surfaces. Pair with design/shaders/p2p-shaders.js.
+
+  <div class="fx" data-p2p-shader="booth-glow"></div>           a layer behind content
+  <div class="fx-mark" data-p2p-shader="idle-smoke" data-image="…">
+    <img class="fx-fallback" src="…/fist-booth.svg" alt="">     shown until the shader mounts,
+  </div>                                                          and forever without WebGL2
+*/
+
+/* A full-bleed layer behind its siblings. The parent needs position: relative. */
+.fx {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.fx ~ * { position: relative; z-index: 1; }
+
+/* A sized box that holds one logo effect. */
+.fx-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--fx-size, 160px);
+  aspect-ratio: 1;
+  max-width: 100%;
+}
+.fx-mark > .fx-fallback { width: 70%; height: auto; }
+/* Logo effects fade out before the box edge, so smoke and glow never show a square. */
+.fx-mark[data-p2p-shader] {
+  -webkit-mask-image: radial-gradient(closest-side, #000 72%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 72%, transparent 100%);
+}
+
+/* The canvas Paper's ShaderMount appends fills the box. */
+[data-p2p-shader] > canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* Once a shader is running, the static fallback steps aside. */
+[data-p2p-shader-state="mounted"] > .fx-fallback { visibility: hidden; }
+
+/* The Pad: paper texture under the rules, content above it. */
+.pad > .fx { border-radius: inherit; }
+.pad > .pad-head, .pad > .pad-lines, .pad > .pad-foot { position: relative; z-index: 1; }
+.pad.has-fx .pad-lines, .pad.has-fx .pad-foot { background-color: transparent; }
+.pad.has-fx { background: var(--pad-paper); }

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<meta name="paper:artboard" content="01 Cover" data-width="1440" data-height="900" data-pinned>
+<title>Cover · Punch2Pen</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap">
+<link rel="stylesheet" href="../tokens/tokens.css">
+<link rel="stylesheet" href="_board.css">
+<style>
+  body.board { padding: 0; gap: 0; flex-direction: row; }
+  .hero { flex: 1.1; display: flex; flex-direction: column; justify-content: space-between; padding: 72px 64px 64px 80px; gap: 40px; }
+  .hero .wm { width: 640px; height: auto; display: block; }
+  .hero .tag { font-family: var(--display); font-stretch: var(--display-stretch); font-weight: 850; font-size: 100px; line-height: 0.86; text-transform: uppercase; letter-spacing: -0.01em; margin: 0; white-space: nowrap; }
+  .hero .tag em { font-style: normal; color: var(--accent-strong); }
+  .hero .dek { font-size: 19px; max-width: 34em; }
+  .hero .meta { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .side { flex: 0.9; position: relative; background: var(--bg-chrome); border-left: 1px solid var(--line); display: flex; flex-direction: column; padding: 72px 72px 64px; gap: 36px; overflow: hidden; }
+  .side .pen { width: 100%; max-width: 380px; margin-top: auto; position: relative; z-index: 1; }
+  .tagrow { display: flex; align-items: center; gap: 36px; }
+  .tagrow img { width: 200px; flex-shrink: 0; }
+  .toc { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 0; max-width: 360px; }
+  .toc div { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 14px; color: var(--ink-2); }
+  .toc div span:first-child { font-family: var(--mono); font-size: 11px; color: var(--ink-3); letter-spacing: 0.08em; width: 32px; }
+  .toc div span:nth-child(2) { flex: 1; }
+</style>
+</head>
+<body class="board" style="--board-h: 900px">
+  <section class="hero">
+    <div class="col" style="gap:28px">
+      <p class="eyebrow">Design system · v1 · 2026-09-30</p>
+      <img class="wm" src="../brand/wordmark-booth.svg" alt="Punch2Pen">
+    </div>
+    <div class="tagrow"><p class="tag">Punch in.<br><em>Pen</em> it.</p><img src="../brand/fist-booth.svg" alt=""></div>
+    <div class="col" style="gap:20px">
+      <p class="dek">One system for the DAW plugin and punch2pen.com. Brick red and a legal-yellow pad from the founder’s 2PEN logo, on the dark graphite chrome the plugin already ships. Mono is the punch, sans is the words. Brand red is a fill; REC red belongs to the recording state alone.</p>
+      <div class="meta"><span class="status shipped">Tokens · marks · components</span><span class="status">Plugin 400 × 600</span><span class="status">Site 1440 · 390</span></div>
+    </div>
+  </section>
+  <aside class="side">
+    <p class="eyebrow">Frames</p>
+    <div class="toc">
+      <div><span>02</span><span>Color</span><span class="label">Foundations</span></div>
+      <div><span>03</span><span>Type</span><span class="label">Foundations</span></div>
+      <div><span>04</span><span>Space, radius, motion</span><span class="label">Foundations</span></div>
+      <div><span>05</span><span>Marks</span><span class="label">Brand</span></div>
+      <div><span>06</span><span>Shaders</span><span class="label">Brand</span></div>
+      <div><span>10</span><span>Anatomy</span><span class="label">Plugin</span></div>
+      <div><span>11</span><span>Components</span><span class="label">Plugin</span></div>
+      <div><span>12</span><span>States</span><span class="label">Plugin</span></div>
+      <div><span>13</span><span>Flows</span><span class="label">Plugin</span></div>
+      <div><span>14</span><span>Proposed</span><span class="label">Plugin</span></div>
+      <div><span>20</span><span>Components</span><span class="label">Site</span></div>
+      <div><span>21</span><span>Home · desktop</span><span class="label">Site</span></div>
+      <div><span>22</span><span>Home · mobile</span><span class="label">Site</span></div>
+      <div><span>23</span><span>Routes and funnel</span><span class="label">Site</span></div>
+    </div>
+    <img class="pen" src="../brand/pen-booth.svg" alt="">
+  </aside>
+</body>
+</html>
