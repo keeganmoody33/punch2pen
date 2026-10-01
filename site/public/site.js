@@ -6,6 +6,8 @@
   const statusInterest = document.getElementById("interest-status");
   const macBtn = document.getElementById("mac-download");
   const heroBtn = document.getElementById("download-btn");
+  const navBtn = document.getElementById("nav-download");
+  const copyBtn = document.getElementById("copy-download");
   const daw = document.getElementById("daw");
 
   let downloadUrl = RELEASE_PAGE;
@@ -35,9 +37,7 @@
 
   function loadPosthog() {
     const key = typeof env.POSTHOG_KEY === "string" ? env.POSTHOG_KEY.trim() : "";
-    if (!key) {
-      return Promise.resolve(false);
-    }
+    if (!key) return Promise.resolve(false);
     return new Promise((resolve) => {
       const s = document.createElement("script");
       s.async = true;
@@ -72,14 +72,15 @@
       if (pkg && pkg.browser_download_url) {
         downloadUrl = pkg.browser_download_url;
         assetName = pkg.name;
-        macBtn.href = downloadUrl;
+        if (macBtn) macBtn.href = downloadUrl;
         setNote(
           statusDownload,
           `Latest Release ${releaseTag}: ${assetName}. Unsigned. Right-click open if Gatekeeper blocks.`,
           "ok"
         );
       } else {
-        macBtn.href = data.html_url || RELEASE_PAGE;
+        downloadUrl = data.html_url || RELEASE_PAGE;
+        if (macBtn) macBtn.href = downloadUrl;
         setNote(
           statusDownload,
           releaseTag
@@ -89,7 +90,8 @@
         );
       }
     } catch (err) {
-      macBtn.href = RELEASE_PAGE;
+      downloadUrl = RELEASE_PAGE;
+      if (macBtn) macBtn.href = RELEASE_PAGE;
       setNote(
         statusDownload,
         "Could not read GitHub Releases from here. Button goes to the latest Release page.",
@@ -98,18 +100,18 @@
     }
   }
 
-  function onDownloadClick(source) {
+  function onDownloadClick(source, href) {
     const sent = track("download_click", {
       source,
       daw: dawValue(),
       release_tag: releaseTag,
       asset: assetName || "",
-      href: source === "hero" ? "https://github.com/keeganmoody33/punch2pen/releases/latest" : downloadUrl,
+      href: href || downloadUrl,
     });
     if (!assetName) {
       track("download_unavailable", { source, daw: dawValue(), release_tag: releaseTag });
     }
-    if (!sent && statusDownload) {
+    if (!sent && statusDownload && source !== "band") {
       const extra = " Analytics key is not configured, so this click was not sent to PostHog.";
       const cur = statusDownload.textContent || "";
       if (cur.indexOf("Analytics key is not configured") === -1) {
@@ -118,154 +120,69 @@
     }
   }
 
-  if (macBtn) macBtn.addEventListener("click", () => onDownloadClick("mac_pkg"));
-  if (heroBtn) heroBtn.addEventListener("click", () => onDownloadClick("hero"));
-
-  const wouldPay = document.getElementById("would-pay");
-  if (wouldPay) wouldPay.addEventListener("click", () => {
-    const sent = track("interest_would_pay", { daw: dawValue() });
-    setNote(
-      statusInterest,
-      sent
-        ? "Recorded. No price was attached — we only needed the signal."
-        : "Wired. PostHog key is missing on this host, so the click stayed in the browser.",
-      sent ? "ok" : "warn"
-    );
-  });
-
-  const justLooking = document.getElementById("just-looking");
-  if (justLooking) justLooking.addEventListener("click", () => {
-    track("interest_just_looking", { daw: dawValue() });
-    setNote(statusInterest, "Stay as long as you want. Download is still free / lite.", "ok");
-  });
-
-  const waitlist = document.getElementById("waitlist");
-  if (waitlist) waitlist.addEventListener("submit", (ev) => {
-    ev.preventDefault();
-    const email = (document.getElementById("email").value || "").trim();
-    if (!email) {
-      setNote(statusInterest, "Add an email, or use “I would pay for the portable dictionary” without one.", "warn");
-      return;
-    }
-    const sent = track("waitlist_submit", { daw: dawValue(), email });
-    if (sent && window.posthog && typeof window.posthog.identify === "function") {
-      window.posthog.identify(email, { email, daw: dawValue() });
-    }
-    setNote(
-      statusInterest,
-      sent
-        ? "On the list. We will not invent a price in the follow-up."
-        : "PostHog is not configured, so that email was not stored anywhere.",
-      sent ? "ok" : "warn"
-    );
-  });
-
-  function escapeHtml(value) {
-    return String(value).replace(/[&<>"']/g, (ch) => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;",
-    }[ch]));
+  if (macBtn) macBtn.addEventListener("click", () => onDownloadClick("mac_pkg", downloadUrl));
+  if (heroBtn) heroBtn.addEventListener("click", () => onDownloadClick("hero", RELEASE_PAGE));
+  if (navBtn) navBtn.addEventListener("click", () => onDownloadClick("nav", RELEASE_PAGE));
+  if (copyBtn) {
+    copyBtn.addEventListener("click", async () => {
+      onDownloadClick("copy_link", downloadUrl);
+      try {
+        await navigator.clipboard.writeText(downloadUrl);
+        setNote(statusDownload, "Download link copied. Open it on the Mac you record on.", "ok");
+      } catch (err) {
+        setNote(statusDownload, "Could not copy from this browser. The release page is " + downloadUrl, "warn");
+      }
+    });
   }
 
-  function initReceipt() {
-    const freeBtn = document.getElementById("tier-free");
-    const paidBtn = document.getElementById("tier-paid");
-    const pill = document.getElementById("receipt-pill");
-    const status = document.getElementById("receipt-status");
-    const panel = document.getElementById("dict-panel");
-    const word = document.getElementById("receipt-word");
-    const sheet = document.getElementById("receipt-sheet");
-    const input = document.getElementById("receipt-correction");
-    const apply = document.getElementById("receipt-apply");
-    const cancel = document.getElementById("receipt-cancel");
-    const replay = document.getElementById("receipt-replay");
-    if (!freeBtn || !paidBtn || !pill || !status || !panel || !word || !sheet || !input || !apply || !cancel) {
-      return;
-    }
+  const wouldPay = document.getElementById("would-pay");
+  if (wouldPay) {
+    wouldPay.addEventListener("click", () => {
+      const sent = track("interest_would_pay", { daw: dawValue() });
+      setNote(
+        statusInterest,
+        sent
+          ? "Recorded. No price was attached — we only needed the signal."
+          : "Wired. PostHog key is missing on this host, so the click stayed in the browser.",
+        sent ? "ok" : "warn"
+      );
+    });
+  }
 
-    let tier = "free";
-    const appliedByTier = { free: null, paid: null };
+  const justLooking = document.getElementById("just-looking");
+  if (justLooking) {
+    justLooking.addEventListener("click", () => {
+      track("interest_just_looking", { daw: dawValue() });
+      setNote(statusInterest, "Stay as long as you want. Download is still free / lite.", "ok");
+    });
+  }
 
-    function render() {
-      const paid = tier === "paid";
-      const applied = appliedByTier[tier];
-      pill.textContent = paid ? "Vocal seat" : "Local";
-      pill.classList.toggle("signed", paid);
-      if (!applied) {
-        word.textContent = "topp";
-        word.classList.remove("corrected");
-        status.textContent = "Following the playhead · click a word to correct it";
-        panel.innerHTML = paid
-          ? '<p class="eyebrow">Vocal seat dictionary</p><p>Signed in. No pairs yet. Apply a correction and it is written on this seat.</p>'
-          : '<p class="eyebrow">This session</p><p>No account. Corrections stay in memory on this Mac and drop when the engine restarts. Nothing is written.</p>';
+  const waitlist = document.getElementById("waitlist");
+  if (waitlist) {
+    waitlist.addEventListener("submit", (ev) => {
+      ev.preventDefault();
+      const emailEl = document.getElementById("email");
+      const email = (emailEl && emailEl.value ? emailEl.value : "").trim();
+      if (!email) {
+        setNote(statusInterest, "Add an email, or use “I would pay for it” without one.", "warn");
         return;
       }
-      word.textContent = applied.to;
-      word.classList.add("corrected");
-      const from = escapeHtml(applied.from);
-      const to = escapeHtml(applied.to);
-      const row = '<p class="pair"><span>' + from + "</span><span>→</span><span>" + to + "</span>";
-      if (paid) {
-        status.textContent = '"' + applied.from + '" → "' + applied.to + '" (in 1 place) · saved to Vocal seat dictionary · synced';
-        panel.innerHTML = '<p class="eyebrow">Vocal seat dictionary</p>' + row + '<span class="count">1</span></p><p>Saved on the seat and synced. Bar and beat stay in the plugin.</p>';
-      } else {
-        status.textContent = '"' + applied.from + '" → "' + applied.to + '" (in 1 place) · session-only on this Mac. A profile carries your dictionary between rooms.';
-        panel.innerHTML = '<p class="eyebrow">This session</p>' + row + "</p><p>Session-only. Not written to disk, not sent to the profile API. Restart drops it.</p>";
+      const sent = track("waitlist_submit", { daw: dawValue(), email: email });
+      if (sent && window.posthog && typeof window.posthog.identify === "function") {
+        window.posthog.identify(email, { email: email, daw: dawValue() });
       }
-    }
-
-    function setTier(next) {
-      tier = next;
-      sheet.hidden = true;
-      freeBtn.setAttribute("aria-pressed", tier === "free" ? "true" : "false");
-      paidBtn.setAttribute("aria-pressed", tier === "paid" ? "true" : "false");
-      render();
-    }
-
-    word.addEventListener("click", () => {
-      sheet.hidden = false;
-      input.value = appliedByTier[tier] ? appliedByTier[tier].to : "top";
-      input.focus();
+      setNote(
+        statusInterest,
+        sent
+          ? "On the list. We will not invent a price in the follow-up."
+          : "PostHog is not configured, so that email was not stored anywhere.",
+        sent ? "ok" : "warn"
+      );
     });
-    cancel.addEventListener("click", () => {
-      sheet.hidden = true;
-    });
-    apply.addEventListener("click", () => {
-      const to = input.value.trim();
-      if (!to) return;
-      appliedByTier[tier] = { from: "topp", to: to };
-      sheet.hidden = true;
-      render();
-    });
-    input.addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter") {
-        ev.preventDefault();
-        apply.click();
-      } else if (ev.key === "Escape") {
-        sheet.hidden = true;
-      }
-    });
-    if (replay) {
-      replay.addEventListener("click", () => {
-        appliedByTier[tier] = null;
-        sheet.hidden = true;
-        input.value = "top";
-        render();
-      });
-    }
-    freeBtn.addEventListener("click", () => setTier("free"));
-    paidBtn.addEventListener("click", () => setTier("paid"));
-    render();
   }
 
   loadPosthog().then((ok) => {
     if (ok) track("site_ready", { posthog: true });
   });
-  if (macBtn) {
-    loadRelease();
-  }
-  initReceipt();
+  if (macBtn || copyBtn) loadRelease();
 })();

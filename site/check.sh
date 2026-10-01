@@ -23,7 +23,10 @@ do
 done
 
 scan_copy() {
-  grep -Rni --exclude-dir=node_modules --exclude-dir=.wrangler "$@" public src
+  # Vendor font bytes and the Paper shader bundle are not site copy.
+  grep -Rni --exclude-dir=node_modules --exclude-dir=.wrangler \
+    --exclude-dir=fonts --exclude-dir=shaders \
+    "$@" public src
 }
 
 if scan_copy -E 'karaoke'; then

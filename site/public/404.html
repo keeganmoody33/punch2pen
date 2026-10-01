@@ -5,34 +5,52 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Not found — Punch2Pen</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/tokens.css" />
+  <link rel="stylesheet" href="/shaders.css" />
   <link rel="stylesheet" href="/site.css" />
 </head>
-<body>
-  <header class="top">
-    <a class="mark" href="/">[ PUNCH<span class="accent">2</span>PEN ]</a>
-    <nav>
+<body class="s-page">
+  <nav class="s-nav" id="site-nav">
+    <a class="wm-link" href="/"><img class="wm" src="/brand/wordmark-booth.svg" alt="Punch2Pen" /></a>
+    <div class="links" id="site-links">
       <a href="/product">Product</a>
       <a href="/pricing">Pricing</a>
       <a href="/for-studios">Studios</a>
       <a href="/creators">Creators</a>
       <a href="/docs">Docs</a>
       <a href="/login">Sign in</a>
+    </div>
+    <a class="s-btn primary sm" href="https://github.com/keeganmoody33/punch2pen/releases/latest">Download free</a>
+    <button class="menu" type="button" aria-label="Menu" aria-expanded="false" aria-controls="site-links"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h14M3 10h14M3 14h14"/></svg></button>
+  </nav>
+
+  <main class="s-wrap lost">
+    <div class="fx-mark lens" data-p2p-shader="lost-lens" data-p2p-static data-image="/brand/wordmark-booth.svg">
+      <img class="fx-fallback" src="/brand/wordmark-booth.svg" alt="" />
+    </div>
+    <p class="s-eyebrow">404</p>
+    <h1 class="s-h1">Nothing here.</h1>
+    <p class="s-lede">That URL is not a page on this site.</p>
+    <nav class="links">
+      <a href="/">Home</a>
+      <a href="/product">Product</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/for-studios">Studios</a>
+      <a href="/creators">Creators</a>
+      <a href="/docs">Docs</a>
+      <a href="/login">Sign in</a>
+      <a href="/privacy">Privacy</a>
     </nav>
-  </header>
-  <main class="wrap narrow">
-    <p class="eyebrow">[ PUNCH2PEN ]</p>
-    <h1>Nothing here.</h1>
-    <p class="lede">That URL is not a page on this site.</p>
-    <ul class="plain">
-      <li><a href="/">Home</a></li>
-      <li><a href="/product">Product</a></li>
-      <li><a href="/pricing">Pricing</a></li>
-      <li><a href="/for-studios">Studios</a></li>
-      <li><a href="/creators">Creators</a></li>
-      <li><a href="/docs">Docs</a></li>
-      <li><a href="/login">Sign in</a></li>
-      <li><a href="/privacy">Privacy</a></li>
-    </ul>
   </main>
+
+  <footer class="s-foot">
+    <span>Punch2Pen · Mac first · never a browser engine</span>
+    <img class="pen" src="/brand/pen-booth.svg" alt="" />
+  </footer>
+  <script src="/nav.js"></script>
+  <script type="module">
+    import { autoMount } from "/shaders/p2p-shaders.js";
+    autoMount();
+  </script>
 </body>
 </html>

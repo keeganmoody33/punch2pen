@@ -1,0 +1,100 @@
+/*
+  The Pad: the legal pad behind the founder's 2PEN logo. Yellow stock, blue
+  rules, pen-black ink, one brand-red header rule. It is where the words land when they leave the booth: exported
+  lyric sheets, share links, and site moments about the finished page.
+  Depends on design/tokens/tokens.css. Never used inside plugin chrome.
+*/
+.pad {
+  --rule-gap: 34px;
+  --gutter: 104px;
+  position: relative;
+  color: var(--pad-ink);
+  background: var(--pad-paper);
+  border-radius: 4px;
+  box-shadow: var(--shadow-sheet);
+  font-family: var(--sans);
+  overflow: hidden;
+}
+/* Blue rules only under the red header line. */
+.pad-lines, .pad-foot {
+  background-image: repeating-linear-gradient(180deg, transparent 0, transparent calc(var(--rule-gap) - 1px), var(--pad-rule) calc(var(--rule-gap) - 1px), var(--pad-rule) var(--rule-gap));
+}
+.pad-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 28px 28px 14px calc(var(--gutter) + 16px);
+  border-bottom: 2px solid var(--pad-accent);
+}
+.pad-title {
+  margin: 0;
+  font-family: var(--display);
+  font-stretch: var(--display-stretch);
+  font-weight: 850;
+  font-size: 34px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: -0.005em;
+}
+.pad-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--pad-ink-2);
+}
+.pad-mark { width: 56px; height: auto; flex-shrink: 0; }
+.pad-lines { display: flex; flex-direction: column; }
+.pad-line {
+  position: relative;
+  height: var(--rule-gap);
+  display: flex;
+  align-items: flex-end;
+  padding: 0 28px 5px calc(var(--gutter) + 16px);
+  font-size: 19px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.pad-line .when {
+  position: absolute;
+  left: 12px;
+  bottom: 7px;
+  width: calc(var(--gutter) - 20px);
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--pad-ink-2);
+}
+.pad-line .when b { color: var(--pad-ink); }
+.pad-line .adlib { font-style: italic; color: var(--pad-accent); margin-left: 0.3em; font-size: 0.86em; }
+.pad-line.is-section {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--pad-accent);
+}
+.pad-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  height: var(--rule-gap);
+  padding: 0 28px 0 calc(var(--gutter) + 16px);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--pad-ink-2);
+}
+.pad-foot img { height: 10px; width: auto; }

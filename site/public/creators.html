@@ -6,89 +6,95 @@
   <title>Creators — Punch2Pen</title>
   <meta name="description" content="Pre-release and affiliate interest for tutorial creators and mix engineers. Applications are not open yet. Nothing is sent." />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/tokens.css" />
   <link rel="stylesheet" href="/site.css" />
 </head>
-<body>
-  <header class="top">
-    <a class="mark" href="/">[ PUNCH<span class="accent">2</span>PEN ]</a>
-    <nav>
+<body class="s-page">
+  <nav class="s-nav" id="site-nav">
+    <a class="wm-link" href="/"><img class="wm" src="/brand/wordmark-booth.svg" alt="Punch2Pen" /></a>
+    <div class="links" id="site-links">
       <a href="/product">Product</a>
       <a href="/pricing">Pricing</a>
       <a href="/for-studios">Studios</a>
       <a href="/creators" aria-current="page">Creators</a>
       <a href="/docs">Docs</a>
       <a href="/login">Sign in</a>
-    </nav>
+    </div>
+    <a class="s-btn primary sm" href="https://github.com/keeganmoody33/punch2pen/releases/latest">Download free</a>
+    <button class="menu" type="button" aria-label="Menu" aria-expanded="false" aria-controls="site-links"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h14M3 10h14M3 14h14"/></svg></button>
+  </nav>
+
+  <header class="page-hero">
+    <div class="s-wrap narrow">
+      <p class="s-eyebrow">Tutorial creators and mix engineers</p>
+      <h1 class="s-h1">Applications are not open yet.</h1>
+      <p class="s-lede">This page is for two kinds of interest: trying the plugin before a paid plan exists, and affiliate interest later. The repo publishes no contact address for either one. No key is issued here, and there is no affiliate program.</p>
+    </div>
   </header>
 
-  <main class="wrap narrow">
-    <p class="eyebrow">Tutorial creators and mix engineers</p>
-    <h1>Applications are not open yet.</h1>
-    <p class="lede">This page is for two kinds of interest: trying the plugin before a paid plan exists, and affiliate interest later. The repo publishes no contact address for either one. No key is issued here, and there is no affiliate program.</p>
-
-    <section>
-      <h2>What you can be interested in</h2>
+  <section class="s-section">
+    <div class="s-wrap narrow">
+      <h2 class="s-h2">What you can be interested in</h2>
       <ul class="plain">
         <li><strong>Pre-release.</strong> You make tutorials, or you engineer mixes, and you want to know when there is something to teach or to punch on besides the free local utility.</li>
         <li><strong>Affiliate.</strong> You might want to point people at Punch2Pen if a program exists someday. It does not exist now. There is no rate and no link to hand out.</li>
       </ul>
-      <p>Questions about the source go to a GitHub discussion on <a href="https://github.com/keeganmoody33/punch2pen">the repo</a>. That is not an application, and it does not issue a key.</p>
-    </section>
+      <p class="s-body" style="margin-top:16px">Questions about the source go to a GitHub discussion on <a href="https://github.com/keeganmoody33/punch2pen">the repo</a>. That is not an application, and it does not issue a key.</p>
+    </div>
+  </section>
 
-    <section>
-      <h2>Interest form</h2>
-      <p class="lede">Fill it in if you want the shape of the note in front of you. Submitting does not deliver it. This page has nowhere to send an application.</p>
-      <div id="creator-interest">
-        <label class="field">
+  <section class="s-section">
+    <div class="s-wrap narrow">
+      <div class="head">
+        <h2 class="s-h2">Interest form</h2>
+        <p class="s-body">Fill it in if you want the shape of the note in front of you. Submitting does not deliver it. This page has nowhere to send an application.</p>
+      </div>
+      <div id="creator-interest" style="display:flex; flex-direction:column; gap:16px">
+        <label class="s-field">
           <span>Name (optional)</span>
-          <input type="text" id="creator-name" autocomplete="name" />
+          <input class="s-input" type="text" id="creator-name" autocomplete="name" />
         </label>
-        <label class="field">
+        <label class="s-field">
           <span>Role</span>
-          <select id="creator-role">
+          <select class="s-select" id="creator-role">
             <option value="">Choose one</option>
             <option value="tutorial-creator">Tutorial creator</option>
             <option value="mix-engineer">Mix engineer</option>
           </select>
         </label>
-        <label class="field">
+        <label class="s-field">
           <span>Interest</span>
-          <select id="creator-kind">
+          <select class="s-select" id="creator-kind">
             <option value="">Choose one</option>
             <option value="pre-release">Pre-release interest</option>
             <option value="affiliate">Affiliate interest</option>
           </select>
         </label>
-        <label class="field">
+        <label class="s-field">
           <span>Note (optional, not stored)</span>
-          <textarea id="creator-note" rows="4" class="wide"></textarea>
+          <textarea class="s-textarea" id="creator-note" rows="4"></textarea>
         </label>
-        <button type="button" class="btn" id="creator-submit">Submit interest</button>
+        <div><button type="button" class="s-btn" id="creator-submit">Submit interest</button></div>
       </div>
-      <p class="note" id="creator-status">Applications are not open yet. This form is not delivered anywhere.</p>
-    </section>
-  </main>
+      <p class="s-note warn" id="creator-status" style="margin-top:16px">Applications are not open yet. This form is not delivered anywhere.</p>
+    </div>
+  </section>
 
-  <footer class="foot">
+  <footer class="s-foot">
     <span>Punch2Pen · Mac first · never a browser engine</span>
-    <span>
+    <nav>
       <a href="/product">Product</a>
-      ·
       <a href="/pricing">Pricing</a>
-      ·
       <a href="/for-studios">Studios</a>
-      ·
       <a href="/creators">Creators</a>
-      ·
       <a href="/docs">Docs</a>
-      ·
       <a href="/login">Sign in</a>
-      ·
       <a href="/privacy">Privacy</a>
-      ·
       <a href="https://github.com/keeganmoody33/punch2pen">Source</a>
-    </span>
+    </nav>
+    <img class="pen" src="/brand/pen-booth.svg" alt="" />
   </footer>
+  <script src="/nav.js"></script>
   <script>
     (function () {
       var button = document.getElementById("creator-submit");
@@ -96,7 +102,7 @@
       if (!button || !status) return;
       button.addEventListener("click", function () {
         status.textContent = "Applications are not open yet. This page did not send your note. No key was issued, and there is no affiliate program.";
-        status.className = "note warn";
+        status.className = "s-note warn";
       });
     })();
   </script>
