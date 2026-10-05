@@ -1,7 +1,7 @@
 /**
  * Punch2Pen public site worker.
- * Serves static assets, plus /env.js so PostHog can be enabled via
- * Cloudflare env without committing a project key.
+ * Serves static assets, plus /env.js so the PostHog key and host come from
+ * worker vars (wrangler.jsonc) rather than being hard-coded in page scripts.
  */
 export default {
   async fetch(request, env) {

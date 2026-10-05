@@ -14,6 +14,8 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/tokens.css" />
   <link rel="stylesheet" href="/site.css" />
+  <script src="/env.js"></script>
+  <script src="/ph.js"></script>
 </head>
 <body class="s-page">
   <a class="skip-link" href="#main">Skip to content</a>
@@ -47,7 +49,7 @@
         <li><strong>Voice stays off this domain.</strong> Local transcription runs on your Mac. This page does not upload audio.</li>
         <li><strong>Hosting.</strong> Cloudflare serves this site and receives normal HTTP request data.</li>
         <li><strong>Product network use.</strong> Free local transcription keeps audio and corrections on the Mac after setup. The installer downloads a Whisper model from Hugging Face when missing; that host receives the download request. A configured signed-in profile syncs correction pairs; an explicitly configured cloud transcription mode sends audio to OpenAI. This website does not enable either mode.</li>
-        <li><strong>Analytics.</strong> If a PostHog project key is configured on the host, the homepage records page views, download clicks, DAW self-report, and “I would pay” / waitlist interest. PostHog receives request information and uses cookies and local storage for visitor identity. Automatic click capture and session replay are disabled. If that key is missing, those events are wired in the page and do not leave the browser. The other routes do not load that script.</li>
+        <li><strong>Analytics.</strong> Every page on this site loads PostHog. It records page views, clicks, download clicks, DAW self-report, “I would pay” / waitlist interest, page performance, and JavaScript errors. Session replay is on: PostHog records how the page was used (scrolls, clicks, page changes) so it can be played back, with every form field masked. PostHog receives request information and uses cookies and local storage for visitor identity. Requests from bots and crawlers are labeled as bots instead of dropped, so the site can count human and machine visits separately.</li>
         <li><strong>Waitlist email</strong> is only sent to PostHog when analytics is live. If analytics is off, the form tells you the address was not stored.</li>
         <li><strong>Creators form</strong> does not leave the browser. Applications are not open, and submitting it does not store the note.</li>
         <li><strong>Download</strong> is the macOS installer from the GitHub Release for <a href="https://github.com/keeganmoody33/punch2pen">keeganmoody33/punch2pen</a>. The homepage also asks GitHub which Release is current so the button can name the pkg. GitHub sees those requests.</li>
