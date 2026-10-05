@@ -1,7 +1,6 @@
 (() => {
   const RELEASES = "https://api.github.com/repos/keeganmoody33/punch2pen/releases/latest";
   const RELEASE_PAGE = "https://github.com/keeganmoody33/punch2pen/releases/latest";
-  const env = window.__P2P_ENV__ || { POSTHOG_KEY: "", POSTHOG_HOST: "https://us.i.posthog.com" };
   const statusDownload = document.getElementById("download-status");
   const statusInterest = document.getElementById("interest-status");
   const macBtn = document.getElementById("mac-download");
@@ -36,30 +35,11 @@
   }
 
   function loadPosthog() {
-    const key = typeof env.POSTHOG_KEY === "string" ? env.POSTHOG_KEY.trim() : "";
-    if (!key) return Promise.resolve(false);
-    return new Promise((resolve) => {
-      const s = document.createElement("script");
-      s.async = true;
-      s.src = "https://us-assets.i.posthog.com/static/array.js";
-      s.onload = () => {
-        if (!window.posthog || typeof window.posthog.init !== "function") {
-          resolve(false);
-          return;
-        }
-        window.posthog.init(key, {
-          api_host: env.POSTHOG_HOST || "https://us.i.posthog.com",
-          persistence: "localStorage+cookie",
-          capture_pageview: true,
-          capture_pageleave: true,
-          autocapture: false,
-          disable_session_recording: true,
-        });
-        posthogReady = true;
-        resolve(true);
-      };
-      s.onerror = () => resolve(false);
-      document.head.appendChild(s);
+    // ph.js (loaded on every page) owns init; this page only waits for it.
+    const ready = window.__p2pPosthog || Promise.resolve(false);
+    return ready.then((ok) => {
+      posthogReady = ok;
+      return ok;
     });
   }
 
