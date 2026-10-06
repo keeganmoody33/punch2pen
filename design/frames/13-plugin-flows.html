@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=2000">
+<meta name="paper:artboard" content="Plugin / 13 Flows" data-width="2000" data-height="2094">
+<title>Plugin Flows · Punch2Pen</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap">
+<link rel="stylesheet" href="../tokens/tokens.css">
+<link rel="stylesheet" href="../components/plugin.css">
+<link rel="stylesheet" href="_board.css">
+<style>
+  .flowset { display: flex; flex-direction: column; gap: 22px; }
+  .flowset .head { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+  .flowset .head p { font-size: 14px; color: var(--ink-3); max-width: 90ch; }
+  .steps { display: flex; align-items: flex-start; gap: 18px; }
+  .step { display: flex; flex-direction: column; gap: 12px; width: 400px; flex-shrink: 0; }
+  .step .n { display: flex; gap: 10px; align-items: center; }
+  .step .n b { font-size: 15px; font-weight: 650; }
+  .step p.note { max-width: none; }
+  .go { align-self: center; margin-top: -40px; color: var(--accent); font-family: var(--mono); font-size: 22px; font-weight: 700; width: 26px; text-align: center; flex-shrink: 0; }
+  .split { display: flex; flex-direction: column; gap: 8px; }
+  .fork { width: 1px; align-self: stretch; background: var(--line-strong); margin: 0 12px; }
+  .host-label { display: inline-flex; align-items: center; gap: 8px; }
+</style>
+</head>
+<body class="board" style="--board-w: 2000px; --board-h: 2094px">
+
+<header class="board-head">
+  <div class="lead">
+    <p class="eyebrow">Plugin · Flows</p>
+    <h1>Fix it, sign in, jump to it</h1>
+    <p class="dek">Three flows the insert has to get right. Correcting a word and signing in ship today. Clicking a word to move the playhead is the unlock from the brief, and whether it can move the DAW depends on the host.</p>
+  </div>
+  <div class="board-meta"><img src="../brand/fist-booth.svg" alt=""><span>Frame 13 · 2000 wide</span></div>
+</header>
+
+<!-- A · CORRECT -->
+<section class="flowset">
+  <div class="head"><h2>A · Correct a mis-hear</h2><span class="status shipped">Shipped</span><span class="status proposed">Double-click proposed</span>
+    <p>Today a single click opens the sheet. With click-to-jump (flow C), correcting moves to double-click or Return on a selected word. Apply replaces every exact match in the take.</p></div>
+  <div class="steps">
+    <div class="step">
+      <div class="n"><span class="pin">1</span><b>Double-click the mis-hear</b></div>
+      <div class="crop"><div class="p-window" data-mode="playback" style="height:300px">
+        <div class="p-transport"><span>BAR <b>18</b> · BEAT <b>3</b></span><span><b>120</b> BPM</span><span><b>00:00:35.104</b></span><span class="p-sync">LIVE</span></div>
+        <div class="p-pane">
+          <div class="p-lines" style="--lines-top: 64px">
+            <div class="p-line is-past"><span class="p-word">late</span><span class="p-word">night</span><span class="p-word">in</span><span class="p-word">the</span><span class="p-word">booth</span><span class="p-word">red</span><span class="p-word">light</span><span class="p-word">on</span><span class="p-word">the</span><span class="p-word">wall</span></div>
+            <div class="p-line is-active"><span class="p-word is-past">punch</span><span class="p-word is-past">it</span><span class="p-word is-past">back</span><span class="p-word is-past">to</span><span class="p-word is-past">the</span><span class="p-word is-hover">topp</span><span class="p-word">I</span><span class="p-word">don’t</span><span class="p-word">miss</span><span class="p-word">the</span><span class="p-word">call</span></div>
+          </div>
+          <div class="p-tip" style="left:150px; top:14px">BAR 18 · BEAT 3 · 00:00:35.104<span>Click to jump · <kbd>2×</kbd> to fix</span></div>
+        </div>
+      </div></div>
+      <p class="note">Hover shows where the word sits on the host clock. The tooltip teaches both gestures.</p>
+    </div>
+    <span class="go">→</span>
+    <div class="step">
+      <div class="n"><span class="pin">2</span><b>Type what you said</b></div>
+      <div class="crop"><div class="p-window" data-mode="playback" style="height:300px">
+        <div class="p-transport"><span>BAR <b>18</b> · BEAT <b>3</b></span><span><b>120</b> BPM</span><span><b>00:00:35.104</b></span><span class="p-sync">LIVE</span></div>
+        <div class="p-pane">
+          <div class="p-lines" style="--lines-top: 20px">
+            <div class="p-line is-active"><span class="p-word is-past">punch</span><span class="p-word is-past">it</span><span class="p-word is-past">back</span><span class="p-word is-past">to</span><span class="p-word is-past">the</span><span class="p-word is-correcting">topp</span><span class="p-word">I</span><span class="p-word">don’t</span><span class="p-word">miss</span><span class="p-word">the</span><span class="p-word">call</span></div>
+          </div>
+          <div class="p-sheet">
+            <div class="ln"><span class="p-eyebrow">Heard</span><span class="heard">topp</span><span class="where">2 in this take</span></div>
+            <div class="ln"><input class="p-input is-focus" id="fa-2" value="top" aria-label="Correct word"><button class="p-btn primary" type="button">Apply</button><button class="p-btn" type="button">Cancel</button></div>
+            <div class="ln"><div class="p-chips"><button class="p-chip" aria-pressed="true" type="button">Word</button><button class="p-chip" aria-pressed="false" type="button">Adlib</button><button class="p-chip" aria-pressed="false" type="button">Phrase</button></div><span class="keys" style="margin-left:auto">Return · Esc</span></div>
+          </div>
+        </div>
+      </div></div>
+      <p class="note"><b>submitCorrection(original, corrected)</b> fires on Apply. Esc sends <b>onCorrectionCancelled()</b>. Entry type is proposed.</p>
+    </div>
+    <span class="go">→</span>
+    <div class="step">
+      <div class="n"><span class="pin">3</span><b>Every match fixed · free</b></div>
+      <div class="crop"><div class="p-window" data-mode="playback" style="height:300px">
+        <div class="p-transport"><span>BAR <b>18</b> · BEAT <b>3</b></span><span><b>120</b> BPM</span><span><b>00:00:35.104</b></span><span class="p-sync">LIVE</span></div>
+        <div class="p-pane">
+          <div class="p-lines" style="--lines-top: 30px">
+            <div class="p-line is-active"><span class="p-word is-past">punch</span><span class="p-word is-past">it</span><span class="p-word is-past">back</span><span class="p-word is-past">to</span><span class="p-word is-past">the</span><span class="p-word is-corrected is-active">top</span><span class="p-word">I</span><span class="p-word">don’t</span><span class="p-word">miss</span><span class="p-word">the</span><span class="p-word">call</span></div>
+            <div class="p-line"><span class="p-word">every</span><span class="p-word">word</span><span class="p-word">I</span><span class="p-word">drop</span><span class="p-word">lands</span><span class="p-word">right</span><span class="p-word">where</span><span class="p-word">it</span><span class="p-word">should</span></div>
+          </div>
+        </div>
+        <footer class="p-status"><span class="text is-nudge"><b>“topp” → “top”</b> (in 2 places) · session-only on this Mac. A profile carries your dictionary between rooms.</span></footer>
+      </div></div>
+      <p class="note">The nudge wraps to two lines, never blocks, names no price, and only appears after a real correction.</p>
+    </div>
+    <span class="go">→</span>
+    <div class="step">
+      <div class="n"><span class="pin">3′</span><b>Same fix · signed in</b></div>
+      <div class="crop"><div class="p-window" data-mode="playback" style="height:300px">
+        <div class="p-transport"><span>BAR <b>18</b> · BEAT <b>3</b></span><span><b>120</b> BPM</span><span><b>00:00:35.104</b></span><span class="p-sync">LIVE</span></div>
+        <div class="p-pane">
+          <div class="p-lines" style="--lines-top: 30px">
+            <div class="p-line is-active"><span class="p-word is-past">punch</span><span class="p-word is-past">it</span><span class="p-word is-past">back</span><span class="p-word is-past">to</span><span class="p-word is-past">the</span><span class="p-word is-corrected is-active">top</span><span class="p-word">I</span><span class="p-word">don’t</span><span class="p-word">miss</span><span class="p-word">the</span><span class="p-word">call</span></div>
+            <div class="p-line"><span class="p-word">every</span><span class="p-word">word</span><span class="p-word">I</span><span class="p-word">drop</span><span class="p-word">lands</span><span class="p-word">right</span><span class="p-word">where</span><span class="p-word">it</span><span class="p-word">should</span></div>
+          </div>
+        </div>
+        <footer class="p-status"><span class="text is-nudge"><b>“topp” → “top”</b> (in 2 places) · saved to Nova dictionary · <span class="ok">synced</span></span></footer>
+      </div></div>
+      <p class="note">The pair writes the active seat’s dictionary and biases the next pass. Offline it reads <span style="color:var(--wait)">1 pending sync</span>.</p>
+    </div>
+  </div>
+</section>
+
+<!-- B · SIGN IN -->
+<section class="flowset">
+  <div class="head"><h2>B · Sign in to a profile</h2><span class="status shipped">Shipped</span>
+    <p>Email, then a six-digit code, inside the plugin. The popover renders the engine’s ProfileStatus and holds no account state of its own. Sign-in stays dark until mail delivery is configured on the deployment.</p></div>
+  <div class="steps">
+    <div class="step">
+      <div class="n"><span class="pin">1</span><b>Pill → email</b></div>
+      <div class="crop"><div class="p-window" data-mode="idle" style="height:320px">
+        <header class="p-header"><img class="p-wordmark" src="../brand/wordmark-plugin.svg" alt="Punch2Pen"><button class="p-pill" data-kind="local" aria-expanded="true" type="button"><span class="dot"></span><span class="name">Local</span></button><span class="p-spacer"></span><span class="p-badge">Idle</span></header>
+        <div class="p-pane"></div>
+        <div class="p-pop">
+          <span class="p-eyebrow">Active profile</span>
+          <div class="p-row is-current"><span class="dot" style="background:var(--ink-3)"></span><span class="who"><b>Local · This Mac</b><span>No account. Corrections stay in this session.</span></span></div>
+          <p class="copy">Sign in to keep your dictionary between sessions and rooms.</p>
+          <div class="form"><input class="p-input is-focus" id="fb-1" value="nova@example.com" aria-label="Email"><button class="p-btn primary" type="button">Send code</button></div>
+        </div>
+      </div></div>
+    </div>
+    <span class="go">→</span>
+    <div class="step">
+      <div class="n"><span class="pin">2</span><b>Six-digit code</b></div>
+      <div class="crop"><div class="p-window" data-mode="idle" style="height:320px">
+        <header class="p-header"><img class="p-wordmark" src="../brand/wordmark-plugin.svg" alt="Punch2Pen"><button class="p-pill" data-kind="local" aria-expanded="true" type="button"><span class="dot"></span><span class="name">Local</span></button><span class="p-spacer"></span><span class="p-badge">Idle</span></header>
+        <div class="p-pane"></div>
+        <div class="p-pop">
+          <span class="p-eyebrow">Sign in</span>
+          <p class="p-note">Code sent to <b>nova@example.com</b> · <button class="p-link" type="button">Change email</button></p>
+          <div class="form"><input class="p-input code is-focus" id="fb-2" value="482910" aria-label="Six digit code"><button class="p-btn primary" type="button">Sign in</button></div>
+          <p class="p-note">Submits on the sixth digit. Ten minutes, five tries.</p>
+        </div>
+      </div></div>
+    </div>
+    <span class="go">→</span>
+    <div class="step">
+      <div class="n"><span class="pin">3</span><b>Pick a seat</b></div>
+      <div class="crop"><div class="p-window" data-mode="idle" style="height:320px">
+        <header class="p-header"><img class="p-wordmark" src="../brand/wordmark-plugin.svg" alt="Punch2Pen"><button class="p-pill" data-kind="seat" aria-expanded="true" type="button"><span class="dot"></span><span class="name">Nova</span></button><span class="p-spacer"></span><span class="p-badge">Idle</span></header>
+        <div class="p-pane"></div>
+        <div class="p-pop">
+          <div class="p-account"><span class="email">nova@example.com</span><button class="p-link" type="button">Refresh</button><button class="p-link" type="button">Sign out</button></div>
+          <span class="p-eyebrow">Seats</span>
+          <div class="p-row is-current"><span class="dot"></span><span class="who"><b>Nova</b><span>Room 4 · Seat · 214 words in dictionary · synced</span></span><span class="check">✓</span></div>
+          <div class="p-row"><span class="dot"></span><span class="who"><b>Nova (features)</b><span>Nova · Owner</span></span></div>
+        </div>
+      </div></div>
+    </div>
+    <span class="go">→</span>
+    <div class="step">
+      <div class="n"><span class="pin">!</span><b>Sign-in not available</b></div>
+      <div class="crop"><div class="p-window" data-mode="idle" style="height:320px">
+        <header class="p-header"><img class="p-wordmark" src="../brand/wordmark-plugin.svg" alt="Punch2Pen"><button class="p-pill" data-kind="local" aria-expanded="true" type="button"><span class="dot"></span><span class="name">Local</span></button><span class="p-spacer"></span><span class="p-badge">Idle</span></header>
+        <div class="p-pane"></div>
+        <div class="p-pop">
+          <span class="p-eyebrow">Active profile</span>
+          <div class="p-row is-current"><span class="dot" style="background:var(--ink-3)"></span><span class="who"><b>Local · This Mac</b><span>No account. Corrections stay in this session.</span></span></div>
+          <p class="copy">Sign-in isn’t available in this build. Everything else works without an account.</p>
+        </div>
+      </div></div>
+      <p class="note">When the build has no profile API (<code>cloudAvailable:false</code>), no form is shown.</p>
+    </div>
+  </div>
+</section>
+
+<!-- C · JUMP -->
+<section class="flowset">
+  <div class="head"><h2>C · Click a word, move the playhead</h2><span class="status proposed">Proposed · host-dependent</span>
+    <p>A standard AU or VST3 insert reads the host clock but cannot move it. ARA 2 adds a playback controller that lets the plugin ask the host to set the playback position. Today the plugin is a standard insert, so this flow needs an ARA 2 build to do the jump; without it, the click shows exactly where to go.</p></div>
+  <div class="steps">
+    <div class="split">
+      <span class="host-label"><span class="label">ARA 2 host</span></span>
+      <div class="steps">
+        <div class="step">
+          <div class="n"><span class="pin">1</span><b>Click a word ahead</b></div>
+          <div class="crop"><div class="p-window" data-mode="playback" style="height:300px">
+            <div class="p-transport"><span>BAR <b>19</b> · BEAT <b>3</b></span><span><b>120</b> BPM</span><span><b>00:00:37.012</b></span><span class="p-sync">LIVE</span></div>
+            <div class="p-pane">
+              <div class="p-lines" style="--lines-top: 30px">
+                <div class="p-line is-active"><span class="p-word is-past">every</span><span class="p-word is-past">word</span><span class="p-word is-past">I</span><span class="p-word is-past">drop</span><span class="p-word is-active">lands</span><span class="p-word">right</span><span class="p-word">where</span><span class="p-word">it</span><span class="p-word">should</span></div>
+                <div class="p-line"><span class="p-word">pen</span><span class="p-word">it</span><span class="p-word">down</span><span class="p-word">run</span><span class="p-word">it</span><span class="p-word">back</span><span class="p-word">make</span><span class="p-word">it</span><span class="p-word is-hover">understood</span></div>
+              </div>
+            </div>
+          </div></div>
+        </div>
+        <span class="go">→</span>
+        <div class="step">
+          <div class="n"><span class="pin">2</span><b>The DAW jumps there</b></div>
+          <div class="crop"><div class="p-window" data-mode="playback" style="height:300px">
+            <div class="p-transport"><span>BAR <b>20</b> · BEAT <b>4</b></span><span><b>120</b> BPM</span><span><b>00:00:39.504</b></span><span class="p-sync">LIVE</span></div>
+            <div class="p-pane">
+              <div class="p-lines" style="--lines-top: 30px">
+                <div class="p-line is-past"><span class="p-word">every</span><span class="p-word">word</span><span class="p-word">I</span><span class="p-word">drop</span><span class="p-word">lands</span><span class="p-word">right</span><span class="p-word">where</span><span class="p-word">it</span><span class="p-word">should</span></div>
+                <div class="p-line is-active"><span class="p-word is-past">pen</span><span class="p-word is-past">it</span><span class="p-word is-past">down</span><span class="p-word is-past">run</span><span class="p-word is-past">it</span><span class="p-word is-past">back</span><span class="p-word is-past">make</span><span class="p-word is-past">it</span><span class="p-word is-seek">understood</span></div>
+              </div>
+            </div>
+          </div></div>
+          <p class="note">Plugin requests the new position; the host moves; the clock reports BAR 20 · BEAT 4 back; the Living Transcript follows. Yellow highlighter for 200 ms.</p>
+        </div>
+      </div>
+    </div>
+    <span class="fork"></span>
+    <div class="split">
+      <span class="host-label"><span class="label">Standard insert (today)</span></span>
+      <div class="step">
+        <div class="n"><span class="pin">1′</span><b>Click shows the spot</b></div>
+        <div class="crop"><div class="p-window" data-mode="playback" style="height:300px">
+          <div class="p-transport"><span>BAR <b>19</b> · BEAT <b>3</b></span><span><b>120</b> BPM</span><span><b>00:00:37.012</b></span><span class="p-sync">LIVE</span></div>
+          <div class="p-pane">
+            <div class="p-lines" style="--lines-top: 30px">
+              <div class="p-line is-active"><span class="p-word is-past">every</span><span class="p-word is-past">word</span><span class="p-word is-past">I</span><span class="p-word is-past">drop</span><span class="p-word is-active">lands</span><span class="p-word">right</span><span class="p-word">where</span><span class="p-word">it</span><span class="p-word">should</span></div>
+              <div class="p-line"><span class="p-word">pen</span><span class="p-word">it</span><span class="p-word">down</span><span class="p-word">run</span><span class="p-word">it</span><span class="p-word">back</span><span class="p-word">make</span><span class="p-word">it</span><span class="p-word is-correcting">understood</span></div>
+            </div>
+            <div class="p-tip" style="left:60px; top:150px; white-space:normal; width:280px">BAR 20 · BEAT 4 · 00:00:39.504<span>This DAW doesn’t let plugins move its playhead. Jump to bar 20 in the DAW.</span><span style="display:flex; gap:6px; margin-top:4px"><button class="p-btn sm" type="button">Copy position</button><button class="p-btn sm" type="button">Fix word</button></span></div>
+          </div>
+        </div></div>
+        <p class="note">No dead click: the position is exact to the millisecond and one tap from the clipboard.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="board-foot"><span>Punch2Pen design system</span><span>ARA 2 playback control: requestSetPlaybackPosition · example profile data</span></footer>
+</body>
+</html>

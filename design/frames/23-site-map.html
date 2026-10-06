@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<meta name="paper:artboard" content="Site / 23 Routes and funnel" data-width="1440" data-height="1942">
+<title>Routes and Funnel · Punch2Pen</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap">
+<link rel="stylesheet" href="../tokens/tokens.css">
+<link rel="stylesheet" href="_board.css">
+<style>
+  .routes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  .route { display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: var(--radius-md); background: var(--bg-pane); border: 1px solid var(--line); }
+  .route.home { grid-column: span 4; flex-direction: row; align-items: center; gap: 24px; background: var(--bg-chrome); }
+  .route .path { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--accent); letter-spacing: .02em; }
+  .route b { font-size: 16px; }
+  .route p { font-size: 13px; color: var(--ink-3); line-height: 1.45; }
+  .route .cta { margin-top: auto; font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+  .route .cta::before { content: "→ "; color: var(--accent); }
+  .funnel { display: flex; flex-direction: column; gap: 0; }
+  .stage { display: grid; grid-template-columns: 56px 300px 1fr 260px; gap: 20px; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--line); }
+  .stage .n { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+  .stage b { font-size: 16px; }
+  .stage .where { font-size: 13px; color: var(--ink-3); }
+  .ev { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ev code { font-family: var(--mono); font-size: 11.5px; padding: 3px 8px; border-radius: 4px; background: var(--accent-dim); color: var(--accent); }
+  .ev code.none { background: rgba(215, 176, 122, 0.12); color: var(--wait); }
+  .blind { margin-top: 8px; padding: 20px 24px; border-radius: var(--radius-md); border: 1px dashed rgba(215,176,122,.5); display: flex; gap: 20px; align-items: flex-start; }
+  .blind b { font-size: 16px; color: var(--wait); }
+  .blind p { font-size: 14px; color: var(--ink-2); max-width: 90ch; }
+</style>
+</head>
+<body class="board" style="--board-h: 1942px">
+
+<header class="board-head">
+  <div class="lead">
+    <p class="eyebrow">Site · Routes and funnel</p>
+    <h1>Where people go, what we can see</h1>
+    <p class="dek">Nine pages in <code class="code">site/public</code> behind the Cloudflare Worker, and the path from a first visit to a signed-in seat. Events are the ones <code class="code">site/public/site.js</code> actually sends to PostHog. After the download click, nothing is measured.</p>
+  </div>
+  <div class="board-meta"><img src="../brand/fist-booth.svg" alt=""><span>Frame 23 · 1440 wide</span></div>
+</header>
+
+<section class="section">
+  <div class="section-head"><h2>Route map</h2><p>From the route-map change (#40). One job per page, one primary action.</p></div>
+  <div class="routes">
+    <div class="route home"><span class="path">/</span><div style="display:flex; flex-direction:column; gap:6px; flex:1"><b>Home</b><p>The punch-in problem, the Living Transcript, Mac download, three tiers without prices, would-you-pay interest.</p></div><span class="cta">Download free utility</span></div>
+    <div class="route"><span class="path">/product</span><b>Product</b><p>DAW integration, compatibility matrix (shipped, the host we run, not shipped), technical specs.</p><span class="cta">Install path</span></div>
+    <div class="route"><span class="path">/pricing</span><b>Pricing</b><p>Free, Pro, Studio split. Every price cell reads “Not published yet”.</p><span class="cta">Download free utility</span></div>
+    <div class="route"><span class="path">/for-studios</span><b>Studios</b><p>A seat per artist; the owner runs the room but never holds the dictionary.</p><span class="cta">See the three tiers</span></div>
+    <div class="route"><span class="path">/creators</span><b>Creators</b><p>Tutorial makers and mix engineers. Applications are not open; the form sends nothing.</p><span class="cta">Interest form</span></div>
+    <div class="route"><span class="path">/docs</span><b>Docs</b><p>Install the unsigned pkg, the nested engine helper, corrections and the dictionary.</p><span class="cta">Search this page</span></div>
+    <div class="route"><span class="path">/login</span><b>Sign in</b><p>Explains that sign-in happens inside the plugin and is dark until mail delivery exists.</p><span class="cta">Download free utility</span></div>
+    <div class="route"><span class="path">/privacy</span><b>Privacy</b><p>What this site does with data: no accounts here, no audio on this domain, analytics only when a PostHog key is set.</p><span class="cta">Back to home</span></div>
+    <div class="route"><span class="path">/404</span><b>Not found</b><p>“Nothing here.” The wordmark through a lens (the lost-lens shader), then links home.</p><span class="cta">Home</span></div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Funnel</h2><p>Stages in order. The right column is the evidence we have for each stage today.</p></div>
+  <div class="funnel">
+    <div class="stage"><span class="n">01</span><b>Lands on the site</b><span class="where">Any route. Worker serves static pages.</span><span class="ev"><code>site_ready</code></span></div>
+    <div class="stage"><span class="n">02</span><b>Says what DAW they use</b><span class="where">Home DAW select. Attached to later events as <code class="code">daw</code>.</span><span class="ev"><code>daw</code> property</span></div>
+    <div class="stage"><span class="n">03</span><b>Clicks download</b><span class="where">Home and pricing CTAs, with the release tag.</span><span class="ev"><code>download_click</code><code>download_unavailable</code></span></div>
+    <div class="stage"><span class="n">04</span><b>Signals intent to pay</b><span class="where">Home interest block, then the optional waitlist.</span><span class="ev"><code>interest_would_pay</code><code>interest_just_looking</code><code>waitlist_submit</code></span></div>
+    <div class="stage"><span class="n">05</span><b>Installs, engine handshakes</b><span class="where">pkg postinstall, LaunchAgent, editor leaves WAIT.</span><span class="ev"><code class="none">not measured</code></span></div>
+    <div class="stage"><span class="n">06</span><b>First punch transcribed</b><span class="where">First TranscriptionResult in a recording.</span><span class="ev"><code class="none">not measured</code></span></div>
+    <div class="stage"><span class="n">07</span><b>First correction, sees the nudge</b><span class="where">submitCorrection on the free tier.</span><span class="ev"><code class="none">not measured</code></span></div>
+    <div class="stage"><span class="n">08</span><b>Signs in, picks a seat</b><span class="where">Plugin popover, once mail delivery is configured.</span><span class="ev"><code class="none">not measured</code></span></div>
+  </div>
+  <div class="blind">
+    <span class="pin" style="background:var(--wait)">!</span>
+    <div style="display:flex; flex-direction:column; gap:6px">
+      <b>The funnel goes dark at the download click</b>
+      <p>The plugin, engine, and profile API send no analytics today. Stages 05–08 are the activation story (install, first punch, first correction, sign-in), and they are exactly the ones we cannot see. Any instrumentation there needs an opt-in the free tier can keep honest, since the site promises nothing leaves the Mac on free.</p>
+    </div>
+  </div>
+</section>
+
+<footer class="board-foot"><span>Punch2Pen design system</span><span>Events from site/public/site.js · routes from site/public/*.html</span></footer>
+</body>
+</html>

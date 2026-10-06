@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<meta name="paper:artboard" content="Plugin / 10 Anatomy" data-width="1440" data-height="1176">
+<title>Plugin Anatomy · Punch2Pen</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap">
+<link rel="stylesheet" href="../tokens/tokens.css">
+<link rel="stylesheet" href="../components/plugin.css">
+<link rel="stylesheet" href="_board.css">
+<style>
+  .stage { display: flex; gap: 72px; align-items: flex-start; }
+  .win { position: relative; flex-shrink: 0; }
+  .legend { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 22px 40px; }
+  .legend .item { display: flex; gap: 12px; align-items: flex-start; }
+  .legend .item .body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .legend .item .top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .legend .item strong { font-size: 15px; font-weight: 650; }
+  .legend .item p { font-size: 13px; color: var(--ink-3); line-height: 1.45; }
+  .legend .item code { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); }
+  .legend .status { height: 18px; font-size: 9px; padding: 0 7px; }
+</style>
+</head>
+<body class="board" style="--board-h: 1176px">
+
+<header class="board-head">
+  <div class="lead">
+    <p class="eyebrow">Plugin · Anatomy</p>
+    <h1>The insert, top to bottom</h1>
+    <p class="dek">Mono is the punch: clock, bar and beat, labels. Sans is the words. White means the pen is live; red is the brand and the REC dot. Every region maps to an element ID the C++ bridge already binds to; new pieces are marked proposed.</p>
+  </div>
+  <div class="board-meta"><img src="../brand/fist-booth.svg" alt=""><span>Frame 10 · 1440 wide</span></div>
+</header>
+
+<div class="stage">
+  <div class="win">
+    <div class="p-window" data-mode="playback">
+      <header class="p-header">
+        <img class="p-wordmark" src="../brand/wordmark-plugin.svg" alt="Punch2Pen">
+        <button class="p-pill" data-kind="seat" type="button"><span class="dot"></span><span class="name">Nova</span><svg class="caret" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4 5 6.5 7.5 4"/></svg></button>
+        <span class="p-spacer"></span>
+        <button class="p-icon-btn" type="button" title="Flow Grid"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2.5 4h11M2.5 8h11M2.5 12h11M6 2.5v11M10 2.5v11"/></svg></button>
+        <button class="p-icon-btn" type="button" title="Dictionary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2.5h7.5a2 2 0 0 1 2 2v9H5a2 2 0 0 1-2-2z"/><path d="M3 11.5a2 2 0 0 1 2-2h7.5"/></svg></button>
+        <button class="p-icon-btn" type="button" title="Pen it"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2.5 13.5 5 6 12.5 3 13l.5-3z"/><path d="M9.5 4 12 6.5"/></svg></button>
+        <span class="p-badge is-play">Play</span>
+      </header>
+      <div class="p-transport"><span>BAR <b>20</b> · BEAT <b>4</b></span><span><b>120</b> BPM</span><span><b>00:00:39.504</b></span><span class="p-sync">LIVE</span></div>
+      <div class="p-pane">
+        <div class="p-lines" style="--lines-top: 88px">
+          <div class="p-line is-past"><span class="p-word">punch</span><span class="p-word">it</span><span class="p-word">back</span><span class="p-word">to</span><span class="p-word">the</span><span class="p-word">top</span><span class="p-word">I</span><span class="p-word">don’t</span><span class="p-word">miss</span><span class="p-word">the</span><span class="p-word">call</span></div>
+          <div class="p-line is-past"><span class="p-word">every</span><span class="p-word">word</span><span class="p-word">I</span><span class="p-word">drop</span><span class="p-word">lands</span><span class="p-word">right</span><span class="p-word">where</span><span class="p-word">it</span><span class="p-word">should</span><span class="p-word is-adlib">yeah</span></div>
+          <div class="p-line is-active"><span class="p-word is-past">pen</span><span class="p-word is-past">it</span><span class="p-word is-past">down</span><span class="p-word is-past is-dictionary">run</span><span class="p-word is-past is-dictionary">it</span><span class="p-word is-past is-dictionary">back</span><span class="p-word is-past">make</span><span class="p-word is-past">it</span><span class="p-word is-active has-syllables"><span class="p-syl is-sung">un</span><span class="p-syl is-sung">der</span><span class="p-syl">stood</span></span></div>
+          <div class="p-line"><span class="p-word">second</span><span class="p-word">verse</span><span class="p-word">same</span><span class="p-word is-corrected">booth</span><span class="p-word">the</span><span class="p-word">take</span><span class="p-word">is</span><span class="p-word">getting</span><span class="p-word">tight</span></div>
+          <div class="p-line"><span class="p-word">one</span><span class="p-word">more</span><span class="p-word">pass</span><span class="p-word">on</span><span class="p-word">the</span><span class="p-word">hook</span><span class="p-word is-adlib">skrrt</span></div>
+        </div>
+      </div>
+      <footer class="p-status"><span class="text">Following the playhead · click a word to jump there</span><img class="p-logo" src="../brand/two-plugin.svg" alt=""></footer>
+    </div>
+    <span class="pin abs" style="left:-11px; top:11px">1</span>
+    <span class="pin abs" style="left:112px; top:-11px">2</span>
+    <span class="pin abs" style="left:282px; top:-11px">3</span>
+    <span class="pin abs" style="right:-11px; top:11px">4</span>
+    <span class="pin abs" style="left:-11px; top:48px">5</span>
+    <span class="pin abs" style="left:228px; top:-11px">6</span>
+    <span class="pin abs" style="right:-11px; top:48px">7</span>
+    <span class="pin abs" style="left:-11px; top:180px">8</span>
+    <span class="pin abs" style="left:-11px; top:262px">9</span>
+    <span class="pin abs" style="left:146px; top:292px">10</span>
+    <span class="pin abs" style="left:-11px; top:348px">11</span>
+    <span class="pin abs" style="left:186px; top:340px">12</span>
+    <span class="pin abs" style="right:-11px; top:572px">13</span>
+  </div>
+
+  <div class="legend">
+    <div class="item"><span class="pin">1</span><div class="body"><div class="top"><strong>Wordmark</strong><span class="status changed">New asset</span></div><p>Archivo 75/900 outlined to paths, the 2 as a one-color badge (no red dot in the DAW). No webfont needed inside the DAW. <code>#app-title</code></p></div></div>
+    <div class="item"><span class="pin">2</span><div class="body"><div class="top"><strong>Profile pill</strong><span class="status shipped">Shipped</span></div><p>Local · This Mac · no account, a seat name with a white dot, or No seat with an amber ring. Opens sign-in and seats. <code>#profile-pill</code></p></div></div>
+    <div class="item"><span class="pin">3</span><div class="body"><div class="top"><strong>Dictionary · Pen it</strong><span class="status proposed">Proposed</span></div><p>Your words, adlibs, and phrases; export the take as a lyric sheet. Icon buttons, 26 px targets.</p></div></div>
+    <div class="item"><span class="pin">4</span><div class="body"><div class="top"><strong>Status badge</strong><span class="status shipped">Shipped</span></div><p>WAIT amber, IDLE grey, REC red with a 1.3 s pulse, PLAY white. <code>#status-badge</code></p></div></div>
+    <div class="item"><span class="pin">5</span><div class="body"><div class="top"><strong>Host clock</strong><span class="status shipped">Shipped</span></div><p>BAR · BEAT from the DAW, host BPM, HH:MM:SS.mmm. Mono, tabular figures. The clock stays in the plugin. <code>#position-display</code></p></div></div>
+    <div class="item"><span class="pin">6</span><div class="body"><div class="top"><strong>Flow Grid toggle</strong><span class="status proposed">Proposed</span></div><p>Switches the pane from the Living Transcript to the Flow Grid, where syllables sit on the 16th-note grid. A header icon so the host clock keeps its room.</p></div></div>
+    <div class="item"><span class="pin">7</span><div class="body"><div class="top"><strong>Sync</strong><span class="status shipped">Shipped</span></div><p>LIVE white, REC red, SCROLLED grey. <code>#sync-indicator</code></p></div></div>
+    <div class="item"><span class="pin">8</span><div class="body"><div class="top"><strong>Past lines</strong><span class="status shipped">Shipped</span></div><p>Opacity 0.38. Adlibs sit in parentheses, italic, never the title.</p></div></div>
+    <div class="item"><span class="pin">9</span><div class="body"><div class="top"><strong>Active line, the title</strong><span class="status shipped">Shipped</span></div><p>Bold, scales with the window (6 cqi, 21–34 px), sits 40% down the pane. Dictionary words carry a yellow highlighter underline.</p></div></div>
+    <div class="item"><span class="pin">10</span><div class="body"><div class="top"><strong>Syllable fill</strong><span class="status proposed">Proposed</span></div><p>Inside the word under the playhead, sung syllables take the ink plate and the rest wait in outline. Needs syllable timestamps from the engine.</p></div></div>
+    <div class="item"><span class="pin">11</span><div class="body"><div class="top"><strong>Upcoming lines</strong><span class="status shipped">Shipped</span></div><p>Opacity 0.68. A red-pen underline marks a word you corrected.</p></div></div>
+    <div class="item"><span class="pin">12</span><div class="body"><div class="top"><strong>Word click</strong><span class="status proposed">Proposed</span></div><p>Click jumps the playhead (ARA 2 hosts) or shows the position (standard insert). Double-click or Return corrects. Today a click corrects. See frame 13.</p></div></div>
+    <div class="item"><span class="pin">13</span><div class="body"><div class="top"><strong>Status bar + 2 mark</strong><span class="status changed">New asset</span></div><p>State copy and the only upgrade nudge, which appears after a real correction. The outlined 2 fills the <code>#logo-mark</code> placeholder.</p></div></div>
+  </div>
+</div>
+
+<footer class="board-foot"><span>Punch2Pen design system</span><span>Nova is an example profile name</span></footer>
+</body>
+</html>

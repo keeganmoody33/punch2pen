@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<meta name="paper:artboard" content="Foundations / 03 Type" data-width="1440" data-height="2621">
+<title>Type · Punch2Pen</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap">
+<link rel="stylesheet" href="../tokens/tokens.css">
+<link rel="stylesheet" href="_board.css">
+<style>
+  .roles { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 20px; }
+  .role { display: flex; flex-direction: column; gap: 16px; padding: 28px; border-radius: var(--radius-md); background: var(--bg-pane); border: 1px solid var(--line); }
+  .role .spec { font-size: 13px; color: var(--ink-3); line-height: 1.5; }
+  .role .spec code { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); }
+  .d-sample { font-family: var(--display); font-stretch: var(--display-stretch); font-weight: 850; font-size: 88px; line-height: 0.86; text-transform: uppercase; }
+  .s-sample { font-family: var(--sans); font-size: 44px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.05; }
+  .m-sample { font-family: var(--mono); font-size: 30px; font-weight: 700; letter-spacing: 0.06em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .scale { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+  .scale .r { display: grid; grid-template-columns: 170px 90px 1fr 280px; align-items: baseline; gap: 20px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .scale .r .tok { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); }
+  .scale .r .px { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); }
+  .scale .r .use { font-size: 12.5px; color: var(--ink-3); }
+  .disp { font-family: var(--display); font-stretch: var(--display-stretch); font-weight: 850; text-transform: uppercase; line-height: 0.95; }
+  .hier { display: flex; flex-direction: column; gap: 4px; padding: 32px; background: var(--bg-pane); border-radius: var(--radius-md); border: 1px solid var(--line); width: 520px; }
+  .hier .l { font-size: 16px; line-height: 1.42; opacity: .68; }
+  .hier .l.p { opacity: .38; }
+  .hier .l.t { opacity: 1; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.26; padding: 6px 0; }
+  .hier .l.t em { font-style: normal; background: var(--ink); color: var(--bg-deep); border-radius: 3px; padding: 0 .14em; }
+  .rules { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; flex: 1; }
+  .rules .rule { padding: 18px; border-radius: var(--radius-md); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+  .rules .rule b { font-size: 14px; }
+  .rules .rule p { font-size: 13px; color: var(--ink-3); line-height: 1.45; }
+</style>
+</head>
+<body class="board" style="--board-h: 2621px">
+
+<header class="board-head">
+  <div class="lead">
+    <p class="eyebrow">Foundations · Type</p>
+    <h1>The punch, the words, the poster</h1>
+    <p class="dek">Three faces, three jobs. The plugin loads nothing from the network, so it runs on the system sans and mono; Archivo is for the site and brand moments only, and the wordmark is outlined so it needs no font at all.</p>
+  </div>
+  <div class="board-meta"><img src="../brand/fist-booth.svg" alt=""><span>Frame 03 · 1440 wide</span></div>
+</header>
+
+<section class="roles">
+  <div class="role">
+    <span class="label">Display · --display</span>
+    <div class="d-sample">Don’t rewrite it by ear.</div>
+    <p class="spec"><b>Archivo</b>, width 68%, weight 850, uppercase, tracking −0.01 em, leading 0.86–0.95. Google Fonts on the site. Headlines, section titles, the lyric-sheet title. <code>font-stretch: var(--display-stretch)</code></p>
+  </div>
+  <div class="role">
+    <span class="label">Sans · --sans</span>
+    <div class="s-sample">every word I drop lands</div>
+    <p class="spec">System sans: <b>SF Pro</b> on Mac, Segoe UI on Windows. Lyrics, UI copy, body text. Weights 400, 600, 700. Tracking −0.01 to −0.02 em at lyric sizes.</p>
+  </div>
+  <div class="role">
+    <span class="label">Mono · --mono</span>
+    <div class="m-sample">BAR 19 · 3<br>00:00:37.012</div>
+    <p class="spec">System mono: <b>SF Mono</b>, Menlo fallback. Clock, bar and beat, badges, buttons, eyebrows. Caps with 0.08–0.2 em tracking, tabular figures always.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Plugin scale</h2><p>Six sizes. The two lyric sizes scale with the window through container units, clamped.</p></div>
+  <div class="scale">
+    <div class="r"><span class="tok">--fs-plugin-badge</span><span class="px">9</span><span style="font-family:var(--mono); font-size:9px; font-weight:600; letter-spacing:.18em">PLAY · REC · WAIT</span><span class="use">Status badge</span></div>
+    <div class="r"><span class="tok">--fs-plugin-micro</span><span class="px">10.5</span><span style="font-family:var(--mono); font-size:10.5px; font-weight:700; letter-spacing:.1em">RETURN TO LIVE · APPLY</span><span class="use">Pill, buttons, banner</span></div>
+    <div class="r"><span class="tok">--fs-plugin-body</span><span class="px">12</span><span style="font-size:12px">Following the playhead · click a word to jump there</span><span class="use">Status bar, popover body</span></div>
+    <div class="r"><span class="tok">--fs-plugin-ui</span><span class="px">13</span><span style="font-size:13px">Sign in to keep your dictionary between sessions and rooms.</span><span class="use">Popover copy, hints</span></div>
+    <div class="r"><span class="tok">--lyric-size</span><span class="px">16 · 15–21</span><span style="font-size:16px">pen it down run it back make it understood</span><span class="use">Past and upcoming lines · clamp(15px, 4.1cqi, 21px)</span></div>
+    <div class="r"><span class="tok">--title-size</span><span class="px">24 · 21–34</span><span style="font-size:24px; font-weight:700; letter-spacing:-.02em">every word I drop lands</span><span class="use">Active line · clamp(21px, 6cqi, 34px)</span></div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Site scale</h2><p>Display sizes in Archivo; 18 and below in the system sans.</p></div>
+  <div class="scale">
+    <div class="r"><span class="tok">--fs-6xl</span><span class="px">112</span><span class="disp" style="font-size:112px">Punch in</span><span class="use">Cover, hero at 1440</span></div>
+    <div class="r"><span class="tok">--fs-5xl</span><span class="px">80</span><span class="disp" style="font-size:80px">You punched the line</span><span class="use">Home hero</span></div>
+    <div class="r"><span class="tok">--fs-4xl</span><span class="px">56</span><span class="disp" style="font-size:56px">Punch-in, then the lyric is gone</span><span class="use">Page titles, mobile hero</span></div>
+    <div class="r"><span class="tok">--fs-3xl</span><span class="px">40</span><span class="disp" style="font-size:40px">Three tiers, no prices yet</span><span class="use">Section titles</span></div>
+    <div class="r"><span class="tok">--fs-2xl</span><span class="px">28</span><span class="disp" style="font-size:28px">Living Transcript</span><span class="use">Card titles</span></div>
+    <div class="r"><span class="tok">--fs-xl</span><span class="px">22</span><span style="font-size:22px; line-height:1.4">Punch2Pen transcribes vocals inside the session.</span><span class="use">Lede</span></div>
+    <div class="r"><span class="tok">--fs-lg / md</span><span class="px">18 · 16</span><span style="font-size:18px; line-height:1.5; color:var(--ink-2)">After a punch-in, the take is already written.</span><span class="use">Body, mobile body</span></div>
+    <div class="r"><span class="tok">--fs-sm / xs</span><span class="px">14 · 12</span><span style="font-family:var(--mono); font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3)">Mac AU + VST3 · Logic</span><span class="use">Eyebrows, fine print, nav</span></div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="row" style="gap:48px; flex-wrap:nowrap">
+    <div class="col">
+      <span class="label">Temporal Hierarchy · plugin sizes</span>
+      <div class="hier">
+        <div class="l p">late night in the booth red light on the wall</div>
+        <div class="l p">punch it back to the top I don’t miss the call</div>
+        <div class="l t">every word I drop <em>lands</em> right where it should</div>
+        <div class="l">pen it down run it back make it understood</div>
+      </div>
+    </div>
+    <div class="rules">
+      <div class="rule"><b>Numbers are mono</b><p>Bar, beat, BPM, time, counts. Always tabular so the clock never jitters as digits change.</p></div>
+      <div class="rule"><b>Caps are mono</b><p>Uppercase lives only in mono labels and Archivo display. Sans text is sentence case.</p></div>
+      <div class="rule"><b>Lyrics are lowercase as sung</b><p>The transcript keeps the engine’s case. The Pad title may be caps; the lines stay as sung.</p></div>
+      <div class="rule"><b>No webfonts in the DAW</b><p>WKWebView in Logic loads nothing remote. Anything branded inside the plugin is SVG.</p></div>
+      <div class="rule"><b>Display is a poster</b><p>Archivo appears once or twice per screen: a headline, a section title. Never for UI controls.</p></div>
+      <div class="rule"><b>Say what happens</b><p>Buttons name the action: Apply, Send code, Return to live, Copy position. Status copy says what the engine is doing.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer class="board-foot"><span>Punch2Pen design system</span><span>Archivo is licensed under the SIL Open Font License</span></footer>
+</body>
+</html>
