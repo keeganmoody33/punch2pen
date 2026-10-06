@@ -7,10 +7,10 @@
   "preview_urls": true,
   "observability": { "enabled": true },
   // PostHog project token is public by design (it ships in every page). POSTHOG_HOST
-  // switches to https://flow.punch2pen.com once that managed-proxy CNAME is live.
+  // is the PostHog managed reverse proxy (CNAME flow -> proxyhog, DNS only).
   "vars": {
     "POSTHOG_KEY": "phc_OkIBjdD7uPJfUGtLkYzBbNYZQhQMY7cDbr1U28Tll9t",
-    "POSTHOG_HOST": "https://us.i.posthog.com"
+    "POSTHOG_HOST": "https://flow.punch2pen.com"
   },
   "assets": {
     "directory": "./public",
